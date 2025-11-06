@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ollama Web</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+  </head>
+  <body>
+    <div id="app" class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-logo">Siret</span>
+        </div>
+
+        <button id="new-conversation" class="new-conversation-button">
+          <span class="icon">＋</span>
+          Nueva conversación
+        </button>
+
+        <section class="conversation-section" aria-label="Conversaciones recientes">
+          <header class="conversation-header">
+            <h2>Recientes</h2>
+          </header>
+          <ul id="conversation-list" class="conversation-list"></ul>
+        </section>
+
+        <footer class="sidebar-footer">
+          <div class="user-card">
+            <div class="avatar">M</div>
+            <div class="user-info">
+              <p class="user-name">David N. Mitrică</p>
+            </div>
+            <span class="chevron">▼</span>
+          </div>
+        </footer>
+      </aside>
+
+      <div class="main-column">
+        <div class="starry-background">
+          <span class="star star-1">✦</span>
+          <span class="star star-2">✧</span>
+          <span class="star star-3">✦</span>
+          <span class="star star-4">✧</span>
+          <span class="star star-5">✦</span>
+          <span class="star star-6">✧</span>
+          <span class="star star-7">✦</span>
+          <span class="star star-8">✧</span>
+          <span class="star star-9">✦</span>
+          <span class="star star-10">✧</span>
+          <span class="star star-11">✦</span>
+          <span class="star star-12">✧</span>
+          <span class="star star-13">✦</span>
+          <span class="star star-14">✧</span>
+          <span class="star star-15">✦</span>
+          <span class="star star-16">✧</span>
+          <span class="star star-17">✦</span>
+          <span class="star star-18">✧</span>
+          <span class="star star-19">✦</span>
+          <span class="star star-20">✧</span>
+          <span class="star star-21">✦</span>
+          <span class="star star-22">✧</span>
+          <span class="star star-23">✦</span>
+          <span class="star star-24">✧</span>
+          <span class="star star-25">✦</span>
+          <span class="star star-26">✧</span>
+          <span class="star star-27">✦</span>
+          <span class="star star-28">✧</span>
+          <span class="star star-29">✦</span>
+          <span class="star star-30">✧</span>
+          <span class="star star-31">✦</span>
+          <span class="star star-32">✧</span>
+          <span class="star star-33">✦</span>
+          <span class="star star-34">✧</span>
+          <span class="star star-35">✦</span>
+          <span class="star star-36">✧</span>
+          <span class="star star-37">✦</span>
+          <span class="star star-38">✧</span>
+          <span class="star star-39">✦</span>
+          <span class="star star-40">✧</span>
+          <span class="star star-41">✦</span>
+          <span class="star star-42">✧</span>
+          <span class="star star-43">✦</span>
+          <span class="star star-44">✧</span>
+          <span class="star star-45">✦</span>
+          <span class="star star-46">✧</span>
+          <span class="star star-47">✦</span>
+          <span class="star star-48">✧</span>
+          <span class="star star-49">✦</span>
+          <span class="star star-50">✧</span>
+        </div>
+        <div id="empty-state" class="empty-state">
+          <div class="greeting">
+            <h1>Buenas noches, <span class="user-name">David</span></h1>
+            <p class="subtitle">¿Cómo puedo ayudarle hoy?</p>
+          </div>
+
+          <div class="main-composer">
+            <form id="chat-form">
+              <div class="input-wrapper">
+                <textarea id="prompt-input" name="prompt" rows="1" placeholder="¿Cómo puedo ayudarle hoy?" autocomplete="off"></textarea>
+                <div class="input-controls">
+                  <div class="input-controls-right">
+                    <div class="model-select-wrapper">
+                      <select id="model-select" name="model" class="model-select"></select>
+                    </div>
+                    <button class="send-button" type="submit" title="Enviar">↑</button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+
+        </div>
+
+        <div id="chat-state" class="chat-state" style="display: none;">
+          <header class="chat-header">
+            <div>
+              <h2 id="conversation-title">Nueva conversación</h2>
+            </div>
+            <div class="chat-actions">
+              <button id="rename-conversation" class="icon-button" type="button" title="Renombrar conversación">✎</button>
+              <button id="delete-conversation" class="icon-button" type="button" title="Eliminar conversación">🗑</button>
+            </div>
+          </header>
+          <main class="chat-area" aria-live="polite">
+            <ul id="chat-list" class="chat-list"></ul>
+          </main>
+          <footer class="composer">
+            <form id="chat-form-inline">
+              <div class="input-wrapper">
+                <textarea id="prompt-input-inline" name="prompt" rows="1" placeholder="Escribe tu mensaje..." autocomplete="off"></textarea>
+                <div class="input-controls">
+                  <div class="input-controls-right">
+                    <div class="model-select-wrapper">
+                      <select id="model-select-inline" name="model" class="model-select"></select>
+                    </div>
+                    <button class="send-button" type="submit" title="Enviar">↑</button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </footer>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
+
