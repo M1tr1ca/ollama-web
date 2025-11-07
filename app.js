@@ -888,3 +888,95 @@ function init() {
 
 document.addEventListener('DOMContentLoaded', init);
 
+// ========================================================================
+// Sistema de fondos artísticos - Cambio diario
+// ========================================================================
+
+const artisticBackgrounds = [
+  './Photos/wallpaper1.jpg',
+  './Photos/wallpaper2.jpg',
+  './Photos/El Puente Japonés (El Estanque de Nenúfares)-4fu0WvfYzycOaMPCIv8h-4k.jpg',
+  './Photos/Juan les Pins-Bm2sDPUlIC9RaBO64j4R-4k.jpg',
+  './Photos/Casa de pescador en Petit Ailly-81LyN1qySPHOjUlgb1BE-4k.jpg',
+  './Photos/Álamos en el Epte-6mRZ3ln8QjrokwBNAkwz-4k.jpg',
+  './Photos/Marino-EJe2s7X77M2ImT8rEVJx-hd-png.png'
+];
+
+function getDailyBackgroundIndex() {
+  // Obtener el día del año (1-365/366)
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now - start;
+  const oneDay = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDay);
+  
+  // Usar el día del año para seleccionar la imagen
+  return dayOfYear % artisticBackgrounds.length;
+}
+
+function setDailyBackground() {
+  const body = document.body;
+  const dailyIndex = getDailyBackgroundIndex();
+  const dailyImage = artisticBackgrounds[dailyIndex];
+  
+  body.style.setProperty('--background-image', `url('${dailyImage}')`);
+  
+  console.log(`🎨 Fondo artístico del día: ${dailyImage.split('/').pop()}`);
+}
+
+// Establecer el fondo del día al cargar
+setDailyBackground();
+
+// Verificar cambio de día cada hora (por si la página queda abierta)
+setInterval(() => {
+  setDailyBackground();
+}, 1000 * 60 * 60); // Cada hora
+
+// ========================================================================
+// Sistema de alternado de barra lateral
+// ========================================================================
+
+const toggleSidebarButton = document.getElementById('toggle-sidebar');
+const closeSidebarButton = document.getElementById('close-sidebar');
+const layoutContainer = document.getElementById('app');
+const SIDEBAR_STATE_KEY = 'ollama-web-sidebar-visible';
+
+function loadSidebarState() {
+  if (!hasLocalStorage) return true;
+  try {
+    const savedState = window.localStorage.getItem(SIDEBAR_STATE_KEY);
+    return savedState === null ? true : savedState === 'true';
+  } catch (error) {
+    return true;
+  }
+}
+
+function saveSidebarState(isVisible) {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(SIDEBAR_STATE_KEY, isVisible.toString());
+  } catch (error) {
+    console.warn('No se pudo guardar el estado de la barra lateral', error);
+  }
+}
+
+function toggleSidebar() {
+  const isHidden = layoutContainer.classList.toggle('sidebar-hidden');
+  saveSidebarState(!isHidden);
+}
+
+// Inicializar el estado de la barra lateral
+function initSidebar() {
+  const isVisible = loadSidebarState();
+  if (!isVisible) {
+    layoutContainer.classList.add('sidebar-hidden');
+  }
+}
+
+// Agregar event listeners a ambos botones
+toggleSidebarButton?.addEventListener('click', toggleSidebar);
+closeSidebarButton?.addEventListener('click', toggleSidebar);
+
+// Inicializar al cargar
+initSidebar();
+
