@@ -1201,3 +1201,153 @@ body::after {
     justify-content: center;
   }
 }
+
+/* New Perplexity-like Search UI */
+.search-process-container {
+  max-width: 900px;
+  margin: 0 auto 24px;
+  padding: 16px;
+  font-family: 'Inter', sans-serif;
+  color: #f5f5f5;
+}
+
+.search-step {
+  margin-bottom: 20px;
+}
+
+.step-status {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.step-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.step-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #d97757;
+  animation: pulse 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.8; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+.search-query-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  background: rgba(40, 40, 40, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.query-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.1);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#search-query-text {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sources-section {
+  padding: 16px;
+  background: rgba(30, 25, 35, 0.7);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sources-header {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #d97757;
+}
+
+.sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.sources-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sources-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.source-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+
+.source-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.source-favicon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.source-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.source-title {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source-hostname {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  white-space: nowrap;
+}

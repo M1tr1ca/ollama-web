@@ -64,6 +64,10 @@
                     <div class="model-select-wrapper">
                       <select id="model-select" name="model" class="model-select"></select>
                     </div>
+                    <div class="search-toggle-wrapper">
+                      <input type="checkbox" id="search-toggle" class="search-toggle" title="Activar/desactivar búsqueda web">
+                      <label for="search-toggle">Búsqueda web</label>
+                    </div>
                     <button class="send-button" type="submit" title="Enviar">↑</button>
                   </div>
                 </div>
@@ -84,6 +88,25 @@
             </div>
           </header>
           <main class="chat-area" aria-live="polite">
+            <div id="search-process-container" class="search-process-container" style="display: none;">
+              <div class="search-step">
+                <span class="step-status">1 paso completado</span>
+                <div class="step-title">
+                  <span class="step-icon"></span>
+                  Searching the web
+                </div>
+              </div>
+              <div class="search-query-display">
+                <span class="query-icon">Q</span>
+                <span id="search-query-text"></span>
+              </div>
+              <div class="sources-section">
+                <div id="sources-header" class="sources-header">
+                  Revisando fuentes · <span id="sources-count">0</span>
+                </div>
+                <div id="sources-list" class="sources-list"></div>
+              </div>
+            </div>
             <ul id="chat-list" class="chat-list"></ul>
           </main>
           <footer class="composer">
@@ -95,6 +118,10 @@
                     <div class="model-select-wrapper">
                       <select id="model-select-inline" name="model" class="model-select"></select>
                     </div>
+                    <div class="search-toggle-wrapper">
+                      <input type="checkbox" id="search-toggle-inline" class="search-toggle" title="Activar/desactivar búsqueda web">
+                      <label for="search-toggle-inline">Búsqueda web</label>
+                    </div>
                     <button class="send-button" type="submit" title="Enviar">↑</button>
                   </div>
                 </div>
@@ -104,7 +131,7 @@
         </div>
       </div>
     </div>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>
 

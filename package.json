@@ -4,7 +4,9 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev:frontend": "vite",
+    "dev:backend": "node server.js",
+    "dev": "npm-run-all --parallel dev:frontend dev:backend",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -12,6 +14,14 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "npm-run-all": "^4.1.5",
     "vite": "^7.2.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "node-fetch": "^3.3.2"
   }
 }
