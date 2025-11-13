@@ -1,6 +1,7 @@
 const API_BASE = 'http://localhost:11434';
 const STORAGE_KEY = 'ollama-web-state-v1';
 const DEFAULT_TITLE = 'Nueva conversación';
+const BACKGROUND_STORAGE_KEY = 'ollama-web-background-date';
 
 const chatList = document.getElementById('chat-list');
 const chatForm = document.getElementById('chat-form');
@@ -886,5 +887,149 @@ function init() {
   deleteConversationButton?.addEventListener('click', handleDeleteActive);
 }
 
-document.addEventListener('DOMContentLoaded', init);
+// Sistema de fondo con imágenes diarias
+const PHOTOS = [
+  'photo/Álamos en el Epte-6mRZ3ln8QjrokwBNAkwz-4k.jpg',
+  'photo/Juan les Pins-Bm2sDPUlIC9RaBO64j4R-4k.jpg',
+  'photo/Marino-EJe2s7X77M2ImT8rEVJx-hd-png.png',
+  'photo/wallpaper1.jpg',
+  'photo/wallpaper2.jpg'
+];
+
+function getTodayDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function shouldChangeBackground() {
+  const storedDate = localStorage.getItem(BACKGROUND_STORAGE_KEY);
+  const today = getTodayDateString();
+  const now = new Date();
+  const hour = now.getHours();
+  
+  // Si no hay fecha guardada o es un día diferente, cambiar
+  if (!storedDate || storedDate !== today) {
+    return true;
+  }
+  
+  // Si es después de las 12 PM y aún no se ha cambiado hoy después de las 12 PM
+  if (hour >= 12) {
+    const lastChangeHour = localStorage.getItem('ollama-web-background-hour');
+    const lastChangeDate = localStorage.getItem(BACKGROUND_STORAGE_KEY);
+    
+    // Si la última vez que cambió fue antes de las 12 PM de hoy, cambiar
+    if (!lastChangeHour || parseInt(lastChangeHour) < 12 || lastChangeDate !== today) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+function selectDailyImage() {
+  const today = getTodayDateString();
+  const now = new Date();
+  
+  // Usar la fecha como semilla para seleccionar una imagen consistente durante el día
+  // Si es después de las 12 PM, usar el día siguiente para la selección
+  let dateForSelection = today;
+  if (now.getHours() >= 12) {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+    dateForSelection = `${year}-${month}-${day}`;
+  }
+  
+  const dateSeed = parseInt(dateForSelection.replace(/-/g, '')) % PHOTOS.length;
+  const selectedIndex = dateSeed;
+  
+  // Guardar la fecha y hora del cambio
+  localStorage.setItem(BACKGROUND_STORAGE_KEY, today);
+  localStorage.setItem('ollama-web-background-hour', String(now.getHours()));
+  
+  return PHOTOS[selectedIndex];
+}
+
+function setBackgroundImage() {
+  const backgroundElement = document.getElementById('background-image');
+  if (!backgroundElement) return;
+  
+  if (shouldChangeBackground()) {
+    const imagePath = selectDailyImage();
+    backgroundElement.style.backgroundImage = `url('${imagePath}')`;
+  } else {
+    // Usar la imagen guardada
+    const storedImage = localStorage.getItem('ollama-web-background-image');
+    if (storedImage) {
+      backgroundElement.style.backgroundImage = `url('${storedImage}')`;
+    } else {
+      const imagePath = selectDailyImage();
+      backgroundElement.style.backgroundImage = `url('${imagePath}')`;
+    }
+  }
+  
+  // Guardar la imagen actual
+  const currentImage = backgroundElement.style.backgroundImage.match(/url\(['"]?([^'"]+)['"]?\)/)?.[1];
+  if (currentImage) {
+    localStorage.setItem('ollama-web-background-image', currentImage);
+  }
+}
+
+function getGreetingMessage() {
+  const now = new Date();
+  const hour = now.getHours();
+  
+  let greeting, subtitle;
+  
+  if (hour >= 6 && hour < 12) {
+    // Mañana: 6:00 - 11:59
+    greeting = 'Buenos días';
+    subtitle = '¿En qué puedo ayudarte esta mañana?';
+  } else if (hour >= 12 && hour < 20) {
+    // Tarde: 12:00 - 19:59
+    greeting = 'Buenas tardes';
+    subtitle = '¿Cómo puedo ayudarte esta tarde?';
+  } else {
+    // Noche: 20:00 - 5:59
+    greeting = 'Buenas noches';
+    subtitle = '¿Cómo puedo ayudarte esta noche?';
+  }
+  
+  return { greeting, subtitle };
+}
+
+function updateGreeting() {
+  const greetingElement = document.getElementById('greeting-text');
+  const subtitleElement = document.getElementById('greeting-subtitle');
+  
+  if (!greetingElement || !subtitleElement) return;
+  
+  const { greeting, subtitle } = getGreetingMessage();
+  
+  greetingElement.innerHTML = `${greeting}, <span class="user-name">David</span>`;
+  subtitleElement.textContent = subtitle;
+}
+
+function initBackgroundSystem() {
+  setBackgroundImage();
+  updateGreeting();
+  
+  // Verificar cada minuto si hay que cambiar el fondo (a las 12 PM)
+  setInterval(() => {
+    if (shouldChangeBackground()) {
+      setBackgroundImage();
+    }
+    updateGreeting(); // Actualizar saludo cada minuto por si cambia la hora
+  }, 60000); // Cada minuto
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  initBackgroundSystem();
+});
 

@@ -26,6 +26,7 @@ body {
   grid-template-columns: 260px 1fr;
   height: 100vh;
   overflow: hidden;
+  position: relative;
 }
 
 /* Sidebar */
@@ -38,6 +39,8 @@ body {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  position: relative;
+  z-index: 20;
 }
 
 .sidebar::-webkit-scrollbar {
@@ -296,8 +299,10 @@ body {
 .main-column {
   display: flex;
   flex-direction: column;
-  background: #2b2b2b;
+  background: transparent;
   overflow: hidden;
+  position: relative;
+  z-index: 10;
 }
 
 .top-bar {
@@ -354,91 +359,38 @@ body {
   margin-bottom: 40px;
 }
 
-.starry-background {
+.main-column {
+  position: relative;
+  overflow-y: auto;
+}
+
+.background-image {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
-  z-index: 1;
-  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+  transition: background-image 1s ease-in-out;
 }
 
-/* Estrellas individuales */
-.star {
+.background-image::after {
+  content: '';
   position: absolute;
-  color: rgba(255, 255, 255, 0.8);
-  z-index: 5;
-  animation: twinkle 4s ease-in-out infinite;
-  pointer-events: none;
-  text-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
-}
-
-.star-1 { top: 5%; left: 8%; font-size: 16px; animation-delay: 0s; animation-duration: 3.5s; }
-.star-2 { top: 12%; left: 18%; font-size: 12px; animation-delay: 0.3s; animation-duration: 4.2s; }
-.star-3 { top: 8%; left: 28%; font-size: 14px; animation-delay: 0.6s; animation-duration: 3.8s; }
-.star-4 { top: 15%; left: 38%; font-size: 13px; animation-delay: 0.9s; animation-duration: 4.5s; }
-.star-5 { top: 10%; left: 48%; font-size: 17px; animation-delay: 1.2s; animation-duration: 3.9s; }
-.star-6 { top: 18%; left: 58%; font-size: 11px; animation-delay: 1.5s; animation-duration: 4.1s; }
-.star-7 { top: 7%; left: 68%; font-size: 15px; animation-delay: 1.8s; animation-duration: 3.6s; }
-.star-8 { top: 13%; left: 78%; font-size: 14px; animation-delay: 2.1s; animation-duration: 4.3s; }
-.star-9 { top: 9%; left: 88%; font-size: 12px; animation-delay: 2.4s; animation-duration: 3.7s; }
-.star-10 { top: 16%; left: 95%; font-size: 16px; animation-delay: 2.7s; animation-duration: 4.4s; }
-
-.star-11 { top: 25%; left: 5%; font-size: 13px; animation-delay: 3s; animation-duration: 4s; }
-.star-12 { top: 30%; left: 15%; font-size: 15px; animation-delay: 0.2s; animation-duration: 3.5s; }
-.star-13 { top: 28%; left: 25%; font-size: 11px; animation-delay: 0.5s; animation-duration: 4.2s; }
-.star-14 { top: 32%; left: 35%; font-size: 14px; animation-delay: 0.8s; animation-duration: 3.8s; }
-.star-15 { top: 27%; left: 45%; font-size: 16px; animation-delay: 1.1s; animation-duration: 4.1s; }
-.star-16 { top: 33%; left: 55%; font-size: 12px; animation-delay: 1.4s; animation-duration: 3.9s; }
-.star-17 { top: 29%; left: 65%; font-size: 17px; animation-delay: 1.7s; animation-duration: 4.3s; }
-.star-18 { top: 31%; left: 75%; font-size: 13px; animation-delay: 2s; animation-duration: 3.6s; }
-.star-19 { top: 26%; left: 85%; font-size: 15px; animation-delay: 2.3s; animation-duration: 4.4s; }
-.star-20 { top: 34%; left: 93%; font-size: 14px; animation-delay: 2.6s; animation-duration: 3.7s; }
-
-.star-21 { top: 42%; left: 3%; font-size: 12px; animation-delay: 2.9s; animation-duration: 4s; }
-.star-22 { top: 48%; left: 12%; font-size: 16px; animation-delay: 0.1s; animation-duration: 3.5s; }
-.star-23 { top: 45%; left: 22%; font-size: 13px; animation-delay: 0.4s; animation-duration: 4.2s; }
-.star-24 { top: 50%; left: 32%; font-size: 15px; animation-delay: 0.7s; animation-duration: 3.8s; }
-.star-25 { top: 46%; left: 42%; font-size: 11px; animation-delay: 1s; animation-duration: 4.1s; }
-.star-26 { top: 52%; left: 52%; font-size: 14px; animation-delay: 1.3s; animation-duration: 3.9s; }
-.star-27 { top: 47%; left: 62%; font-size: 17px; animation-delay: 1.6s; animation-duration: 4.3s; }
-.star-28 { top: 49%; left: 72%; font-size: 12px; animation-delay: 1.9s; animation-duration: 3.6s; }
-.star-29 { top: 44%; left: 82%; font-size: 16px; animation-delay: 2.2s; animation-duration: 4.4s; }
-.star-30 { top: 51%; left: 92%; font-size: 13px; animation-delay: 2.5s; animation-duration: 3.7s; }
-
-.star-31 { top: 60%; left: 7%; font-size: 15px; animation-delay: 2.8s; animation-duration: 4s; }
-.star-32 { top: 65%; left: 17%; font-size: 14px; animation-delay: 0.15s; animation-duration: 3.5s; }
-.star-33 { top: 62%; left: 27%; font-size: 12px; animation-delay: 0.45s; animation-duration: 4.2s; }
-.star-34 { top: 68%; left: 37%; font-size: 16px; animation-delay: 0.75s; animation-duration: 3.8s; }
-.star-35 { top: 63%; left: 47%; font-size: 11px; animation-delay: 1.05s; animation-duration: 4.1s; }
-.star-36 { top: 67%; left: 57%; font-size: 13px; animation-delay: 1.35s; animation-duration: 3.9s; }
-.star-37 { top: 61%; left: 67%; font-size: 17px; animation-delay: 1.65s; animation-duration: 4.3s; }
-.star-38 { top: 66%; left: 77%; font-size: 14px; animation-delay: 1.95s; animation-duration: 3.6s; }
-.star-39 { top: 64%; left: 87%; font-size: 15px; animation-delay: 2.25s; animation-duration: 4.4s; }
-.star-40 { top: 69%; left: 95%; font-size: 12px; animation-delay: 2.55s; animation-duration: 3.7s; }
-
-.star-41 { top: 75%; left: 4%; font-size: 16px; animation-delay: 2.85s; animation-duration: 4s; }
-.star-42 { top: 80%; left: 14%; font-size: 13px; animation-delay: 0.25s; animation-duration: 3.5s; }
-.star-43 { top: 78%; left: 24%; font-size: 15px; animation-delay: 0.55s; animation-duration: 4.2s; }
-.star-44 { top: 82%; left: 34%; font-size: 11px; animation-delay: 0.85s; animation-duration: 3.8s; }
-.star-45 { top: 77%; left: 44%; font-size: 14px; animation-delay: 1.15s; animation-duration: 4.1s; }
-.star-46 { top: 83%; left: 54%; font-size: 17px; animation-delay: 1.45s; animation-duration: 3.9s; }
-.star-47 { top: 79%; left: 64%; font-size: 12px; animation-delay: 1.75s; animation-duration: 4.3s; }
-.star-48 { top: 81%; left: 74%; font-size: 16px; animation-delay: 2.05s; animation-duration: 3.6s; }
-.star-49 { top: 76%; left: 84%; font-size: 13px; animation-delay: 2.35s; animation-duration: 4.4s; }
-.star-50 { top: 84%; left: 94%; font-size: 15px; animation-delay: 2.65s; animation-duration: 3.7s; }
-
-@keyframes twinkle {
-  0%, 100% {
-    opacity: 0.2;
-    transform: scale(0.8);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.3);
-  }
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.4) 0%,
+    rgba(0, 0, 0, 0.5) 50%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+  z-index: 1;
 }
 
 /* Matemáticas con KaTeX */
@@ -474,8 +426,9 @@ body {
   font-weight: 300;
   letter-spacing: -0.01em;
   margin: 0 0 10px;
-  color: #e5e5e5;
+  color: #ffffff;
   line-height: 1.2;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
 .greeting .user-name {
@@ -484,8 +437,9 @@ body {
 
 .greeting .subtitle {
   font-size: 16px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.8);
   margin: 0;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
 }
 
 .main-composer {
@@ -716,6 +670,8 @@ body {
   overflow: hidden;
   position: relative;
   z-index: 10;
+  background: rgba(43, 43, 43, 0.7);
+  backdrop-filter: blur(10px);
 }
 
 .chat-header {
@@ -724,6 +680,8 @@ body {
   align-items: center;
   padding: 12px 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(43, 43, 43, 0.85);
+  backdrop-filter: blur(10px);
 }
 
 .chat-header h2 {
@@ -765,6 +723,7 @@ body {
   padding: 24px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  background: rgba(43, 43, 43, 0.5);
 }
 
 .chat-area::-webkit-scrollbar {
@@ -1056,7 +1015,8 @@ body {
 .composer {
   padding: 16px 24px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: #2b2b2b;
+  background: rgba(43, 43, 43, 0.85);
+  backdrop-filter: blur(10px);
 }
 
 .composer .input-wrapper {
