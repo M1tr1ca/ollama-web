@@ -2063,13 +2063,13 @@ function getGreetingMessage() {
 const USER_NAME_STORAGE_KEY = 'ollama-web-user-name';
 
 function getUserName() {
-  if (!hasLocalStorage) return 'David N. Mitrică';
+  if (!hasLocalStorage) return 'Default';
   try {
     const storedName = window.localStorage.getItem(USER_NAME_STORAGE_KEY);
-    return storedName || 'David N. Mitrică';
+    return storedName || 'Default';
   } catch (error) {
     console.warn('No se pudo obtener el nombre del usuario', error);
-    return 'David N. Mitrică';
+    return 'Default';
   }
 }
 
