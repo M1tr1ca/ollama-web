@@ -18,6 +18,9 @@ const deleteConversationButton = document.getElementById('delete-conversation');
 const conversationTitle = document.getElementById('conversation-title');
 const emptyState = document.getElementById('empty-state');
 const chatState = document.getElementById('chat-state');
+const sidebar = document.getElementById('sidebar');
+const toggleSidebarButton = document.getElementById('toggle-sidebar');
+const layout = document.getElementById('app');
 
 const state = {
   conversations: {},
@@ -26,6 +29,12 @@ const state = {
   currentModel: null,
   loading: false,
 };
+
+// Archivos adjuntos por conversación
+const attachedFiles = {};
+
+let currentStreamReader = null;
+let wasCancelled = false;
 
 const hasLocalStorage = (() => {
   try {
@@ -52,11 +61,12 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function createMessage(role, content = '') {
+function createMessage(role, content = '', attachedFilesList = []) {
   return {
     id: generateId('msg'),
     role,
     content,
+    attachedFiles: attachedFilesList,
     createdAt: Date.now(),
   };
 }
@@ -250,6 +260,47 @@ function parseMarkdown(text) {
   return html;
 }
 
+function getFileExtension(filename) {
+  return filename.split('.').pop().toUpperCase();
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function createFileAttachmentElement(file) {
+  const fileExt = getFileExtension(file.name);
+  const fileSize = formatFileSize(file.size);
+  
+  // Si es una imagen, mostrar la miniatura
+  if (file.isImage && file.content) {
+    return `
+      <div class="message-attachment message-attachment-image">
+        <img src="${file.content}" alt="${escapeHtml(file.name)}" class="attachment-image-preview" />
+        <div class="attachment-info">
+          <div class="attachment-name">${escapeHtml(file.name)}</div>
+          <div class="attachment-size">${fileSize}</div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Para otros archivos, mostrar el icono normal
+  return `
+    <div class="message-attachment">
+      <div class="attachment-icon attachment-${fileExt.toLowerCase()}">
+        <span class="attachment-ext">${fileExt}</span>
+      </div>
+      <div class="attachment-info">
+        <div class="attachment-name">${escapeHtml(file.name)}</div>
+        <div class="attachment-size">${fileSize}</div>
+      </div>
+    </div>
+  `;
+}
+
 function appendMessageElement(message) {
   const li = document.createElement('li');
   li.className = `message ${message.role}`;
@@ -262,6 +313,13 @@ function appendMessageElement(message) {
   bubble.className = 'message-bubble';
   
   let content = '';
+  
+  // Agregar archivos adjuntos si existen (solo para mensajes del usuario)
+  if (message.attachedFiles && message.attachedFiles.length > 0 && message.role === 'user') {
+    message.attachedFiles.forEach(file => {
+      content += createFileAttachmentElement(file);
+    });
+  }
   
   // Agregar bloque de pensamiento si existe
   if (message.thinking && message.role === 'assistant') {
@@ -308,6 +366,7 @@ function renderActiveConversation() {
     conversation.messages.forEach((message) => appendMessageElement(message));
   }
   conversationTitle.textContent = conversation.title ?? DEFAULT_TITLE;
+  updateAttachmentsBadge(); // Actualizar badge al cambiar de conversación
 }
 
 function showEmptyState() {
@@ -390,8 +449,12 @@ function renderConversationList() {
 function setActiveConversation(id) {
   if (!state.conversations[id]) return;
   state.activeId = id;
+  if (!attachedFiles[id]) {
+    attachedFiles[id] = [];
+  }
   renderConversationList();
   renderActiveConversation();
+  renderAttachedFiles();
   persistState();
 }
 
@@ -405,6 +468,7 @@ function createConversation() {
     messages: [],
   };
   state.conversations[id] = conversation;
+  attachedFiles[id] = []; // Inicializar array de archivos para esta conversación
   touchConversation(id);
   setActiveConversation(id);
   if (promptInput) promptInput.focus();
@@ -467,8 +531,15 @@ function createThinkingBlock(thinking, duration = null, isLoading = false) {
     `;
   }
   
+  // Si hay thinking real (no solo el mensaje genérico), expandirlo por defecto
+  const hasRealThinking = thinking && 
+    !thinking.includes('Procesó la solicitud en') && 
+    thinking.trim().length > 0;
+  
+  const expandedClass = hasRealThinking ? 'expanded' : '';
+  
   return `
-    <div class="thinking-block" onclick="this.classList.toggle('expanded')">
+    <div class="thinking-block ${expandedClass}" onclick="this.classList.toggle('expanded')">
       <div class="thinking-header">
         <span class="thinking-icon">⚛</span>
         <span class="thinking-title">Pensó durante ${durationText || '...'}</span>
@@ -481,7 +552,11 @@ function createThinkingBlock(thinking, duration = null, isLoading = false) {
   `;
 }
 
-function updateAssistantBubble(bubble, text, thinkingData = null) {
+// Variable para rastrear si necesitamos scroll
+let lastScrollTime = 0;
+const SCROLL_INTERVAL = 100; // Scroll máximo cada 100ms
+
+function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = false) {
   if (!bubble) return;
   
   let content = '';
@@ -500,10 +575,14 @@ function updateAssistantBubble(bubble, text, thinkingData = null) {
     content += parseMarkdown(text);
   }
   
+  // Usar requestAnimationFrame para actualizar el DOM de forma más eficiente
+  requestAnimationFrame(() => {
   bubble.innerHTML = content;
   
-  // Renderizar matemáticas con KaTeX
-  if (typeof renderMathInElement !== 'undefined') {
+    // Renderizar matemáticas con KaTeX solo si hay contenido
+    if (content && typeof renderMathInElement !== 'undefined') {
+      // Usar setTimeout para no bloquear el frame principal
+      setTimeout(() => {
     renderMathInElement(bubble, {
       delimiters: [
         {left: '$$', right: '$$', display: true},
@@ -511,9 +590,18 @@ function updateAssistantBubble(bubble, text, thinkingData = null) {
       ],
       throwOnError: false
     });
+      }, 0);
   }
   
+    // Scroll solo si ha pasado suficiente tiempo y no se debe saltar
+    if (!skipScroll) {
+      const now = Date.now();
+      if (now - lastScrollTime >= SCROLL_INTERVAL) {
   scrollChatToBottom();
+        lastScrollTime = now;
+      }
+    }
+  });
 }
 
 function syncModelSelects() {
@@ -653,21 +741,87 @@ async function streamAssistantResponse(conversation, payloadMessages) {
     messages: payloadMessages,
   };
 
+  // Log para depuración (solo mostrar estructura, no el contenido completo de imágenes)
+  console.log('Enviando mensajes al modelo:', {
+    model: body.model,
+    messageCount: body.messages.length,
+    messages: body.messages.map(msg => ({
+      role: msg.role,
+      contentLength: msg.content?.length || 0,
+      hasImages: !!msg.images,
+      imageCount: msg.images?.length || 0,
+      firstImageLength: msg.images?.[0]?.length || 0
+    }))
+  });
+
   const response = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 
-  if (!response.ok || !response.body) {
-    throw new Error(`Error al consultar el modelo: ${response.statusText}`);
+  if (!response.ok) {
+    let errorText = '';
+    try {
+      errorText = await response.text();
+    } catch (e) {
+      // Si no se puede leer el texto del error, continuar
+    }
+    console.error('Error del servidor:', response.status, response.statusText, errorText);
+    throw new Error(`Error al consultar el modelo: ${response.statusText}. ${errorText.substring(0, 200)}`);
+  }
+  
+  if (!response.body) {
+    throw new Error('No se recibió respuesta del servidor');
   }
 
   const reader = response.body.getReader();
+  currentStreamReader = reader; // Guardar el reader para poder cancelarlo
+  updateSendButtonToStop();
+  
   const decoder = new TextDecoder();
   let buffer = '';
   let isFirstChunk = true;
   let thinkingComplete = false;
+  wasCancelled = false; // Resetear el flag de cancelación
+  
+  // Sistema de batching para actualizaciones suaves
+  let pendingUpdate = false;
+  let updateScheduled = false;
+  let lastUpdateTime = 0;
+  const UPDATE_INTERVAL = 16; // ~60fps (16ms)
+  const BATCH_SIZE = 50; // Número de caracteres antes de forzar actualización
+  
+  // Función para programar actualización del DOM
+  const scheduleUpdate = () => {
+    if (updateScheduled) return;
+    updateScheduled = true;
+    
+    requestAnimationFrame(() => {
+      updateScheduled = false;
+      const now = Date.now();
+      
+      // Solo actualizar si ha pasado suficiente tiempo o hay mucho contenido pendiente
+      const currentTextLength = bubble.textContent?.length || 0;
+      const contentDiff = assistantMessage.content.length - currentTextLength;
+      
+      if (now - lastUpdateTime >= UPDATE_INTERVAL || contentDiff > BATCH_SIZE) {
+        const thinkingData = assistantMessage.thinking ? {
+          thinking: assistantMessage.thinking,
+          duration: assistantMessage.thinkingDuration
+        } : null;
+        
+        // Solo hacer scroll si hay mucho contenido nuevo
+        const skipScroll = contentDiff < 20;
+        updateAssistantBubble(bubble, assistantMessage.content, thinkingData, skipScroll);
+        lastUpdateTime = now;
+        pendingUpdate = false;
+      } else {
+        // Reprogramar si aún no es tiempo
+        scheduleUpdate();
+      }
+    });
+  };
 
   try {
     while (true) {
@@ -687,15 +841,21 @@ async function streamAssistantResponse(conversation, payloadMessages) {
           // Algunos modelos envían esto en diferentes campos
           if (parsed.thinking || parsed.reasoning || parsed.thought) {
             const thinkingText = parsed.thinking || parsed.reasoning || parsed.thought;
+            // Agregar salto de línea si ya hay thinking previo
+            if (assistantMessage.thinking && !assistantMessage.thinking.endsWith('\n')) {
+              assistantMessage.thinking += '\n';
+            }
             assistantMessage.thinking += thinkingText;
             const duration = ((Date.now() - startTime) / 1000).toFixed(0);
             assistantMessage.thinkingDuration = duration;
+            
+            // Actualizar inmediatamente para thinking (con scroll)
             updateAssistantBubble(bubble, assistantMessage.content, {
               thinking: assistantMessage.thinking,
               duration: duration
-            });
+            }, false);
             thinkingComplete = true;
-            persistState();
+            // No persistir en cada chunk de thinking, solo al final
           }
 
           if (parsed.message?.content) {
@@ -703,16 +863,50 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             
             // Detectar si el contenido contiene marcadores de razonamiento
             // Algunos modelos incluyen el razonamiento en el contenido con tags especiales
-            const thinkingMatch = contentChunk.match(/<think>([\s\S]*?)<\/think>/);
-            if (thinkingMatch && thinkingMatch[1]) {
-              assistantMessage.thinking += thinkingMatch[1];
-              const duration = ((Date.now() - startTime) / 1000).toFixed(0);
-              assistantMessage.thinkingDuration = duration;
-              thinkingComplete = true;
-              // Remover el tag de pensamiento del contenido
-              const cleanContent = contentChunk.replace(/<think>[\s\S]*?<\/think>/, '');
-              if (cleanContent.trim()) {
+            // Varios formatos posibles: <think>, <reasoning>, <thought>, etc.
+            const thinkingPatterns = [
+              /<think>([\s\S]*?)<\/think>/i,
+              /<reasoning>([\s\S]*?)<\/reasoning>/i,
+              /<thought>([\s\S]*?)<\/thought>/i,
+              /<think>([\s\S]*?)<\/redacted_reasoning>/i,
+              /\[thinking\]([\s\S]*?)\[\/thinking\]/i,
+              /\[reasoning\]([\s\S]*?)\[\/reasoning\]/i
+            ];
+            
+            let thinkingFound = false;
+            let cleanContent = contentChunk;
+            
+            for (const pattern of thinkingPatterns) {
+              const match = contentChunk.match(pattern);
+              if (match && match[1]) {
+                // Agregar salto de línea si ya hay thinking previo
+                if (assistantMessage.thinking && !assistantMessage.thinking.endsWith('\n')) {
+                  assistantMessage.thinking += '\n';
+                }
+                assistantMessage.thinking += match[1];
+                const duration = ((Date.now() - startTime) / 1000).toFixed(0);
+                assistantMessage.thinkingDuration = duration;
+                thinkingComplete = true;
+                thinkingFound = true;
+                // Remover el tag de pensamiento del contenido
+                cleanContent = contentChunk.replace(pattern, '').trim();
+                break;
+              }
+            }
+            
+            if (thinkingFound) {
+              // Si hay contenido limpio después de extraer el thinking, agregarlo
+              if (cleanContent) {
                 assistantMessage.content += cleanContent;
+                pendingUpdate = true;
+                scheduleUpdate();
+              } else {
+                // Si solo había thinking, actualizar la vista inmediatamente
+                const thinkingData = assistantMessage.thinking ? {
+                  thinking: assistantMessage.thinking,
+                  duration: assistantMessage.thinkingDuration
+                } : null;
+                updateAssistantBubble(bubble, assistantMessage.content, thinkingData, false);
               }
             } else {
               // Si es el primer chunk y no hay pensamiento explícito, registrar el tiempo de primera respuesta
@@ -720,8 +914,9 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                 const duration = ((Date.now() - startTime) / 1000).toFixed(0);
                 assistantMessage.thinkingDuration = duration;
                 
-                // Solo mostrar el indicador de pensamiento si tomó más de 1 segundo
-                if (duration > 1) {
+                // Solo mostrar el indicador de pensamiento genérico si tomó más de 1 segundo
+                // Y NO hay thinking real capturado
+                if (duration > 1 && !assistantMessage.thinking) {
                   assistantMessage.thinking = `Procesó la solicitud en ${duration} segundos antes de responder...`;
                 }
                 
@@ -729,16 +924,11 @@ async function streamAssistantResponse(conversation, payloadMessages) {
               }
               
               assistantMessage.content += contentChunk;
+              pendingUpdate = true;
+              
+              // Programar actualización de forma asíncrona
+              scheduleUpdate();
             }
-            
-            // Actualizar con pensamiento si existe
-            const thinkingData = assistantMessage.thinking ? {
-              thinking: assistantMessage.thinking,
-              duration: assistantMessage.thinkingDuration
-            } : null;
-            
-            updateAssistantBubble(bubble, assistantMessage.content, thinkingData);
-            persistState();
           }
 
           if (parsed.error) {
@@ -746,19 +936,125 @@ async function streamAssistantResponse(conversation, payloadMessages) {
           }
 
           if (parsed.done) {
+            // Actualización final inmediata cuando termina (con scroll)
+            const thinkingData = assistantMessage.thinking ? {
+              thinking: assistantMessage.thinking,
+              duration: assistantMessage.thinkingDuration
+            } : null;
+            
+            updateAssistantBubble(bubble, assistantMessage.content, thinkingData, false);
             conversation.updatedAt = Date.now();
             persistState();
             renderConversationList();
+            currentStreamReader = null;
+            updateStopButtonToSend();
+            // Scroll final garantizado
+            setTimeout(() => scrollChatToBottom(), 0);
             return;
           }
         } catch (parseError) {
           console.warn('No se pudo analizar un fragmento del stream', parseError, line);
         }
       }
+      
+      // Dar tiempo al navegador periódicamente
+      if (Math.random() < 0.1) { // ~10% de las veces
+        await yieldToBrowser();
+      }
+    }
+    
+    // Asegurar última actualización si hay contenido pendiente
+    if (pendingUpdate) {
+      const thinkingData = assistantMessage.thinking ? {
+        thinking: assistantMessage.thinking,
+        duration: assistantMessage.thinkingDuration
+      } : null;
+      updateAssistantBubble(bubble, assistantMessage.content, thinkingData, false);
+      // Scroll final garantizado
+      setTimeout(() => scrollChatToBottom(), 0);
+    }
+  } catch (error) {
+    // Si el error es por cancelación, no lanzarlo
+    if (error.name === 'AbortError' || error.message?.includes('cancel')) {
+      wasCancelled = true;
+    } else {
+      throw error;
     }
   } finally {
-    reader.releaseLock();
+    try {
+      reader.releaseLock();
+    } catch (e) {
+      // Ignorar errores al liberar el lock
+    }
+    currentStreamReader = null;
+    updateStopButtonToSend();
+    
+    // Solo actualizar si fue cancelado y aún no se ha actualizado el bubble
+    if (wasCancelled) {
+      // Verificar si el bubble ya fue actualizado en stopStream
+      const currentContent = bubble?.textContent || '';
+      if (!currentContent.includes('cancelada')) {
+        assistantMessage.content += (assistantMessage.content ? '\n\n' : '') + '⚠️ Respuesta cancelada por el usuario.';
+        updateAssistantBubble(bubble, assistantMessage.content, null);
+        persistState();
+      }
+    }
   }
+}
+
+function stopStream() {
+  if (currentStreamReader) {
+    wasCancelled = true; // Marcar como cancelado antes de cancelar
+    currentStreamReader.cancel();
+    state.loading = false;
+    
+    // Actualizar inmediatamente el bubble para eliminar la animación de carga
+    const chatList = document.getElementById('chat-list');
+    const lastMessage = chatList?.lastElementChild;
+    if (lastMessage) {
+      const bubble = lastMessage.querySelector('.message-bubble');
+      if (bubble) {
+        // Buscar el mensaje de asistente actual en el estado
+        const conversation = state.conversations[state.activeId];
+        if (conversation) {
+          const assistantMessage = conversation.messages[conversation.messages.length - 1];
+          if (assistantMessage && assistantMessage.role === 'assistant') {
+            assistantMessage.content += (assistantMessage.content ? '\n\n' : '') + '⚠️ Respuesta cancelada por el usuario.';
+            updateAssistantBubble(bubble, assistantMessage.content, null);
+            persistState();
+          }
+        }
+      }
+    }
+  }
+}
+
+function updateSendButtonToStop() {
+  const sendButtons = document.querySelectorAll('.send-button');
+  
+  sendButtons.forEach(button => {
+    button.textContent = '■';
+    button.title = 'Detener';
+    button.classList.add('stop-button');
+    button.type = 'button'; // Cambiar a button para evitar submit
+    button.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      stopStream();
+    };
+  });
+}
+
+function updateStopButtonToSend() {
+  const sendButtons = document.querySelectorAll('.send-button');
+  
+  sendButtons.forEach(button => {
+    button.textContent = '↑';
+    button.title = 'Enviar';
+    button.classList.remove('stop-button');
+    button.type = 'submit'; // Volver a submit
+    button.onclick = null;
+  });
 }
 
 async function handleSubmit(event) {
@@ -777,7 +1073,9 @@ async function handleSubmit(event) {
   activeInput.value = '';
   autoResizeTextarea(activeInput);
 
-  const userMessage = createMessage('user', prompt);
+  // Obtener archivos adjuntos de la conversación actual
+  const currentFiles = attachedFiles[conversation.id] || [];
+  const userMessage = createMessage('user', prompt, currentFiles);
   conversation.messages.push(userMessage);
   touchConversation(conversation.id);
   
@@ -792,10 +1090,86 @@ async function handleSubmit(event) {
   persistState();
   renderConversationList();
 
-  const payloadMessages = conversation.messages.map((message) => ({
-    role: message.role,
-    content: message.content,
-  }));
+  // Construir mensajes incluyendo el contexto de archivos adjuntos
+  const payloadMessages = [];
+  
+  // Si hay archivos adjuntos, añadir el contexto al primer mensaje del usuario
+  // Solo añadir el contexto una vez al inicio de la conversación con archivos
+  const hasFiles = attachedFiles[conversation.id] && attachedFiles[conversation.id].length > 0;
+  const isFirstMessageWithFiles = hasFiles && conversation.messages.length === 1;
+  
+  // Separar imágenes de otros archivos
+  const imageFiles = hasFiles ? attachedFiles[conversation.id].filter(f => f.isImage) : [];
+  const textFiles = hasFiles ? attachedFiles[conversation.id].filter(f => !f.isImage) : [];
+  
+  if (hasFiles) {
+    // Construir el contexto de archivos de texto (no imágenes)
+    let contextContent = '';
+    if (textFiles.length > 0) {
+      contextContent = 'Contexto de archivos adjuntos:\n\n';
+      textFiles.forEach(file => {
+      contextContent += `--- Archivo: ${file.name} ---\n${file.content}\n\n`;
+    });
+    }
+    
+    // Si es el primer mensaje, añadir el contexto como mensaje del sistema
+    if (isFirstMessageWithFiles && textFiles.length > 0) {
+      payloadMessages.push({
+        role: 'system',
+        content: contextContent + 'Responde las preguntas del usuario basándote en el contenido de estos archivos cuando sea relevante.'
+      });
+    } else if (textFiles.length > 0) {
+      // Para mensajes posteriores, añadir el contexto al mensaje del usuario actual
+      const lastUserMessage = conversation.messages[conversation.messages.length - 1];
+      if (lastUserMessage && lastUserMessage.role === 'user') {
+        lastUserMessage.content = contextContent + '\n\nPregunta del usuario: ' + lastUserMessage.content;
+      }
+    }
+  }
+  
+  // Añadir los mensajes de la conversación
+  conversation.messages.forEach((message, index) => {
+    const payloadMessage = {
+      role: message.role,
+      content: message.content || '', // Asegurar que siempre haya contenido (aunque sea vacío)
+    };
+    
+    // Solo añadir imágenes al último mensaje del usuario (el mensaje actual)
+    const isLastUserMessage = message.role === 'user' && 
+                              index === conversation.messages.length - 1 &&
+                              imageFiles.length > 0;
+    
+    if (isLastUserMessage) {
+      // Extraer solo el base64 sin el prefijo data:image/...
+      payloadMessage.images = imageFiles.map(file => {
+        // El contenido ya viene como data:image/...;base64,... así que extraemos solo la parte base64
+        if (file.content && file.content.startsWith('data:')) {
+          const base64Part = file.content.split(',')[1]; // Extraer solo la parte después de la coma
+          console.log(`Imagen ${file.name}: base64 length = ${base64Part ? base64Part.length : 0}`);
+          
+          // Validar que el base64 no esté vacío
+          if (!base64Part || base64Part.length === 0) {
+            console.error(`Error: La imagen ${file.name} tiene base64 vacío`);
+            return null;
+          }
+          
+          return base64Part;
+        }
+        console.warn(`Imagen ${file.name} no tiene formato data: correcto`);
+        return file.content;
+      }).filter(img => img !== null); // Filtrar imágenes nulas
+      
+      console.log(`Añadidas ${payloadMessage.images.length} imagen(es) al mensaje del usuario`);
+      
+      // Si no hay contenido de texto pero hay imágenes, agregar un prompt por defecto
+      if (!payloadMessage.content.trim() && payloadMessage.images.length > 0) {
+        payloadMessage.content = 'Describe esta imagen';
+        console.log('No hay texto en el mensaje, agregando prompt por defecto');
+      }
+    }
+    
+    payloadMessages.push(payloadMessage);
+  });
 
   try {
     await streamAssistantResponse(conversation, payloadMessages);
@@ -803,13 +1177,18 @@ async function handleSubmit(event) {
     console.error(error);
     const assistantMessage = conversation.messages[conversation.messages.length - 1];
     if (assistantMessage?.role === 'assistant') {
-      assistantMessage.content = `⚠️ ${error.message}`;
-      const lastBubble = chatList?.lastElementChild?.querySelector('.message-bubble');
-      updateAssistantBubble(lastBubble, assistantMessage.content);
-      persistState();
+      // Solo mostrar error si no fue cancelado por el usuario
+      if (error.name !== 'AbortError' && !error.message.includes('cancel')) {
+        assistantMessage.content = `⚠️ ${error.message}`;
+        const lastBubble = chatList?.lastElementChild?.querySelector('.message-bubble');
+        updateAssistantBubble(lastBubble, assistantMessage.content);
+        persistState();
+      }
     }
   } finally {
     state.loading = false;
+    currentStreamReader = null;
+    updateStopButtonToSend();
   }
 }
 
@@ -841,10 +1220,557 @@ function handleKeyDown(event, form) {
   // Shift+Enter = nueva línea (comportamiento por defecto del textarea)
 }
 
+// Funciones para manejar archivos
+async function readFileAsText(file) {
+  return new Promise(async (resolve, reject) => {
+    // Para archivos muy grandes (>5MB), procesar en chunks
+    const MAX_SYNC_SIZE = 5 * 1024 * 1024; // 5MB
+    
+    if (file.size > MAX_SYNC_SIZE) {
+      // Procesar archivos grandes de forma asíncrona
+      try {
+        const text = await file.text();
+        // Dar tiempo al navegador después de leer archivos grandes
+        await yieldToBrowser();
+        resolve(text);
+      } catch (error) {
+        reject(new Error('Error al leer el archivo grande'));
+      }
+    } else {
+      // Archivos pequeños: procesamiento normal
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (e) => reject(new Error('Error al leer el archivo'));
+    reader.readAsText(file);
+    }
+  });
+}
+
+// Función para esperar a que pdf.js esté cargado
+async function waitForPdfJs(maxAttempts = 50) {
+  for (let i = 0; i < maxAttempts; i++) {
+    if (typeof pdfjsLib !== 'undefined') {
+      return true;
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  return false;
+}
+
+// Función auxiliar para dar tiempo al navegador entre operaciones pesadas
+function yieldToBrowser() {
+  return new Promise(resolve => {
+    // Usar requestIdleCallback si está disponible, sino setTimeout
+    if (window.requestIdleCallback) {
+      requestIdleCallback(() => resolve(), { timeout: 50 });
+    } else {
+      setTimeout(() => resolve(), 10);
+    }
+  });
+}
+
+// Función para extraer texto de un PDF con procesamiento incremental
+async function extractTextFromPDF(file, progressCallback) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Esperar a que pdf.js esté cargado
+      const isLoaded = await waitForPdfJs();
+      if (!isLoaded) {
+        reject(new Error('La biblioteca PDF.js no está cargada. Por favor, recarga la página.'));
+        return;
+      }
+
+      // Configurar el worker de PDF.js
+      if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+
+      // Leer el archivo como ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Cargar el documento PDF
+      const loadingTask = pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        useSystemFonts: true
+      });
+      const pdf = await loadingTask.promise;
+      
+      let fullText = '';
+      const numPages = pdf.numPages;
+      
+      // Extraer texto de cada página con pausas para no bloquear el navegador
+      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+        // Dar tiempo al navegador cada página
+        await yieldToBrowser();
+        
+        // Actualizar progreso si hay callback
+        if (progressCallback) {
+          progressCallback(pageNum, numPages);
+        }
+        
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        
+        // Concatenar el texto de la página, preservando saltos de línea cuando sea apropiado
+        const pageText = textContent.items
+          .map((item, index, array) => {
+            const text = item.str;
+            // Si el siguiente item está en una posición muy diferente, probablemente es una nueva línea
+            if (index < array.length - 1) {
+              const nextItem = array[index + 1];
+              const currentY = item.transform[5];
+              const nextY = nextItem.transform[5];
+              // Si hay una diferencia significativa en Y, agregar salto de línea
+              if (Math.abs(currentY - nextY) > item.height * 0.5) {
+                return text + '\n';
+              }
+            }
+            return text;
+          })
+          .join(' ');
+        
+        fullText += `\n--- Página ${pageNum} de ${numPages} ---\n${pageText}\n`;
+        
+        // Pausa adicional cada 5 páginas para archivos muy grandes
+        if (pageNum % 5 === 0) {
+          await yieldToBrowser();
+        }
+      }
+      
+      if (!fullText.trim()) {
+        reject(new Error('No se pudo extraer texto del PDF. El archivo podría estar escaneado (solo imágenes) o protegido con contraseña.'));
+        return;
+      }
+      
+      resolve(fullText.trim());
+    } catch (error) {
+      console.error('Error al extraer texto del PDF:', error);
+      
+      // Mensajes de error más específicos
+      let errorMessage = 'Error al leer el PDF';
+      if (error.message.includes('password') || error.message.includes('encrypted')) {
+        errorMessage = 'El PDF está protegido con contraseña y no se puede leer.';
+      } else if (error.message.includes('Invalid PDF')) {
+        errorMessage = 'El archivo PDF está dañado o no es válido.';
+      } else {
+        errorMessage = `Error al leer el PDF: ${error.message}`;
+      }
+      
+      reject(new Error(errorMessage));
+    }
+  });
+}
+
+// Función para convertir imagen a base64
+async function convertImageToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      // El resultado ya incluye el prefijo data:image/...
+      resolve(e.target.result);
+    };
+    reader.onerror = (e) => reject(new Error('Error al leer la imagen'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Función para verificar si un archivo es una imagen
+function isImageFile(file) {
+  const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  const fileName = file.name.toLowerCase();
+  
+  return imageTypes.includes(file.type) || 
+         imageExtensions.some(ext => fileName.endsWith(ext));
+}
+
+// Función unificada para leer archivos (texto, PDF o imagen)
+async function readFileContent(file) {
+  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  const isImage = isImageFile(file);
+  
+  if (isImage) {
+    // Para imágenes, devolvemos el base64 directamente
+    return await convertImageToBase64(file);
+  } else if (isPDF) {
+    return await extractTextFromPDF(file, null); // Sin callback de progreso aquí
+  } else {
+    return await readFileAsText(file);
+  }
+}
+
+// Función para crear y mostrar indicador de progreso
+function createProgressIndicator(fileName) {
+  const progressDiv = document.createElement('div');
+  progressDiv.className = 'file-progress-indicator';
+  progressDiv.innerHTML = `
+    <div class="file-progress-content">
+      <div class="file-progress-spinner"></div>
+      <div class="file-progress-text">
+        <div class="file-progress-name">${escapeHtml(fileName)}</div>
+        <div class="file-progress-status">Procesando...</div>
+      </div>
+    </div>
+  `;
+  
+  // Agregar al área de archivos
+  const isEmptyState = emptyState?.style.display !== 'none';
+  const fileList = isEmptyState 
+    ? document.getElementById('file-list')
+    : document.getElementById('file-list-inline');
+  
+  if (fileList) {
+    fileList.appendChild(progressDiv);
+  }
+  
+  return {
+    update: (current, total) => {
+      const statusEl = progressDiv.querySelector('.file-progress-status');
+      if (statusEl) {
+        if (total > 1) {
+          statusEl.textContent = `Procesando página ${current} de ${total}...`;
+        } else {
+          statusEl.textContent = 'Procesando...';
+        }
+      }
+    },
+    complete: () => {
+      progressDiv.remove();
+    },
+    error: (message) => {
+      const statusEl = progressDiv.querySelector('.file-progress-status');
+      if (statusEl) {
+        statusEl.textContent = `Error: ${message}`;
+        statusEl.style.color = '#e74c3c';
+      }
+      setTimeout(() => progressDiv.remove(), 3000);
+    }
+  };
+}
+
+async function handleFiles(files, isInline = false) {
+  if (!state.activeId) return;
+  
+  const fileArray = Array.from(files);
+  const conversationId = state.activeId;
+  
+  // Límites de tamaño
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+  const MAX_PDF_PAGES = 500; // Límite de páginas para PDFs
+  
+  if (!attachedFiles[conversationId]) {
+    attachedFiles[conversationId] = [];
+  }
+  
+  // Procesar archivos uno por uno con pausas entre ellos
+  for (let i = 0; i < fileArray.length; i++) {
+    const file = fileArray[i];
+    
+    try {
+      // Verificar tamaño del archivo
+      if (file.size > MAX_FILE_SIZE) {
+        alert(`El archivo ${file.name} es demasiado grande (${formatFileSize(file.size)}). El tamaño máximo es ${formatFileSize(MAX_FILE_SIZE)}.`);
+        continue;
+      }
+      
+      const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const isImage = isImageFile(file);
+      
+      // Crear indicador de progreso
+      const progress = createProgressIndicator(file.name);
+      
+      if (isPDF) {
+        console.log(`Procesando PDF: ${file.name}...`);
+        
+        // Verificar número de páginas antes de procesar
+        try {
+          const isLoaded = await waitForPdfJs();
+          if (isLoaded) {
+            const arrayBuffer = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+            const pdf = await loadingTask.promise;
+            
+            if (pdf.numPages > MAX_PDF_PAGES) {
+              progress.error(`El PDF tiene demasiadas páginas (${pdf.numPages}). El máximo es ${MAX_PDF_PAGES} páginas.`);
+              alert(`El PDF ${file.name} tiene demasiadas páginas (${pdf.numPages}). El máximo permitido es ${MAX_PDF_PAGES} páginas.`);
+              continue;
+            }
+          }
+        } catch (e) {
+          // Si falla la verificación, continuar de todos modos
+        }
+        
+        // Procesar PDF con callback de progreso
+        const content = await extractTextFromPDF(file, (current, total) => {
+          progress.update(current, total);
+        });
+        
+      attachedFiles[conversationId].push({
+        id: generateId('file'),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        content: content,
+          isImage: false,
+        uploadedAt: Date.now()
+      });
+        
+        progress.complete();
+        console.log(`Archivo ${file.name} procesado correctamente`);
+      } else if (isImage) {
+        console.log(`Procesando imagen: ${file.name}...`);
+        const content = await readFileContent(file);
+        attachedFiles[conversationId].push({
+          id: generateId('file'),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: content,
+          isImage: true,
+          uploadedAt: Date.now()
+        });
+        progress.complete();
+        console.log(`Archivo ${file.name} procesado correctamente`);
+      } else {
+        console.log(`Procesando archivo de texto: ${file.name}...`);
+        const content = await readFileContent(file);
+        attachedFiles[conversationId].push({
+          id: generateId('file'),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: content,
+          isImage: false,
+          uploadedAt: Date.now()
+        });
+        progress.complete();
+        console.log(`Archivo ${file.name} procesado correctamente`);
+      }
+      
+      // Pausa entre archivos para no sobrecargar el navegador
+      if (i < fileArray.length - 1) {
+        await yieldToBrowser();
+      }
+    } catch (error) {
+      console.error(`Error al leer el archivo ${file.name}:`, error);
+      let errorMessage;
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        errorMessage = `Error al leer el PDF ${file.name}: ${error.message}`;
+      } else if (isImageFile(file)) {
+        errorMessage = `Error al leer la imagen ${file.name}: ${error.message}`;
+      } else {
+        errorMessage = `Error al leer el archivo ${file.name}: ${error.message}`;
+      }
+      alert(errorMessage);
+    }
+  }
+  
+  renderAttachedFiles();
+}
+
+function removeFile(fileId) {
+  if (!state.activeId) return;
+  const conversationId = state.activeId;
+  
+  if (attachedFiles[conversationId]) {
+    attachedFiles[conversationId] = attachedFiles[conversationId].filter(f => f.id !== fileId);
+    renderAttachedFiles();
+    // Actualizar el dropdown si está abierto
+    const dropdown = document.getElementById('attachments-dropdown');
+    if (dropdown && dropdown.style.display !== 'none') {
+      showAttachmentsDropdown();
+    }
+  }
+}
+
+function renderAttachedFiles() {
+  if (!state.activeId) return;
+  
+  const conversationId = state.activeId;
+  const files = attachedFiles[conversationId] || [];
+  
+  const isEmptyState = emptyState?.style.display !== 'none';
+  const fileList = isEmptyState 
+    ? document.getElementById('file-list')
+    : document.getElementById('file-list-inline');
+  const fileDropArea = isEmptyState
+    ? document.getElementById('file-drop-area')
+    : document.getElementById('file-drop-area-inline');
+  
+  if (!fileList || !fileDropArea) return;
+  
+  fileList.innerHTML = '';
+  
+  if (files.length > 0) {
+    fileDropArea.classList.add('has-files');
+    
+    files.forEach(file => {
+      const fileItem = document.createElement('div');
+      fileItem.className = 'file-item';
+      
+      // Si es una imagen, mostrar miniatura
+      if (file.isImage && file.content) {
+        const imagePreview = document.createElement('img');
+        imagePreview.src = file.content;
+        imagePreview.className = 'file-item-image';
+        imagePreview.alt = file.name;
+        imagePreview.title = file.name;
+        fileItem.appendChild(imagePreview);
+      }
+      
+      const fileName = document.createElement('span');
+      fileName.className = 'file-item-name';
+      fileName.textContent = file.name;
+      fileName.title = file.name;
+      
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'file-item-remove';
+      removeBtn.textContent = '×';
+      removeBtn.title = 'Eliminar archivo';
+      removeBtn.onclick = () => removeFile(file.id);
+      
+      fileItem.appendChild(fileName);
+      fileItem.appendChild(removeBtn);
+      fileList.appendChild(fileItem);
+    });
+  } else {
+    fileDropArea.classList.remove('has-files');
+  }
+  
+  // Actualizar badge de archivos en el header
+  updateAttachmentsBadge();
+}
+
+function updateAttachmentsBadge() {
+  if (!state.activeId) return;
+  
+  const conversationId = state.activeId;
+  const files = attachedFiles[conversationId] || [];
+  const badge = document.getElementById('attachments-badge');
+  const count = document.getElementById('attachments-count');
+  
+  if (badge && count) {
+    if (files.length > 0) {
+      count.textContent = files.length;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+}
+
+function showAttachmentsDropdown() {
+  if (!state.activeId) return;
+  
+  const conversationId = state.activeId;
+  const files = attachedFiles[conversationId] || [];
+  const dropdown = document.getElementById('attachments-dropdown');
+  const list = document.getElementById('attachments-list');
+  
+  if (!dropdown || !list) return;
+  
+  list.innerHTML = '';
+  
+  if (files.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'attachments-list-item';
+    empty.style.justifyContent = 'center';
+    empty.style.color = 'rgba(255, 255, 255, 0.5)';
+    empty.textContent = 'No hay archivos adjuntos';
+    list.appendChild(empty);
+  } else {
+    files.forEach(file => {
+      const item = document.createElement('div');
+      item.className = 'attachments-list-item';
+      
+      const fileExt = getFileExtension(file.name);
+      const fileSize = formatFileSize(file.size);
+      
+      const icon = document.createElement('div');
+      icon.className = 'attachments-list-item-icon';
+      icon.textContent = fileExt;
+      
+      const info = document.createElement('div');
+      info.className = 'attachments-list-item-info';
+      
+      const name = document.createElement('div');
+      name.className = 'attachments-list-item-name';
+      name.textContent = file.name;
+      name.title = file.name;
+      
+      const size = document.createElement('div');
+      size.className = 'attachments-list-item-size';
+      size.textContent = fileSize;
+      
+      info.appendChild(name);
+      info.appendChild(size);
+      
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'attachments-list-item-remove';
+      removeBtn.textContent = '×';
+      removeBtn.title = 'Eliminar archivo';
+      removeBtn.onclick = (e) => {
+        e.stopPropagation();
+        removeFile(file.id);
+      };
+      
+      item.appendChild(icon);
+      item.appendChild(info);
+      item.appendChild(removeBtn);
+      list.appendChild(item);
+    });
+  }
+  
+  dropdown.style.display = 'flex';
+}
+
+function hideAttachmentsDropdown() {
+  const dropdown = document.getElementById('attachments-dropdown');
+  if (dropdown) {
+    dropdown.style.display = 'none';
+  }
+}
+
+function toggleSidebar() {
+  if (!sidebar || !layout || !toggleSidebarButton) return;
+  
+  const isMinimized = sidebar.classList.toggle('minimized');
+  layout.classList.toggle('sidebar-minimized', isMinimized);
+  
+  // Actualizar el título del botón
+  toggleSidebarButton.title = isMinimized ? 'Expandir barra lateral' : 'Minimizar barra lateral';
+  
+  // Guardar el estado en localStorage
+  if (hasLocalStorage) {
+    try {
+      localStorage.setItem('sidebar-minimized', JSON.stringify(isMinimized));
+    } catch (error) {
+      console.warn('No se pudo guardar el estado del sidebar', error);
+    }
+  }
+}
+
+function loadSidebarState() {
+  if (!sidebar || !layout || !toggleSidebarButton || !hasLocalStorage) return;
+  
+  try {
+    const saved = localStorage.getItem('sidebar-minimized');
+    if (saved === 'true') {
+      sidebar.classList.add('minimized');
+      layout.classList.add('sidebar-minimized');
+      toggleSidebarButton.title = 'Expandir barra lateral';
+    }
+  } catch (error) {
+    console.warn('No se pudo restaurar el estado del sidebar', error);
+  }
+}
+
 function init() {
   if (!chatList) return;
 
   loadState();
+  loadSidebarState();
+  
   if (!state.activeId || !state.conversations[state.activeId]) {
     createConversation();
   } else {
@@ -885,6 +1811,136 @@ function init() {
   newConversationButton?.addEventListener('click', createConversation);
   renameConversationButton?.addEventListener('click', handleRenameActive);
   deleteConversationButton?.addEventListener('click', handleDeleteActive);
+  
+  toggleSidebarButton?.addEventListener('click', toggleSidebar);
+  
+  // Configurar manejo de archivos
+  setupFileHandlers();
+  
+  // Configurar badge de archivos
+  const attachmentsBadge = document.getElementById('attachments-badge');
+  const closeAttachments = document.getElementById('close-attachments');
+  
+  attachmentsBadge?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showAttachmentsDropdown();
+  });
+  
+  closeAttachments?.addEventListener('click', () => {
+    hideAttachmentsDropdown();
+  });
+  
+  // Cerrar dropdown al hacer clic fuera
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('attachments-dropdown');
+    const badge = document.getElementById('attachments-badge');
+    if (dropdown && badge && !dropdown.contains(e.target) && !badge.contains(e.target)) {
+      hideAttachmentsDropdown();
+    }
+  });
+}
+
+function setupFileHandlers() {
+  const fileInput = document.getElementById('file-input');
+  const fileInputInline = document.getElementById('file-input-inline');
+  const attachFileBtn = document.getElementById('attach-file-btn');
+  const attachFileBtnInline = document.getElementById('attach-file-btn-inline');
+  const fileDropArea = document.getElementById('file-drop-area');
+  const fileDropAreaInline = document.getElementById('file-drop-area-inline');
+  
+  // Botones para abrir selector de archivos
+  attachFileBtn?.addEventListener('click', () => fileInput?.click());
+  attachFileBtnInline?.addEventListener('click', () => fileInputInline?.click());
+  
+  // Manejar selección de archivos
+  fileInput?.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      handleFiles(e.target.files, false);
+      e.target.value = ''; // Resetear input
+    }
+  });
+  
+  fileInputInline?.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      handleFiles(e.target.files, true);
+      e.target.value = ''; // Resetear input
+    }
+  });
+  
+  // Drag and drop en empty-state (página principal)
+  if (emptyState) {
+    emptyState.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      emptyState.classList.add('drag-over');
+    });
+    
+    emptyState.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Solo remover si realmente salimos del elemento
+      if (!emptyState.contains(e.relatedTarget)) {
+        emptyState.classList.remove('drag-over');
+      }
+    });
+    
+    emptyState.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      emptyState.classList.remove('drag-over');
+      
+      if (e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files, false);
+      }
+    });
+  }
+  
+  // Drag and drop en chat-state
+  if (chatState) {
+    chatState.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      chatState.classList.add('drag-over');
+    });
+    
+    chatState.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!chatState.contains(e.relatedTarget)) {
+        chatState.classList.remove('drag-over');
+      }
+    });
+    
+    chatState.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      chatState.classList.remove('drag-over');
+      
+      if (e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files, true);
+      }
+    });
+  }
+  
+  // Drag and drop en áreas de archivos (solo cuando hay archivos)
+  [fileDropArea, fileDropAreaInline].forEach(area => {
+    if (!area) return;
+    
+    area.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    
+    area.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (e.dataTransfer.files.length > 0) {
+        const isInline = area === fileDropAreaInline;
+        handleFiles(e.dataTransfer.files, isInline);
+      }
+    });
+  });
 }
 
 // Sistema de fondo con imágenes diarias
@@ -1003,6 +2059,29 @@ function getGreetingMessage() {
   return { greeting, subtitle };
 }
 
+// Funciones para manejar el nombre del usuario
+const USER_NAME_STORAGE_KEY = 'ollama-web-user-name';
+
+function getUserName() {
+  if (!hasLocalStorage) return 'David N. Mitrică';
+  try {
+    const storedName = window.localStorage.getItem(USER_NAME_STORAGE_KEY);
+    return storedName || 'David N. Mitrică';
+  } catch (error) {
+    console.warn('No se pudo obtener el nombre del usuario', error);
+    return 'David N. Mitrică';
+  }
+}
+
+function saveUserName(name) {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(USER_NAME_STORAGE_KEY, name);
+  } catch (error) {
+    console.warn('No se pudo guardar el nombre del usuario', error);
+  }
+}
+
 function updateGreeting() {
   const greetingElement = document.getElementById('greeting-text');
   const subtitleElement = document.getElementById('greeting-subtitle');
@@ -1010,8 +2089,10 @@ function updateGreeting() {
   if (!greetingElement || !subtitleElement) return;
   
   const { greeting, subtitle } = getGreetingMessage();
+  const userName = getUserName();
+  const firstName = userName.split(' ')[0];
   
-  greetingElement.innerHTML = `${greeting}, <span class="user-name">David</span>`;
+  greetingElement.innerHTML = `${greeting}, <span class="user-name">${firstName}</span>`;
   subtitleElement.textContent = subtitle;
 }
 
@@ -1028,8 +2109,231 @@ function initBackgroundSystem() {
   }, 60000); // Cada minuto
 }
 
+function updateUserNameDisplay() {
+  const userName = getUserName();
+  const userNameDisplay = document.getElementById('user-name-display');
+  if (userNameDisplay) {
+    userNameDisplay.textContent = userName;
+  }
+  
+  // Actualizar también en el saludo
+  const greetingElement = document.getElementById('greeting-text');
+  if (greetingElement) {
+    const firstName = userName.split(' ')[0];
+    const { greeting } = getGreetingMessage();
+    greetingElement.innerHTML = `${greeting}, <span class="user-name">${firstName}</span>`;
+  }
+  
+  // Actualizar avatar con primera letra
+  const avatar = document.querySelector('.user-card .avatar');
+  if (avatar && userName) {
+    avatar.textContent = userName.charAt(0).toUpperCase();
+  }
+}
+
+function initUserMenu() {
+  const userCard = document.getElementById('user-card');
+  const userMenu = document.getElementById('user-menu');
+  const changeNameBtn = document.getElementById('change-name-btn');
+  const settingsBtn = document.getElementById('settings-btn');
+  const changeNameModal = document.getElementById('change-name-modal');
+  const closeNameModal = document.getElementById('close-name-modal');
+  const cancelNameChange = document.getElementById('cancel-name-change');
+  const saveNameChange = document.getElementById('save-name-change');
+  const newNameInput = document.getElementById('new-name-input');
+  
+  if (!userCard || !userMenu) return;
+  
+  // Toggle del menú al hacer clic en la tarjeta de usuario
+  userCard.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = userMenu.style.display !== 'none';
+    userMenu.style.display = isOpen ? 'none' : 'block';
+    userCard.classList.toggle('active', !isOpen);
+  });
+  
+  // Cerrar menú al hacer clic fuera
+  document.addEventListener('click', (e) => {
+    if (!userCard.contains(e.target) && !userMenu.contains(e.target)) {
+      userMenu.style.display = 'none';
+      userCard.classList.remove('active');
+    }
+  });
+  
+  // Abrir modal de cambio de nombre
+  if (changeNameBtn) {
+    changeNameBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (changeNameModal) {
+        changeNameModal.style.display = 'flex';
+        if (newNameInput) {
+          newNameInput.value = getUserName();
+          setTimeout(() => newNameInput.focus(), 100);
+        }
+        userMenu.style.display = 'none';
+        userCard.classList.remove('active');
+      }
+    });
+  }
+  
+  // Configuración - Abrir modal de temas
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const settingsModal = document.getElementById('settings-modal');
+      if (settingsModal) {
+        settingsModal.style.display = 'flex';
+        userMenu.style.display = 'none';
+        userCard.classList.remove('active');
+        
+        // Marcar el tema actual como seleccionado
+        const currentTheme = getCurrentTheme();
+        const themeOptions = settingsModal.querySelectorAll('.theme-option');
+        themeOptions.forEach(option => {
+          if (option.dataset.theme === currentTheme) {
+            option.classList.add('active');
+          } else {
+            option.classList.remove('active');
+          }
+        });
+      }
+    });
+  }
+  
+  // Cerrar modal
+  const closeModal = () => {
+    if (changeNameModal) {
+      changeNameModal.style.display = 'none';
+      if (newNameInput) {
+        newNameInput.value = '';
+      }
+    }
+  };
+  
+  if (closeNameModal) {
+    closeNameModal.addEventListener('click', closeModal);
+  }
+  
+  if (cancelNameChange) {
+    cancelNameChange.addEventListener('click', closeModal);
+  }
+  
+  // Cerrar modal al hacer clic fuera
+  if (changeNameModal) {
+    changeNameModal.addEventListener('click', (e) => {
+      if (e.target === changeNameModal) {
+        closeModal();
+      }
+    });
+  }
+  
+  // Guardar nombre
+  if (saveNameChange && newNameInput) {
+    saveNameChange.addEventListener('click', () => {
+      const newName = newNameInput.value.trim();
+      if (newName) {
+        saveUserName(newName);
+        updateUserNameDisplay();
+        closeModal();
+      }
+    });
+    
+    // Permitir guardar con Enter
+    newNameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveNameChange.click();
+      }
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    });
+  }
+  
+  // Cargar y mostrar el nombre guardado
+  updateUserNameDisplay();
+  
+  // Inicializar sistema de temas
+  initThemeSystem();
+}
+
+// Sistema de temas
+const THEME_STORAGE_KEY = 'ollama-web-theme';
+
+function getCurrentTheme() {
+  if (!hasLocalStorage) return 'orange';
+  try {
+    return window.localStorage.getItem(THEME_STORAGE_KEY) || 'orange';
+  } catch (error) {
+    console.warn('No se pudo obtener el tema', error);
+    return 'orange';
+  }
+}
+
+function setTheme(themeName) {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, themeName);
+    document.documentElement.setAttribute('data-theme', themeName);
+  } catch (error) {
+    console.warn('No se pudo guardar el tema', error);
+  }
+}
+
+function initThemeSystem() {
+  // Cargar tema guardado
+  const savedTheme = getCurrentTheme();
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  
+  // Configurar modal de temas
+  const settingsModal = document.getElementById('settings-modal');
+  const closeSettingsModal = document.getElementById('close-settings-modal');
+  const closeSettingsBtn = document.getElementById('close-settings-btn');
+  
+  const closeModal = () => {
+    if (settingsModal) {
+      settingsModal.style.display = 'none';
+    }
+  };
+  
+  if (closeSettingsModal) {
+    closeSettingsModal.addEventListener('click', closeModal);
+  }
+  
+  if (closeSettingsBtn) {
+    closeSettingsBtn.addEventListener('click', closeModal);
+  }
+  
+  // Cerrar modal al hacer clic fuera
+  if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) {
+        closeModal();
+      }
+    });
+  }
+  
+  // Manejar selección de temas
+  const themeOptions = settingsModal?.querySelectorAll('.theme-option');
+  if (themeOptions) {
+    themeOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        const themeName = option.dataset.theme;
+        if (themeName) {
+          setTheme(themeName);
+          
+          // Actualizar estado visual
+          themeOptions.forEach(opt => opt.classList.remove('active'));
+          option.classList.add('active');
+        }
+      });
+    });
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init();
   initBackgroundSystem();
+  initUserMenu();
 });
 
