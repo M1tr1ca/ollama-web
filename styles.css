@@ -693,6 +693,31 @@ body {
   color: rgba(255, 255, 255, 0.4);
 }
 
+.modal-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.modal-textarea:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.modal-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
 .modal-footer {
   display: flex;
   gap: 10px;

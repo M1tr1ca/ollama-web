@@ -1093,6 +1093,10 @@ async function handleSubmit(event) {
   // Construir mensajes incluyendo el contexto de archivos adjuntos
   const payloadMessages = [];
   
+  // Agregar información personal del usuario como contexto del sistema (solo en el primer mensaje)
+  const isFirstMessage = conversation.messages.length === 1;
+  const personalInfo = getAIPersonalization();
+  
   // Si hay archivos adjuntos, añadir el contexto al primer mensaje del usuario
   // Solo añadir el contexto una vez al inicio de la conversación con archivos
   const hasFiles = attachedFiles[conversation.id] && attachedFiles[conversation.id].length > 0;
@@ -1102,28 +1106,50 @@ async function handleSubmit(event) {
   const imageFiles = hasFiles ? attachedFiles[conversation.id].filter(f => f.isImage) : [];
   const textFiles = hasFiles ? attachedFiles[conversation.id].filter(f => !f.isImage) : [];
   
-  if (hasFiles) {
-    // Construir el contexto de archivos de texto (no imágenes)
-    let contextContent = '';
-    if (textFiles.length > 0) {
-      contextContent = 'Contexto de archivos adjuntos:\n\n';
-      textFiles.forEach(file => {
-      contextContent += `--- Archivo: ${file.name} ---\n${file.content}\n\n`;
-    });
+  // Construir mensaje del sistema combinando información personal y archivos (solo en el primer mensaje)
+  if (isFirstMessage) {
+    let systemContent = '';
+    
+    // Agregar información personal si existe
+    if (personalInfo.trim()) {
+      systemContent += `Información personal del usuario: ${personalInfo.trim()}\n\n`;
     }
     
-    // Si es el primer mensaje, añadir el contexto como mensaje del sistema
-    if (isFirstMessageWithFiles && textFiles.length > 0) {
-      payloadMessages.push({
-        role: 'system',
-        content: contextContent + 'Responde las preguntas del usuario basándote en el contenido de estos archivos cuando sea relevante.'
+    // Agregar contexto de archivos si existen
+    if (textFiles.length > 0) {
+      systemContent += 'Contexto de archivos adjuntos:\n\n';
+      textFiles.forEach(file => {
+        systemContent += `--- Archivo: ${file.name} ---\n${file.content}\n\n`;
       });
-    } else if (textFiles.length > 0) {
-      // Para mensajes posteriores, añadir el contexto al mensaje del usuario actual
-      const lastUserMessage = conversation.messages[conversation.messages.length - 1];
-      if (lastUserMessage && lastUserMessage.role === 'user') {
-        lastUserMessage.content = contextContent + '\n\nPregunta del usuario: ' + lastUserMessage.content;
+    }
+    
+    // Agregar instrucciones finales
+    if (systemContent) {
+      let instructions = '';
+      if (personalInfo.trim() && textFiles.length > 0) {
+        instructions = 'Ten en cuenta esta información sobre el usuario y el contenido de estos archivos al responder sus preguntas. Proporciona respuestas más personalizadas cuando sea relevante.';
+      } else if (personalInfo.trim()) {
+        instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas y proporciona respuestas más personalizadas cuando sea relevante.';
+      } else if (textFiles.length > 0) {
+        instructions = 'Responde las preguntas del usuario basándote en el contenido de estos archivos cuando sea relevante.';
       }
+      
+      if (instructions) {
+        payloadMessages.push({
+          role: 'system',
+          content: systemContent + instructions
+        });
+      }
+    }
+  } else if (textFiles.length > 0) {
+    // Para mensajes posteriores, añadir el contexto de archivos al mensaje del usuario actual
+    let contextContent = 'Contexto de archivos adjuntos:\n\n';
+    textFiles.forEach(file => {
+      contextContent += `--- Archivo: ${file.name} ---\n${file.content}\n\n`;
+    });
+    const lastUserMessage = conversation.messages[conversation.messages.length - 1];
+    if (lastUserMessage && lastUserMessage.role === 'user') {
+      lastUserMessage.content = contextContent + '\n\nPregunta del usuario: ' + lastUserMessage.content;
     }
   }
   
@@ -2092,6 +2118,28 @@ function saveUserName(name) {
   }
 }
 
+// Funciones para manejar la personalización de IA
+const AI_PERSONALIZATION_STORAGE_KEY = 'ollama-web-ai-personalization';
+
+function getAIPersonalization() {
+  if (!hasLocalStorage) return '';
+  try {
+    return window.localStorage.getItem(AI_PERSONALIZATION_STORAGE_KEY) || '';
+  } catch (error) {
+    console.warn('No se pudo obtener la personalización de IA', error);
+    return '';
+  }
+}
+
+function saveAIPersonalization(info) {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(AI_PERSONALIZATION_STORAGE_KEY, info);
+  } catch (error) {
+    console.warn('No se pudo guardar la personalización de IA', error);
+  }
+}
+
 function updateGreeting() {
   const greetingElement = document.getElementById('greeting-text');
   const subtitleElement = document.getElementById('greeting-subtitle');
@@ -2147,11 +2195,17 @@ function initUserMenu() {
   const settingsMenu = document.getElementById('settings-menu');
   const settingsBtn = document.getElementById('settings-btn');
   const changeNameBtnMenu = document.getElementById('change-name-btn-menu');
+  const aiPersonalizationBtn = document.getElementById('ai-personalization-btn');
   const changeNameModal = document.getElementById('change-name-modal');
   const closeNameModal = document.getElementById('close-name-modal');
   const cancelNameChange = document.getElementById('cancel-name-change');
   const saveNameChange = document.getElementById('save-name-change');
   const newNameInput = document.getElementById('new-name-input');
+  const aiPersonalizationModal = document.getElementById('ai-personalization-modal');
+  const closeAIPersonalizationModal = document.getElementById('close-ai-personalization-modal');
+  const cancelAIPersonalization = document.getElementById('cancel-ai-personalization');
+  const saveAIPersonalizationBtn = document.getElementById('save-ai-personalization');
+  const aiPersonalInfoInput = document.getElementById('ai-personal-info-input');
   
   if (!userCard || !userMenu) return;
   
@@ -2222,8 +2276,27 @@ function initUserMenu() {
     });
   }
   
-  // Cerrar modal
-  const closeModal = () => {
+  // Abrir modal de personalización de IA desde el submenú
+  if (aiPersonalizationBtn) {
+    aiPersonalizationBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (aiPersonalizationModal) {
+        aiPersonalizationModal.style.display = 'flex';
+        if (aiPersonalInfoInput) {
+          aiPersonalInfoInput.value = getAIPersonalization();
+          setTimeout(() => aiPersonalInfoInput.focus(), 100);
+        }
+        if (settingsMenu) {
+          settingsMenu.style.display = 'none';
+        }
+        userMenu.style.display = 'none';
+        userCard.classList.remove('active');
+      }
+    });
+  }
+  
+  // Cerrar modal de cambio de nombre
+  const closeNameModalFunc = () => {
     if (changeNameModal) {
       changeNameModal.style.display = 'none';
       if (newNameInput) {
@@ -2233,18 +2306,45 @@ function initUserMenu() {
   };
   
   if (closeNameModal) {
-    closeNameModal.addEventListener('click', closeModal);
+    closeNameModal.addEventListener('click', closeNameModalFunc);
   }
   
   if (cancelNameChange) {
-    cancelNameChange.addEventListener('click', closeModal);
+    cancelNameChange.addEventListener('click', closeNameModalFunc);
   }
   
-  // Cerrar modal al hacer clic fuera
+  // Cerrar modal de cambio de nombre al hacer clic fuera
   if (changeNameModal) {
     changeNameModal.addEventListener('click', (e) => {
       if (e.target === changeNameModal) {
-        closeModal();
+        closeNameModalFunc();
+      }
+    });
+  }
+  
+  // Cerrar modal de personalización de IA
+  const closeAIPersonalizationModalFunc = () => {
+    if (aiPersonalizationModal) {
+      aiPersonalizationModal.style.display = 'none';
+      if (aiPersonalInfoInput) {
+        aiPersonalInfoInput.value = '';
+      }
+    }
+  };
+  
+  if (closeAIPersonalizationModal) {
+    closeAIPersonalizationModal.addEventListener('click', closeAIPersonalizationModalFunc);
+  }
+  
+  if (cancelAIPersonalization) {
+    cancelAIPersonalization.addEventListener('click', closeAIPersonalizationModalFunc);
+  }
+  
+  // Cerrar modal de personalización de IA al hacer clic fuera
+  if (aiPersonalizationModal) {
+    aiPersonalizationModal.addEventListener('click', (e) => {
+      if (e.target === aiPersonalizationModal) {
+        closeAIPersonalizationModalFunc();
       }
     });
   }
@@ -2256,18 +2356,38 @@ function initUserMenu() {
       if (newName) {
         saveUserName(newName);
         updateUserNameDisplay();
-        closeModal();
+        closeNameModalFunc();
       }
     });
     
     // Permitir guardar con Enter
     newNameInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         saveNameChange.click();
       }
       if (e.key === 'Escape') {
-        closeModal();
+        closeNameModalFunc();
+      }
+    });
+  }
+  
+  // Guardar personalización de IA
+  if (saveAIPersonalizationBtn && aiPersonalInfoInput) {
+    saveAIPersonalizationBtn.addEventListener('click', () => {
+      const personalInfo = aiPersonalInfoInput.value.trim();
+      saveAIPersonalization(personalInfo);
+      closeAIPersonalizationModalFunc();
+    });
+    
+    // Permitir guardar con Ctrl+Enter o Cmd+Enter
+    aiPersonalInfoInput.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        saveAIPersonalizationBtn.click();
+      }
+      if (e.key === 'Escape') {
+        closeAIPersonalizationModalFunc();
       }
     });
   }
