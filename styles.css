@@ -611,6 +611,10 @@ body {
   animation: slideDown 0.2s ease;
 }
 
+.modal-content-compact {
+  max-width: 500px;
+}
+
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -661,6 +665,49 @@ body {
 
 .modal-body {
   padding: 20px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.personalization-section {
+  margin-bottom: 20px;
+}
+
+.personalization-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 8px;
+}
+
+.modal-textarea-compact {
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 70px;
+}
+
+.modal-textarea-compact:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.modal-textarea-compact::placeholder {
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .modal-body label {
@@ -716,6 +763,87 @@ body {
 
 .modal-textarea::placeholder {
   color: rgba(255, 255, 255, 0.4);
+}
+
+/* Selector de estilo */
+.style-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.style-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.style-option {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.style-option-compact {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.style-option:hover,
+.style-option-compact:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.style-option.active,
+.style-option-compact.active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--theme-primary, rgba(255, 255, 255, 0.3));
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05);
+}
+
+.style-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.style-name-compact {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.style-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+}
+
+.style-desc-compact {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.3;
 }
 
 .modal-footer {

@@ -55,7 +55,7 @@
               <span>Cambiar nombre</span>
             </button>
             <button class="user-menu-item" id="ai-personalization-btn">
-              <span class="menu-icon">🧠</span>
+              <span class="menu-icon">✨</span>
               <span>Personalización de IA</span>
             </button>
             <div class="settings-divider"></div>
@@ -103,19 +103,50 @@
         
         <!-- Modal para personalización de IA -->
         <div id="ai-personalization-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content">
+          <div class="modal-content modal-content-compact">
             <div class="modal-header">
               <h3>Personalización de IA</h3>
               <button class="modal-close" id="close-ai-personalization-modal">×</button>
             </div>
             <div class="modal-body">
-              <label for="ai-personal-info-input" style="display: block; margin-bottom: 8px; font-size: 14px; color: rgba(255, 255, 255, 0.9);">
-                Información personal sobre ti:
-              </label>
-              <p style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-bottom: 12px; line-height: 1.5;">
-                Escribe información sobre ti que quieras que la IA conozca. Por ejemplo: "Estudio ingeniería informática", "Trabajo como desarrollador", "Me interesa la inteligencia artificial", etc. Esta información ayudará a la IA a darte respuestas más personalizadas.
-              </p>
-              <textarea id="ai-personal-info-input" class="modal-textarea" rows="6" placeholder="Ejemplo: Estudio ingeniería informática y me interesa el desarrollo de software y la inteligencia artificial..."></textarea>
+              <div class="personalization-section">
+                <label for="ai-personal-info-input" class="section-label">
+                  Información personal
+                </label>
+                <textarea id="ai-personal-info-input" class="modal-textarea-compact" rows="3" placeholder="Ej: Estudio ingeniería informática, trabajo como desarrollador..."></textarea>
+              </div>
+              
+              <div class="personalization-section">
+                <label class="section-label">
+                  Estilo de respuesta
+                </label>
+                <div class="style-selector-grid">
+                  <button class="style-option-compact" data-style="normal">
+                    <span class="style-name-compact">Normal</span>
+                    <span class="style-desc-compact">Deja el modelo como está</span>
+                  </button>
+                  <button class="style-option-compact" data-style="aprendizaje">
+                    <span class="style-name-compact">Aprendizaje</span>
+                    <span class="style-desc-compact">Paciente y educativo</span>
+                  </button>
+                  <button class="style-option-compact" data-style="conciso">
+                    <span class="style-name-compact">Conciso</span>
+                    <span class="style-desc-compact">Respuestas cortas</span>
+                  </button>
+                  <button class="style-option-compact" data-style="explicativo">
+                    <span class="style-name-compact">Explicativo</span>
+                    <span class="style-desc-compact">Didáctico y claro</span>
+                  </button>
+                  <button class="style-option-compact" data-style="formal">
+                    <span class="style-name-compact">Formal</span>
+                    <span class="style-desc-compact">Estructurado</span>
+                  </button>
+                  <button class="style-option-compact" data-style="plan">
+                    <span class="style-name-compact">Plan</span>
+                    <span class="style-desc-compact">Estratégico y detallado</span>
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="modal-footer">
               <button class="modal-button secondary" id="cancel-ai-personalization">Cancelar</button>

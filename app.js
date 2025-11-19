@@ -1106,7 +1106,7 @@ async function handleSubmit(event) {
   const imageFiles = hasFiles ? attachedFiles[conversation.id].filter(f => f.isImage) : [];
   const textFiles = hasFiles ? attachedFiles[conversation.id].filter(f => !f.isImage) : [];
   
-  // Construir mensaje del sistema combinando información personal y archivos (solo en el primer mensaje)
+  // Construir mensaje del sistema combinando información personal, estilo y archivos (solo en el primer mensaje)
   if (isFirstMessage) {
     let systemContent = '';
     
@@ -1123,21 +1123,42 @@ async function handleSubmit(event) {
       });
     }
     
+    // Agregar instrucciones del estilo de respuesta
+    const responseStyle = getAIResponseStyle();
+    const styleInstructions = getStyleInstructions(responseStyle);
+    
     // Agregar instrucciones finales
-    if (systemContent) {
-      let instructions = '';
-      if (personalInfo.trim() && textFiles.length > 0) {
-        instructions = 'Ten en cuenta esta información sobre el usuario y el contenido de estos archivos al responder sus preguntas. Proporciona respuestas más personalizadas cuando sea relevante.';
-      } else if (personalInfo.trim()) {
-        instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas y proporciona respuestas más personalizadas cuando sea relevante.';
-      } else if (textFiles.length > 0) {
-        instructions = 'Responde las preguntas del usuario basándote en el contenido de estos archivos cuando sea relevante.';
+    let instructions = '';
+    if (personalInfo.trim() && textFiles.length > 0) {
+      instructions = 'Ten en cuenta esta información sobre el usuario y el contenido de estos archivos al responder sus preguntas. Proporciona respuestas más personalizadas cuando sea relevante.';
+    } else if (personalInfo.trim()) {
+      instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas y proporciona respuestas más personalizadas cuando sea relevante.';
+    } else if (textFiles.length > 0) {
+      instructions = 'Responde las preguntas del usuario basándote en el contenido de estos archivos cuando sea relevante.';
+    }
+    
+    // Combinar todas las instrucciones
+    if (systemContent || styleInstructions || instructions) {
+      let finalContent = systemContent;
+      
+      if (styleInstructions) {
+        if (finalContent) {
+          finalContent += '\n';
+        }
+        finalContent += `Instrucciones de estilo de respuesta: ${styleInstructions}`;
       }
       
       if (instructions) {
+        if (finalContent) {
+          finalContent += '\n\n';
+        }
+        finalContent += instructions;
+      }
+      
+      if (finalContent.trim()) {
         payloadMessages.push({
           role: 'system',
-          content: systemContent + instructions
+          content: finalContent.trim()
         });
       }
     }
@@ -2140,6 +2161,40 @@ function saveAIPersonalization(info) {
   }
 }
 
+// Funciones para manejar el estilo de respuesta
+const AI_RESPONSE_STYLE_KEY = 'ollama-web-ai-response-style';
+
+function getAIResponseStyle() {
+  if (!hasLocalStorage) return 'normal';
+  try {
+    return window.localStorage.getItem(AI_RESPONSE_STYLE_KEY) || 'normal';
+  } catch (error) {
+    console.warn('No se pudo obtener el estilo de respuesta', error);
+    return 'normal';
+  }
+}
+
+function saveAIResponseStyle(style) {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(AI_RESPONSE_STYLE_KEY, style);
+  } catch (error) {
+    console.warn('No se pudo guardar el estilo de respuesta', error);
+  }
+}
+
+function getStyleInstructions(style) {
+  const styleInstructions = {
+    normal: '',
+    aprendizaje: 'Proporciona respuestas pacientes y educativas que fomenten la comprensión. Explica los conceptos de manera clara y gradual, asegurándote de que el usuario entienda cada paso.',
+    conciso: 'Proporciona respuestas más cortas y directas. Divide información larga en múltiples mensajes más breves cuando sea necesario.',
+    explicativo: 'Proporciona respuestas didácticas para el aprendizaje. Explica el "por qué" detrás de las cosas y ayuda al usuario a entender los conceptos fundamentales.',
+    formal: 'Proporciona respuestas claras y bien estructuradas. Usa un tono profesional y organiza la información de manera lógica y coherente.',
+    plan: 'Deliver meticulously structured, strategic planning with comprehensive goal-oriented thinking. Provide detailed, step-by-step plans with clear objectives and actionable items.'
+  };
+  return styleInstructions[style] || '';
+}
+
 function updateGreeting() {
   const greetingElement = document.getElementById('greeting-text');
   const subtitleElement = document.getElementById('greeting-subtitle');
@@ -2284,14 +2339,39 @@ function initUserMenu() {
         aiPersonalizationModal.style.display = 'flex';
         if (aiPersonalInfoInput) {
           aiPersonalInfoInput.value = getAIPersonalization();
-          setTimeout(() => aiPersonalInfoInput.focus(), 100);
         }
+        
+        // Cargar y marcar el estilo seleccionado
+        const currentStyle = getAIResponseStyle();
+        const styleOptions = aiPersonalizationModal.querySelectorAll('.style-option-compact');
+        styleOptions.forEach(option => {
+          if (option.dataset.style === currentStyle) {
+            option.classList.add('active');
+          } else {
+            option.classList.remove('active');
+          }
+        });
+        
+        setTimeout(() => aiPersonalInfoInput.focus(), 100);
         if (settingsMenu) {
           settingsMenu.style.display = 'none';
         }
         userMenu.style.display = 'none';
         userCard.classList.remove('active');
       }
+    });
+  }
+  
+  // Manejar selección de estilos
+  const styleOptions = aiPersonalizationModal?.querySelectorAll('.style-option-compact');
+  if (styleOptions) {
+    styleOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        // Remover active de todos los botones
+        styleOptions.forEach(opt => opt.classList.remove('active'));
+        // Agregar active al botón seleccionado
+        option.classList.add('active');
+      });
     });
   }
   
@@ -2377,6 +2457,14 @@ function initUserMenu() {
     saveAIPersonalizationBtn.addEventListener('click', () => {
       const personalInfo = aiPersonalInfoInput.value.trim();
       saveAIPersonalization(personalInfo);
+      
+      // Guardar el estilo seleccionado
+      const selectedStyleOption = aiPersonalizationModal?.querySelector('.style-option-compact.active');
+      if (selectedStyleOption) {
+        const selectedStyle = selectedStyleOption.dataset.style || 'normal';
+        saveAIResponseStyle(selectedStyle);
+      }
+      
       closeAIPersonalizationModalFunc();
     });
     
