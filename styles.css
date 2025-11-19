@@ -1435,7 +1435,8 @@ body {
 
 /* Estilos para el dropdown nativo */
 .model-select option {
-  background: #1e1e1e;
+  background: rgba(42, 42, 42, 0.95);
+  backdrop-filter: blur(10px);
   color: rgba(255, 255, 255, 0.9);
   padding: 10px 14px;
   font-size: 13px;
@@ -1448,11 +1449,12 @@ body {
 
 .model-select option:hover {
   background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 1);
 }
 
 .model-select option:checked,
 .model-select option:focus {
-  background: rgba(107, 159, 237, 0.2);
+  background: rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 1);
   font-weight: 500;
 }
