@@ -643,7 +643,6 @@ async function loadModels() {
         
         // Formatear nombre del modelo
         let displayName = model.name;
-        let sizeInfo = '';
         
         // Limpiar el nombre y extraer información
         if (model.name.includes(':')) {
@@ -679,22 +678,7 @@ async function loadModels() {
           displayName = model.name.charAt(0).toUpperCase() + model.name.slice(1);
         }
         
-        // Agregar tamaño de parámetros si está disponible
-        if (model.details?.parameter_size) {
-          const size = model.details.parameter_size;
-          // Convertir tamaños a formato legible
-          if (size.includes('B')) {
-            sizeInfo = ` • ${size}`;
-          } else if (size.includes('M')) {
-            sizeInfo = ` • ${size}`;
-          }
-        } else if (model.size) {
-          // Si tiene tamaño en bytes, convertir
-          const gb = (model.size / (1024 ** 3)).toFixed(1);
-          sizeInfo = ` • ${gb} GB`;
-        }
-        
-        option.textContent = displayName + sizeInfo;
+        option.textContent = displayName;
         select.appendChild(option);
       });
     });
