@@ -1944,10 +1944,20 @@ function setupFileHandlers() {
 }
 
 // Sistema de fondo con imágenes diarias
+// Las fotos se cargan desde la carpeta photo/
 const PHOTOS = [
-  'photo/Álamos en el Epte-6mRZ3ln8QjrokwBNAkwz-4k.jpg',
-  'photo/Juan les Pins-Bm2sDPUlIC9RaBO64j4R-4k.jpg',
+  'photo/Amapolas en Giverny-4PlDWaz5pyPbfHSUZORo-hd-png.png',
+  'photo/Paseo por el acantilado en Pourville-3n9hPIFczHFbyrrqLki8-hd-jpg.jpg',
+  'photo/La Playa en Trouville-JDjJ5hjHafRnEOORxYFH-hd-jpg.jpg',
+  'photo/Puente de Waterloo, Londres, al anochecer-2ZkCL0uZxiZy0h7jcnpQ-hd-jpg.jpg',
+  'photo/La Bahía de Antibes-estQxBHAwAOEt4QSFxZd-hd-png.png',
+  'photo/1884 Calle Romana en Bordighera-XI6oT8T2YW9Uf3S31k7G-hd-jpg.jpg',
+  'photo/Iris en el jardín de Monet-DU9ojbpxI0TpoyKV7M8c-hd-jpg.jpg',
   'photo/Marino-EJe2s7X77M2ImT8rEVJx-hd-png.png',
+  'photo/Álamos en el Epte-6mRZ3ln8QjrokwBNAkwz-4k.jpg',
+  'photo/Casa de pescador en Petit Ailly-81LyN1qySPHOjUlgb1BE-4k.jpg',
+  'photo/El Puente Japonés (El Estanque de Nenúfares)-4fu0WvfYzycOaMPCIv8h-4k.jpg',
+  'photo/Juan les Pins-Bm2sDPUlIC9RaBO64j4R-4k.jpg',
   'photo/wallpaper1.jpg',
   'photo/wallpaper2.jpg'
 ];
@@ -2134,8 +2144,9 @@ function updateUserNameDisplay() {
 function initUserMenu() {
   const userCard = document.getElementById('user-card');
   const userMenu = document.getElementById('user-menu');
-  const changeNameBtn = document.getElementById('change-name-btn');
+  const settingsMenu = document.getElementById('settings-menu');
   const settingsBtn = document.getElementById('settings-btn');
+  const changeNameBtnMenu = document.getElementById('change-name-btn-menu');
   const changeNameModal = document.getElementById('change-name-modal');
   const closeNameModal = document.getElementById('close-name-modal');
   const cancelNameChange = document.getElementById('cancel-name-change');
@@ -2150,19 +2161,51 @@ function initUserMenu() {
     const isOpen = userMenu.style.display !== 'none';
     userMenu.style.display = isOpen ? 'none' : 'block';
     userCard.classList.toggle('active', !isOpen);
+    // Cerrar submenú de configuración si está abierto
+    if (settingsMenu) {
+      settingsMenu.style.display = 'none';
+    }
   });
   
   // Cerrar menú al hacer clic fuera
   document.addEventListener('click', (e) => {
-    if (!userCard.contains(e.target) && !userMenu.contains(e.target)) {
+    if (!userCard.contains(e.target) && !userMenu.contains(e.target) && 
+        (!settingsMenu || !settingsMenu.contains(e.target))) {
       userMenu.style.display = 'none';
       userCard.classList.remove('active');
+      if (settingsMenu) {
+        settingsMenu.style.display = 'none';
+      }
     }
   });
   
-  // Abrir modal de cambio de nombre
-  if (changeNameBtn) {
-    changeNameBtn.addEventListener('click', (e) => {
+  // Configuración - Abrir submenú de configuración
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (settingsMenu) {
+        const isOpen = settingsMenu.style.display !== 'none';
+        settingsMenu.style.display = isOpen ? 'none' : 'block';
+        
+        // Marcar el tema actual como seleccionado
+        if (!isOpen) {
+          const currentTheme = getCurrentTheme();
+          const themeOptions = settingsMenu.querySelectorAll('.theme-option-compact');
+          themeOptions.forEach(option => {
+            if (option.dataset.theme === currentTheme) {
+              option.classList.add('active');
+            } else {
+              option.classList.remove('active');
+            }
+          });
+        }
+      }
+    });
+  }
+  
+  // Abrir modal de cambio de nombre desde el submenú
+  if (changeNameBtnMenu) {
+    changeNameBtnMenu.addEventListener('click', (e) => {
       e.stopPropagation();
       if (changeNameModal) {
         changeNameModal.style.display = 'flex';
@@ -2170,32 +2213,11 @@ function initUserMenu() {
           newNameInput.value = getUserName();
           setTimeout(() => newNameInput.focus(), 100);
         }
+        if (settingsMenu) {
+          settingsMenu.style.display = 'none';
+        }
         userMenu.style.display = 'none';
         userCard.classList.remove('active');
-      }
-    });
-  }
-  
-  // Configuración - Abrir modal de temas
-  if (settingsBtn) {
-    settingsBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const settingsModal = document.getElementById('settings-modal');
-      if (settingsModal) {
-        settingsModal.style.display = 'flex';
-        userMenu.style.display = 'none';
-        userCard.classList.remove('active');
-        
-        // Marcar el tema actual como seleccionado
-        const currentTheme = getCurrentTheme();
-        const themeOptions = settingsModal.querySelectorAll('.theme-option');
-        themeOptions.forEach(option => {
-          if (option.dataset.theme === currentTheme) {
-            option.classList.add('active');
-          } else {
-            option.classList.remove('active');
-          }
-        });
       }
     });
   }
@@ -2285,7 +2307,7 @@ function initThemeSystem() {
   const savedTheme = getCurrentTheme();
   document.documentElement.setAttribute('data-theme', savedTheme);
   
-  // Configurar modal de temas
+  // Configurar modal de temas (por si se usa en el futuro)
   const settingsModal = document.getElementById('settings-modal');
   const closeSettingsModal = document.getElementById('close-settings-modal');
   const closeSettingsBtn = document.getElementById('close-settings-btn');
@@ -2313,7 +2335,7 @@ function initThemeSystem() {
     });
   }
   
-  // Manejar selección de temas
+  // Manejar selección de temas en el modal (si existe)
   const themeOptions = settingsModal?.querySelectorAll('.theme-option');
   if (themeOptions) {
     themeOptions.forEach(option => {
@@ -2322,9 +2344,52 @@ function initThemeSystem() {
         if (themeName) {
           setTheme(themeName);
           
-          // Actualizar estado visual
+          // Actualizar estado visual en el modal
           themeOptions.forEach(opt => opt.classList.remove('active'));
           option.classList.add('active');
+          
+          // Actualizar estado visual en el submenú también
+          const settingsMenu = document.getElementById('settings-menu');
+          if (settingsMenu) {
+            const compactOptions = settingsMenu.querySelectorAll('.theme-option-compact');
+            compactOptions.forEach(opt => {
+              if (opt.dataset.theme === themeName) {
+                opt.classList.add('active');
+              } else {
+                opt.classList.remove('active');
+              }
+            });
+          }
+        }
+      });
+    });
+  }
+  
+  // Manejar selección de temas en el submenú compacto
+  const settingsMenu = document.getElementById('settings-menu');
+  const compactThemeOptions = settingsMenu?.querySelectorAll('.theme-option-compact');
+  if (compactThemeOptions) {
+    compactThemeOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        const themeName = option.dataset.theme;
+        if (themeName) {
+          setTheme(themeName);
+          
+          // Actualizar estado visual en el submenú
+          compactThemeOptions.forEach(opt => opt.classList.remove('active'));
+          option.classList.add('active');
+          
+          // Actualizar estado visual en el modal también (si existe)
+          if (settingsModal) {
+            const modalOptions = settingsModal.querySelectorAll('.theme-option');
+            modalOptions.forEach(opt => {
+              if (opt.dataset.theme === themeName) {
+                opt.classList.add('active');
+              } else {
+                opt.classList.remove('active');
+              }
+            });
+          }
         }
       });
     });
