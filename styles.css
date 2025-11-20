@@ -1845,6 +1845,14 @@ body {
   font-size: 14px;
   color: white;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.message-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
 }
 
 .message.user .message-avatar {

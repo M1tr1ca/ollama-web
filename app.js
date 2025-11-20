@@ -180,6 +180,111 @@ function parseMarkdown(text) {
   const mathInline = [];
   const codeBlocks = [];
   
+  // Detectar y convertir marcadores CODEBLOCK0, CODEBLOCK1, etc. en bloques de código
+  // Procesar cada CODEBLOCK buscando código asociado después del marcador
+  
+  // Primero encontrar todos los marcadores CODEBLOCK con sus posiciones
+  const codeBlockMatches = [];
+  let regexMatch;
+  const codeBlockRegex = /CODEBLOCK(\d+)/g;
+  while ((regexMatch = codeBlockRegex.exec(html)) !== null) {
+    codeBlockMatches.push({
+      fullMatch: regexMatch[0],
+      number: regexMatch[1],
+      index: regexMatch.index
+    });
+  }
+  
+  // Procesar de atrás hacia adelante para no afectar los índices
+  for (let i = codeBlockMatches.length - 1; i >= 0; i--) {
+    const match = codeBlockMatches[i];
+    const startIndex = match.index;
+    const endIndex = i < codeBlockMatches.length - 1 
+      ? codeBlockMatches[i + 1].index 
+      : html.length;
+    
+    // Buscar código después del marcador hasta el siguiente CODEBLOCK o fin
+    const textAfter = html.substring(startIndex + match.fullMatch.length, endIndex);
+    
+    // Buscar bloques ``` existentes primero
+    const existingCodeBlock = textAfter.match(/```[\s\S]*?```/);
+    if (existingCodeBlock) {
+      const code = existingCodeBlock[0].replace(/```/g, '').trim();
+      if (code) {
+        html = html.substring(0, startIndex) + 
+               `\`\`\`\n${code}\n\`\`\`` + 
+               html.substring(startIndex + match.fullMatch.length);
+        continue;
+      }
+    }
+    
+    // Si no hay bloque ```, buscar código en las líneas siguientes
+    const lines = textAfter.split('\n');
+    const codeLines = [];
+    let collectingCode = false;
+    let consecutiveEmpty = 0;
+    
+    for (let j = 0; j < lines.length && j < 100; j++) { // Aumentar límite a 100 líneas
+      const line = lines[j];
+      const trimmedLine = line.trim();
+      
+      if (trimmedLine === '') {
+        consecutiveEmpty++;
+        if (collectingCode && consecutiveEmpty < 3) { // Permitir hasta 3 líneas vacías consecutivas
+          codeLines.push(line);
+        }
+        continue;
+      }
+      
+      consecutiveEmpty = 0;
+      
+      // Detectar si es claramente texto explicativo (más estricto)
+      const isExplanatoryText = 
+        trimmedLine.match(/^\d+\.\s+[A-Z][a-z]+/) || // "1. Explicación" con minúsculas después
+        (trimmedLine.match(/^[A-Z][a-z]+\s*:$/) && trimmedLine.length < 30) || // "Explicación:" corto
+        (trimmedLine.length > 80 && trimmedLine.match(/^[A-Z]/) && 
+         !trimmedLine.includes('{') && !trimmedLine.includes('(') && 
+         !trimmedLine.includes(';') && !trimmedLine.includes('=') &&
+         !trimmedLine.includes('#') && !trimmedLine.includes('//') &&
+         !trimmedLine.includes('*') && !trimmedLine.includes('['));
+      
+      // Si encontramos texto explicativo claro después de código, detener
+      if (collectingCode && isExplanatoryText) {
+        break;
+      }
+      
+      // Detectar si parece código (tiene caracteres comunes de programación)
+      const looksLikeCode = 
+        trimmedLine.includes('{') || trimmedLine.includes('}') ||
+        trimmedLine.includes('(') || trimmedLine.includes(')') ||
+        trimmedLine.includes(';') || trimmedLine.includes('=') ||
+        trimmedLine.includes('#') || trimmedLine.includes('//') ||
+        trimmedLine.includes('*') || trimmedLine.includes('[') ||
+        trimmedLine.includes('function') || trimmedLine.includes('const') ||
+        trimmedLine.includes('var') || trimmedLine.includes('let') ||
+        trimmedLine.includes('return') || trimmedLine.includes('if') ||
+        trimmedLine.includes('for') || trimmedLine.includes('while') ||
+        trimmedLine.match(/^[a-z_][a-zA-Z0-9_]*\s*[=\(:]/) || // Variables/funciones
+        (line.match(/^\s{2,}/) && trimmedLine.length > 0); // Líneas con indentación
+      
+      // Si parece código o no es claramente texto explicativo, incluirlo
+      if (looksLikeCode || !isExplanatoryText) {
+        collectingCode = true;
+        codeLines.push(line);
+      }
+    }
+    
+    const codeContent = codeLines.join('\n').trim();
+    if (codeContent && codeContent.length > 0) {
+      html = html.substring(0, startIndex) + 
+             `\`\`\`\n${codeContent}\n\`\`\`` + 
+             html.substring(startIndex + match.fullMatch.length);
+    } else {
+      // Si no hay código, eliminar solo el marcador CODEBLOCK
+      html = html.substring(0, startIndex) + html.substring(startIndex + match.fullMatch.length);
+    }
+  }
+  
   // Guardar code blocks primero para no procesarlos
   html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
     codeBlocks.push(code);
@@ -799,7 +904,14 @@ function appendMessageElement(message) {
 
   const avatar = document.createElement('div');
   avatar.className = 'message-avatar';
-  avatar.textContent = message.role === 'user' ? 'Tú' : 'AI';
+  if (message.role === 'user') {
+    avatar.textContent = 'Tú';
+  } else {
+    const img = document.createElement('img');
+    img.src = 'assets/Fondo.png';
+    img.alt = 'AI';
+    avatar.appendChild(img);
+  }
 
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
@@ -2565,7 +2677,10 @@ const PHOTOS = [
   'photo/El Puente Japonés (El Estanque de Nenúfares)-4fu0WvfYzycOaMPCIv8h-4k.jpg',
   'photo/Juan les Pins-Bm2sDPUlIC9RaBO64j4R-4k.jpg',
   'photo/wallpaper1.jpg',
-  'photo/wallpaper2.jpg'
+  'photo/wallpaper2.jpg',
+  'photo/Argenteuil. Yates-4kJbsbyBKFUobnFEKK3u-hd-png.png',
+  'photo/Puente de Waterloo, Londres, al anochecer-2ZkCL0uZxiZy0h7jcnpQ-hd-png.png',
+  'photo/Canoe on the Epte-2HF5cCC7u0ju6eRcwdwr-hd-jpg.jpg'
 ];
 
 function getTodayDateString() {
@@ -2579,23 +2694,10 @@ function getTodayDateString() {
 function shouldChangeBackground() {
   const storedDate = localStorage.getItem(BACKGROUND_STORAGE_KEY);
   const today = getTodayDateString();
-  const now = new Date();
-  const hour = now.getHours();
   
-  // Si no hay fecha guardada o es un día diferente, cambiar
+  // Cambiar solo cuando cambia el día (a las 00:00)
   if (!storedDate || storedDate !== today) {
     return true;
-  }
-  
-  // Si es después de las 12 PM y aún no se ha cambiado hoy después de las 12 PM
-  if (hour >= 12) {
-    const lastChangeHour = localStorage.getItem('ollama-web-background-hour');
-    const lastChangeDate = localStorage.getItem(BACKGROUND_STORAGE_KEY);
-    
-    // Si la última vez que cambió fue antes de las 12 PM de hoy, cambiar
-    if (!lastChangeHour || parseInt(lastChangeHour) < 12 || lastChangeDate !== today) {
-      return true;
-    }
   }
   
   return false;
@@ -2603,26 +2705,14 @@ function shouldChangeBackground() {
 
 function selectDailyImage() {
   const today = getTodayDateString();
-  const now = new Date();
   
   // Usar la fecha como semilla para seleccionar una imagen consistente durante el día
-  // Si es después de las 12 PM, usar el día siguiente para la selección
-  let dateForSelection = today;
-  if (now.getHours() >= 12) {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const year = tomorrow.getFullYear();
-    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
-    const day = String(tomorrow.getDate()).padStart(2, '0');
-    dateForSelection = `${year}-${month}-${day}`;
-  }
-  
-  const dateSeed = parseInt(dateForSelection.replace(/-/g, '')) % PHOTOS.length;
+  // La imagen cambia a las 00:00 cuando cambia el día
+  const dateSeed = parseInt(today.replace(/-/g, '')) % PHOTOS.length;
   const selectedIndex = dateSeed;
   
-  // Guardar la fecha y hora del cambio
+  // Guardar la fecha del cambio
   localStorage.setItem(BACKGROUND_STORAGE_KEY, today);
-  localStorage.setItem('ollama-web-background-hour', String(now.getHours()));
   
   return PHOTOS[selectedIndex];
 }
@@ -2772,7 +2862,7 @@ function initBackgroundSystem() {
   setBackgroundImage();
   updateGreeting();
   
-  // Verificar cada minuto si hay que cambiar el fondo (a las 12 PM)
+  // Verificar cada minuto si hay que cambiar el fondo (a las 00:00)
   setInterval(() => {
     if (shouldChangeBackground()) {
       setBackgroundImage();
