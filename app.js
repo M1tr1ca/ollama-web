@@ -2406,6 +2406,20 @@ function init() {
   
   toggleSidebarButton?.addEventListener('click', toggleSidebar);
   
+  // Atajos de teclado
+  document.addEventListener('keydown', (e) => {
+    // Control+B para abrir/cerrar la barra lateral
+    if (e.ctrlKey && e.key === 'b') {
+      e.preventDefault();
+      toggleSidebar();
+    }
+    // Control+M para nueva conversación
+    if (e.ctrlKey && e.key === 'm') {
+      e.preventDefault();
+      createConversation();
+    }
+  });
+  
   // Configurar manejo de archivos
   setupFileHandlers();
   
