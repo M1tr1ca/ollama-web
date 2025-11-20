@@ -2663,6 +2663,9 @@ function setupFileHandlers() {
 
 // Sistema de fondo con imágenes diarias
 // Las fotos se cargan desde la carpeta photo/
+const BACKGROUND_AUTO_KEY = 'ollama-web-background-auto';
+const BACKGROUND_MANUAL_KEY = 'ollama-web-background-manual';
+
 const PHOTOS = [
   'photo/Amapolas en Giverny-4PlDWaz5pyPbfHSUZORo-hd-png.png',
   'photo/Paseo por el acantilado en Pourville-3n9hPIFczHFbyrrqLki8-hd-jpg.jpg',
@@ -2691,7 +2694,29 @@ function getTodayDateString() {
   return `${year}-${month}-${day}`;
 }
 
+function getBackgroundAutoMode() {
+  const autoMode = localStorage.getItem(BACKGROUND_AUTO_KEY);
+  return autoMode === null ? true : autoMode === 'true'; // Por defecto está activado
+}
+
+function getManualBackground() {
+  return localStorage.getItem(BACKGROUND_MANUAL_KEY);
+}
+
+function setBackgroundAutoMode(enabled) {
+  localStorage.setItem(BACKGROUND_AUTO_KEY, String(enabled));
+}
+
+function setManualBackground(imagePath) {
+  localStorage.setItem(BACKGROUND_MANUAL_KEY, imagePath);
+}
+
 function shouldChangeBackground() {
+  // Si el modo automático está desactivado, no cambiar
+  if (!getBackgroundAutoMode()) {
+    return false;
+  }
+  
   const storedDate = localStorage.getItem(BACKGROUND_STORAGE_KEY);
   const today = getTodayDateString();
   
@@ -2721,9 +2746,25 @@ function setBackgroundImage() {
   const backgroundElement = document.getElementById('background-image');
   if (!backgroundElement) return;
   
+  // Si el modo automático está desactivado, usar la imagen manual
+  if (!getBackgroundAutoMode()) {
+    const manualImage = getManualBackground();
+    if (manualImage) {
+      backgroundElement.style.backgroundImage = `url('${manualImage}')`;
+      localStorage.setItem('ollama-web-background-image', manualImage);
+      return;
+    }
+    // Si no hay imagen manual pero el modo está desactivado, usar la primera imagen
+    const defaultImage = PHOTOS[0];
+    backgroundElement.style.backgroundImage = `url('${defaultImage}')`;
+    localStorage.setItem('ollama-web-background-image', defaultImage);
+    return;
+  }
+  
   if (shouldChangeBackground()) {
     const imagePath = selectDailyImage();
     backgroundElement.style.backgroundImage = `url('${imagePath}')`;
+    localStorage.setItem('ollama-web-background-image', imagePath);
   } else {
     // Usar la imagen guardada
     const storedImage = localStorage.getItem('ollama-web-background-image');
@@ -2732,13 +2773,8 @@ function setBackgroundImage() {
     } else {
       const imagePath = selectDailyImage();
       backgroundElement.style.backgroundImage = `url('${imagePath}')`;
+      localStorage.setItem('ollama-web-background-image', imagePath);
     }
-  }
-  
-  // Guardar la imagen actual
-  const currentImage = backgroundElement.style.backgroundImage.match(/url\(['"]?([^'"]+)['"]?\)/)?.[1];
-  if (currentImage) {
-    localStorage.setItem('ollama-web-background-image', currentImage);
   }
 }
 
@@ -2858,9 +2894,30 @@ function updateGreeting() {
   subtitleElement.textContent = subtitle;
 }
 
+// Precargar todas las imágenes de fondo en caché al iniciar
+function preloadBackgroundImages() {
+  PHOTOS.forEach((photoPath) => {
+    const img = new Image();
+    img.src = photoPath;
+    // No necesitamos hacer nada más, solo cargar en caché
+  });
+}
+
 function initBackgroundSystem() {
   setBackgroundImage();
   updateGreeting();
+  
+  // Precargar todas las imágenes de fondo en segundo plano
+  // Usar requestIdleCallback si está disponible, sino setTimeout
+  if (window.requestIdleCallback) {
+    requestIdleCallback(() => {
+      preloadBackgroundImages();
+    }, { timeout: 2000 });
+  } else {
+    setTimeout(() => {
+      preloadBackgroundImages();
+    }, 1000);
+  }
   
   // Verificar cada minuto si hay que cambiar el fondo (a las 00:00)
   setInterval(() => {
@@ -3134,10 +3191,182 @@ function initUserMenu() {
   
   // Inicializar sistema de temas
   initThemeSystem();
+  
+  // Personalización de fondo
+  const backgroundPersonalizationBtn = document.getElementById('background-personalization-btn');
+  const backgroundPersonalizationModal = document.getElementById('background-personalization-modal');
+  const closeBackgroundPersonalizationModal = document.getElementById('close-background-personalization-modal');
+  const cancelBackgroundPersonalization = document.getElementById('cancel-background-personalization');
+  const saveBackgroundPersonalizationBtn = document.getElementById('save-background-personalization');
+  const autoBackgroundToggle = document.getElementById('auto-background-toggle');
+  const manualBackgroundSection = document.getElementById('manual-background-section');
+  const backgroundGallery = document.getElementById('background-gallery');
+  
+  // Función para cargar la galería de imágenes (ya precargadas en caché)
+  function loadBackgroundGallery() {
+    if (!backgroundGallery) return;
+    
+    const manualImage = getManualBackground();
+    const isAutoMode = getBackgroundAutoMode();
+    
+    // Limpiar galería
+    backgroundGallery.innerHTML = '';
+    
+    // Cargar imágenes de forma asíncrona para no bloquear el UI
+    // Usar requestAnimationFrame para permitir que el modal se renderice primero
+    requestAnimationFrame(() => {
+      // Dividir la carga en pequeños lotes para no bloquear
+      let index = 0;
+      
+      const loadNextBatch = () => {
+        const batchSize = 3; // Cargar 3 imágenes por frame
+        const endIndex = Math.min(index + batchSize, PHOTOS.length);
+        
+        for (let i = index; i < endIndex; i++) {
+          const photoPath = PHOTOS[i];
+          const item = document.createElement('div');
+          item.className = 'background-gallery-item';
+          item.dataset.imagePath = photoPath;
+          
+          const img = document.createElement('img');
+          img.src = photoPath;
+          img.alt = `Fondo ${i + 1}`;
+          img.loading = 'eager';
+          
+          item.appendChild(img);
+          backgroundGallery.appendChild(item);
+          
+          // Marcar como activa si es la imagen manual seleccionada
+          if (!isAutoMode && manualImage === photoPath) {
+            item.classList.add('active');
+          }
+          
+          // Seleccionar imagen al hacer clic
+          item.addEventListener('click', () => {
+            // Remover active de todos los items
+            backgroundGallery.querySelectorAll('.background-gallery-item').forEach(i => {
+              i.classList.remove('active');
+            });
+            // Agregar active al item seleccionado
+            item.classList.add('active');
+          });
+        }
+        
+        index = endIndex;
+        
+        // Continuar cargando el siguiente lote si quedan imágenes
+        if (index < PHOTOS.length) {
+          requestAnimationFrame(loadNextBatch);
+        }
+      };
+      
+      // Iniciar la carga
+      loadNextBatch();
+    });
+  }
+  
+  // Abrir modal de personalización de fondo
+  if (backgroundPersonalizationBtn) {
+    backgroundPersonalizationBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (backgroundPersonalizationModal) {
+        // Cargar estado actual ANTES de mostrar el modal para evitar bloqueos
+        const autoMode = getBackgroundAutoMode();
+        if (autoBackgroundToggle) {
+          autoBackgroundToggle.checked = autoMode;
+        }
+        if (manualBackgroundSection) {
+          manualBackgroundSection.style.display = autoMode ? 'none' : 'block';
+        }
+        
+        // Mostrar el modal inmediatamente
+        backgroundPersonalizationModal.style.display = 'flex';
+        if (settingsMenu) {
+          settingsMenu.style.display = 'none';
+        }
+        userMenu.style.display = 'none';
+        userCard.classList.remove('active');
+        
+        // Forzar un reflow para asegurar que el modal se renderice
+        void backgroundPersonalizationModal.offsetHeight;
+        
+        // Cargar galería de forma completamente asíncrona después de mostrar el modal
+        // Usar requestIdleCallback si está disponible para no bloquear
+        if (window.requestIdleCallback) {
+          requestIdleCallback(() => {
+            loadBackgroundGallery();
+          }, { timeout: 100 });
+        } else {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              loadBackgroundGallery();
+            }, 0);
+          });
+        }
+      }
+    });
+  }
+  
+  // Manejar toggle del switch
+  if (autoBackgroundToggle && manualBackgroundSection) {
+    autoBackgroundToggle.addEventListener('change', (e) => {
+      manualBackgroundSection.style.display = e.target.checked ? 'none' : 'block';
+    });
+  }
+  
+  // Cerrar modal de personalización de fondo
+  const closeBackgroundPersonalizationModalFunc = () => {
+    if (backgroundPersonalizationModal) {
+      backgroundPersonalizationModal.style.display = 'none';
+    }
+  };
+  
+  if (closeBackgroundPersonalizationModal) {
+    closeBackgroundPersonalizationModal.addEventListener('click', closeBackgroundPersonalizationModalFunc);
+  }
+  
+  if (cancelBackgroundPersonalization) {
+    cancelBackgroundPersonalization.addEventListener('click', closeBackgroundPersonalizationModalFunc);
+  }
+  
+  // Cerrar modal al hacer clic fuera
+  if (backgroundPersonalizationModal) {
+    backgroundPersonalizationModal.addEventListener('click', (e) => {
+      if (e.target === backgroundPersonalizationModal) {
+        closeBackgroundPersonalizationModalFunc();
+      }
+    });
+  }
+  
+  // Guardar personalización de fondo
+  if (saveBackgroundPersonalizationBtn && autoBackgroundToggle) {
+    saveBackgroundPersonalizationBtn.addEventListener('click', () => {
+      const autoMode = autoBackgroundToggle.checked;
+      setBackgroundAutoMode(autoMode);
+      
+      if (!autoMode) {
+        // Si el modo automático está desactivado, guardar la imagen seleccionada
+        const selectedItem = backgroundGallery?.querySelector('.background-gallery-item.active');
+        if (selectedItem) {
+          const imagePath = selectedItem.dataset.imagePath;
+          setManualBackground(imagePath);
+        } else {
+          // Si no hay imagen seleccionada, usar la primera
+          setManualBackground(PHOTOS[0]);
+        }
+      }
+      
+      // Actualizar el fondo inmediatamente
+      setBackgroundImage();
+      
+      closeBackgroundPersonalizationModalFunc();
+    });
+  }
 }
 
 // Sistema de temas
 const THEME_STORAGE_KEY = 'ollama-web-theme';
+const CUSTOM_THEME_KEY = 'ollama-web-custom-theme';
 
 function getCurrentTheme() {
   if (!hasLocalStorage) return 'orange';
@@ -3149,11 +3378,131 @@ function getCurrentTheme() {
   }
 }
 
+// Función para convertir hex a RGB
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+}
+
+// Función para convertir RGB a hex
+function rgbToHex(r, g, b) {
+  return "#" + [r, g, b].map(x => {
+    const hex = x.toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  }).join("");
+}
+
+// Función para oscurecer un color
+function darkenColor(hex, percent) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  const factor = 1 - (percent / 100);
+  return rgbToHex(
+    Math.round(rgb.r * factor),
+    Math.round(rgb.g * factor),
+    Math.round(rgb.b * factor)
+  );
+}
+
+// Función para aclarar un color
+function lightenColor(hex, percent) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  const factor = percent / 100;
+  return rgbToHex(
+    Math.round(rgb.r + (255 - rgb.r) * factor),
+    Math.round(rgb.g + (255 - rgb.g) * factor),
+    Math.round(rgb.b + (255 - rgb.b) * factor)
+  );
+}
+
+// Función para aplicar tema personalizado
+function setCustomTheme(color) {
+  if (!hasLocalStorage) return;
+  try {
+    const primary = color;
+    const primaryDark = darkenColor(color, 15);
+    const primaryLight = lightenColor(color, 20);
+    
+    // Guardar el color personalizado
+    window.localStorage.setItem(CUSTOM_THEME_KEY, color);
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'custom');
+    
+    // Aplicar variables CSS dinámicamente
+    const root = document.documentElement;
+    root.style.setProperty('--theme-primary', primary);
+    root.style.setProperty('--theme-primary-dark', primaryDark);
+    root.style.setProperty('--theme-primary-light', primaryLight);
+    
+    // Calcular transparencias
+    const rgb = hexToRgb(primary);
+    if (rgb) {
+      root.style.setProperty('--theme-primary-shadow', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`);
+      root.style.setProperty('--theme-primary-alpha-5', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.05)`);
+      root.style.setProperty('--theme-primary-alpha-10', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`);
+      root.style.setProperty('--theme-primary-alpha-15', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`);
+      root.style.setProperty('--theme-primary-alpha-30', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`);
+      root.style.setProperty('--theme-primary-alpha-35', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)`);
+    }
+    
+    document.documentElement.setAttribute('data-theme', 'custom');
+    
+    // Actualizar el botón de color personalizado para mostrar el color seleccionado
+    const customColorBtn = document.getElementById('custom-color-btn');
+    if (customColorBtn) {
+      const colorDisplay = customColorBtn.querySelector('.theme-color-compact');
+      if (colorDisplay) {
+        colorDisplay.style.background = `linear-gradient(135deg, ${primary}, ${primaryDark})`;
+        colorDisplay.textContent = '';
+      }
+    }
+  } catch (error) {
+    console.warn('No se pudo aplicar el tema personalizado', error);
+  }
+}
+
+// Función para cargar tema personalizado guardado
+function loadCustomTheme() {
+  if (!hasLocalStorage) return;
+  try {
+    const customColor = window.localStorage.getItem(CUSTOM_THEME_KEY);
+    const currentTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    
+    if (customColor && currentTheme === 'custom') {
+      setCustomTheme(customColor);
+    }
+  } catch (error) {
+    console.warn('No se pudo cargar el tema personalizado', error);
+  }
+}
+
 function setTheme(themeName) {
   if (!hasLocalStorage) return;
   try {
+    // Si se selecciona un tema predefinido, limpiar el tema personalizado
+    if (themeName !== 'custom') {
+      document.documentElement.style.removeProperty('--theme-primary');
+      document.documentElement.style.removeProperty('--theme-primary-dark');
+      document.documentElement.style.removeProperty('--theme-primary-light');
+      document.documentElement.style.removeProperty('--theme-primary-shadow');
+      document.documentElement.style.removeProperty('--theme-primary-alpha-5');
+      document.documentElement.style.removeProperty('--theme-primary-alpha-10');
+      document.documentElement.style.removeProperty('--theme-primary-alpha-15');
+      document.documentElement.style.removeProperty('--theme-primary-alpha-30');
+      document.documentElement.style.removeProperty('--theme-primary-alpha-35');
+    }
+    
     window.localStorage.setItem(THEME_STORAGE_KEY, themeName);
     document.documentElement.setAttribute('data-theme', themeName);
+    
+    // Si no es custom, cargar el tema personalizado guardado
+    if (themeName === 'custom') {
+      loadCustomTheme();
+    }
   } catch (error) {
     console.warn('No se pudo guardar el tema', error);
   }
@@ -3163,6 +3512,11 @@ function initThemeSystem() {
   // Cargar tema guardado
   const savedTheme = getCurrentTheme();
   document.documentElement.setAttribute('data-theme', savedTheme);
+  
+  // Cargar tema personalizado si está guardado
+  if (savedTheme === 'custom') {
+    loadCustomTheme();
+  }
   
   // Configurar modal de temas (por si se usa en el futuro)
   const settingsModal = document.getElementById('settings-modal');
@@ -3224,7 +3578,7 @@ function initThemeSystem() {
   
   // Manejar selección de temas en el submenú compacto
   const settingsMenu = document.getElementById('settings-menu');
-  const compactThemeOptions = settingsMenu?.querySelectorAll('.theme-option-compact');
+  const compactThemeOptions = settingsMenu?.querySelectorAll('.theme-option-compact:not(.theme-custom-color)');
   if (compactThemeOptions) {
     compactThemeOptions.forEach(option => {
       option.addEventListener('click', () => {
@@ -3235,6 +3589,12 @@ function initThemeSystem() {
           // Actualizar estado visual en el submenú
           compactThemeOptions.forEach(opt => opt.classList.remove('active'));
           option.classList.add('active');
+          
+          // Desactivar botón de color personalizado
+          const customColorBtn = document.getElementById('custom-color-btn');
+          if (customColorBtn) {
+            customColorBtn.classList.remove('active');
+          }
           
           // Actualizar estado visual en el modal también (si existe)
           if (settingsModal) {
@@ -3249,6 +3609,55 @@ function initThemeSystem() {
           }
         }
       });
+    });
+  }
+  
+  // Manejar selector de color personalizado
+  const customColorBtn = document.getElementById('custom-color-btn');
+  const customColorPicker = document.getElementById('custom-color-picker');
+  
+  if (customColorBtn && customColorPicker) {
+    // Cargar y mostrar el color personalizado guardado si existe
+    const savedColor = localStorage.getItem(CUSTOM_THEME_KEY);
+    if (savedColor && savedTheme === 'custom') {
+      const colorDisplay = customColorBtn.querySelector('.theme-color-compact');
+      if (colorDisplay) {
+        const rgb = hexToRgb(savedColor);
+        if (rgb) {
+          const primaryDark = darkenColor(savedColor, 15);
+          colorDisplay.style.background = `linear-gradient(135deg, ${savedColor}, ${primaryDark})`;
+          colorDisplay.textContent = '';
+        }
+      }
+      customColorBtn.classList.add('active');
+    }
+    
+    // Abrir selector de color al hacer clic en el botón
+    customColorBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Cargar color guardado si existe
+      if (savedColor) {
+        customColorPicker.value = savedColor;
+      }
+      customColorPicker.click();
+    });
+    
+    // Aplicar color cuando se seleccione
+    customColorPicker.addEventListener('change', (e) => {
+      const selectedColor = e.target.value;
+      setCustomTheme(selectedColor);
+      
+      // Actualizar estado visual en el submenú
+      if (compactThemeOptions) {
+        compactThemeOptions.forEach(opt => opt.classList.remove('active'));
+        customColorBtn.classList.add('active');
+      }
+      
+      // Actualizar estado visual en el modal también (si existe)
+      if (settingsModal) {
+        const modalOptions = settingsModal.querySelectorAll('.theme-option');
+        modalOptions.forEach(opt => opt.classList.remove('active'));
+      }
     });
   }
 }

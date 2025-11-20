@@ -59,27 +59,38 @@
               <span class="menu-icon">✨</span>
               <span>Personalización de IA</span>
             </button>
+            <button class="user-menu-item" id="background-personalization-btn">
+              <span class="menu-icon">🖼️</span>
+              <span>Personalizar fondo</span>
+            </button>
             <div class="settings-divider"></div>
             <div class="settings-themes-label">Temas:</div>
             <div class="settings-themes-grid">
               <button class="theme-option-compact" data-theme="orange" title="Naranja">
                 <span class="theme-color-compact" style="background: linear-gradient(135deg, #d97757, #cc6b4d);"></span>
               </button>
-              <button class="theme-option-compact" data-theme="blue" title="Azul">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #3b82f6, #2563eb);"></span>
-              </button>
-              <button class="theme-option-compact" data-theme="green" title="Verde">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #10b981, #059669);"></span>
+              <button class="theme-option-compact" data-theme="green" title="Verde Oscuro">
+                <span class="theme-color-compact" style="background: linear-gradient(135deg, #065f46, #047857);"></span>
               </button>
               <button class="theme-option-compact" data-theme="purple" title="Morado">
                 <span class="theme-color-compact" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></span>
               </button>
-              <button class="theme-option-compact" data-theme="pink" title="Rosa">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #ec4899, #db2777);"></span>
+              <button class="theme-option-compact" data-theme="pink" title="Rojo Cereza">
+                <span class="theme-color-compact" style="background: linear-gradient(135deg, #dc2626, #991b1b);"></span>
               </button>
-              <button class="theme-option-compact" data-theme="cyan" title="Cian">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #06b6d4, #0891b2);"></span>
+              <button class="theme-option-compact" data-theme="cyan" title="Azul Cielo">
+                <span class="theme-color-compact" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);"></span>
               </button>
+              <button class="theme-option-compact" data-theme="navy" title="Azul Marino">
+                <span class="theme-color-compact" style="background: linear-gradient(135deg, #1e40af, #1e3a8a);"></span>
+              </button>
+              <button class="theme-option-compact" data-theme="petroleum" title="Azul Petróleo">
+                <span class="theme-color-compact" style="background: linear-gradient(135deg, #24495e, #1a3442);"></span>
+              </button>
+              <button class="theme-option-compact theme-custom-color" id="custom-color-btn" title="Color personalizado">
+                <span class="theme-color-compact custom-color-icon">🎨</span>
+              </button>
+              <input type="color" id="custom-color-picker" style="display: none;" />
             </div>
           </div>
         </footer>
@@ -156,6 +167,43 @@
           </div>
         </div>
         
+        <!-- Modal para personalización de fondo -->
+        <div id="background-personalization-modal" class="modal-overlay" style="display: none;">
+          <div class="modal-content modal-content-compact">
+            <div class="modal-header">
+              <h3>Personalizar fondo</h3>
+              <button class="modal-close" id="close-background-personalization-modal">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="personalization-section">
+                <div class="switch-container">
+                  <label class="switch-label">
+                    <span>Cambio automático diario</span>
+                    <span class="switch-description">El fondo cambiará automáticamente cada día a las 00:00</span>
+                  </label>
+                  <label class="switch">
+                    <input type="checkbox" id="auto-background-toggle" checked>
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+              
+              <div class="personalization-section" id="manual-background-section" style="display: none;">
+                <label class="section-label">
+                  Seleccionar fondo manualmente
+                </label>
+                <div class="background-gallery" id="background-gallery">
+                  <!-- Las imágenes se cargarán dinámicamente -->
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="modal-button secondary" id="cancel-background-personalization">Cancelar</button>
+              <button class="modal-button primary" id="save-background-personalization">Guardar</button>
+            </div>
+          </div>
+        </div>
+        
         <!-- Modal para configuración de temas -->
         <div id="settings-modal" class="modal-overlay" style="display: none;">
           <div class="modal-content">
@@ -172,25 +220,25 @@
                   <span class="theme-color" style="background: linear-gradient(135deg, #d97757, #cc6b4d);"></span>
                   <span class="theme-name">Naranja</span>
                 </button>
-                <button class="theme-option" data-theme="blue" title="Azul">
-                  <span class="theme-color" style="background: linear-gradient(135deg, #3b82f6, #2563eb);"></span>
-                  <span class="theme-name">Azul</span>
-                </button>
-                <button class="theme-option" data-theme="green" title="Verde">
-                  <span class="theme-color" style="background: linear-gradient(135deg, #10b981, #059669);"></span>
-                  <span class="theme-name">Verde</span>
+                <button class="theme-option" data-theme="green" title="Verde Oscuro">
+                  <span class="theme-color" style="background: linear-gradient(135deg, #065f46, #047857);"></span>
+                  <span class="theme-name">Verde Oscuro</span>
                 </button>
                 <button class="theme-option" data-theme="purple" title="Morado">
                   <span class="theme-color" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></span>
                   <span class="theme-name">Morado</span>
                 </button>
-                <button class="theme-option" data-theme="pink" title="Rosa">
-                  <span class="theme-color" style="background: linear-gradient(135deg, #ec4899, #db2777);"></span>
-                  <span class="theme-name">Rosa</span>
+                <button class="theme-option" data-theme="pink" title="Rojo Cereza">
+                  <span class="theme-color" style="background: linear-gradient(135deg, #dc2626, #991b1b);"></span>
+                  <span class="theme-name">Rojo Cereza</span>
                 </button>
-                <button class="theme-option" data-theme="cyan" title="Cian">
-                  <span class="theme-color" style="background: linear-gradient(135deg, #06b6d4, #0891b2);"></span>
-                  <span class="theme-name">Cian</span>
+                <button class="theme-option" data-theme="cyan" title="Azul Cielo">
+                  <span class="theme-color" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);"></span>
+                  <span class="theme-name">Azul Cielo</span>
+                </button>
+                <button class="theme-option" data-theme="navy" title="Azul Marino">
+                  <span class="theme-color" style="background: linear-gradient(135deg, #1e40af, #1e3a8a);"></span>
+                  <span class="theme-name">Azul Marino</span>
                 </button>
               </div>
             </div>

@@ -33,28 +33,16 @@
   --theme-primary-alpha-35: rgba(217, 119, 87, 0.35);
 }
 
-:root[data-theme="blue"] {
-  --theme-primary: #3b82f6;
-  --theme-primary-dark: #2563eb;
-  --theme-primary-light: #60a5fa;
-  --theme-primary-shadow: rgba(59, 130, 246, 0.3);
-  --theme-primary-alpha-5: rgba(59, 130, 246, 0.05);
-  --theme-primary-alpha-10: rgba(59, 130, 246, 0.1);
-  --theme-primary-alpha-15: rgba(59, 130, 246, 0.15);
-  --theme-primary-alpha-30: rgba(59, 130, 246, 0.3);
-  --theme-primary-alpha-35: rgba(59, 130, 246, 0.35);
-}
-
 :root[data-theme="green"] {
-  --theme-primary: #10b981;
-  --theme-primary-dark: #059669;
-  --theme-primary-light: #34d399;
-  --theme-primary-shadow: rgba(16, 185, 129, 0.3);
-  --theme-primary-alpha-5: rgba(16, 185, 129, 0.05);
-  --theme-primary-alpha-10: rgba(16, 185, 129, 0.1);
-  --theme-primary-alpha-15: rgba(16, 185, 129, 0.15);
-  --theme-primary-alpha-30: rgba(16, 185, 129, 0.3);
-  --theme-primary-alpha-35: rgba(16, 185, 129, 0.35);
+  --theme-primary: #065f46;
+  --theme-primary-dark: #047857;
+  --theme-primary-light: #059669;
+  --theme-primary-shadow: rgba(6, 95, 70, 0.3);
+  --theme-primary-alpha-5: rgba(6, 95, 70, 0.05);
+  --theme-primary-alpha-10: rgba(6, 95, 70, 0.1);
+  --theme-primary-alpha-15: rgba(6, 95, 70, 0.15);
+  --theme-primary-alpha-30: rgba(6, 95, 70, 0.3);
+  --theme-primary-alpha-35: rgba(6, 95, 70, 0.35);
 }
 
 :root[data-theme="purple"] {
@@ -70,27 +58,51 @@
 }
 
 :root[data-theme="pink"] {
-  --theme-primary: #ec4899;
-  --theme-primary-dark: #db2777;
-  --theme-primary-light: #f472b6;
-  --theme-primary-shadow: rgba(236, 72, 153, 0.3);
-  --theme-primary-alpha-5: rgba(236, 72, 153, 0.05);
-  --theme-primary-alpha-10: rgba(236, 72, 153, 0.1);
-  --theme-primary-alpha-15: rgba(236, 72, 153, 0.15);
-  --theme-primary-alpha-30: rgba(236, 72, 153, 0.3);
-  --theme-primary-alpha-35: rgba(236, 72, 153, 0.35);
+  --theme-primary: #dc2626;
+  --theme-primary-dark: #991b1b;
+  --theme-primary-light: #ef4444;
+  --theme-primary-shadow: rgba(220, 38, 38, 0.3);
+  --theme-primary-alpha-5: rgba(220, 38, 38, 0.05);
+  --theme-primary-alpha-10: rgba(220, 38, 38, 0.1);
+  --theme-primary-alpha-15: rgba(220, 38, 38, 0.15);
+  --theme-primary-alpha-30: rgba(220, 38, 38, 0.3);
+  --theme-primary-alpha-35: rgba(220, 38, 38, 0.35);
 }
 
 :root[data-theme="cyan"] {
-  --theme-primary: #06b6d4;
-  --theme-primary-dark: #0891b2;
-  --theme-primary-light: #22d3ee;
-  --theme-primary-shadow: rgba(6, 182, 212, 0.3);
-  --theme-primary-alpha-5: rgba(6, 182, 212, 0.05);
-  --theme-primary-alpha-10: rgba(6, 182, 212, 0.1);
-  --theme-primary-alpha-15: rgba(6, 182, 212, 0.15);
-  --theme-primary-alpha-30: rgba(6, 182, 212, 0.3);
-  --theme-primary-alpha-35: rgba(6, 182, 212, 0.35);
+  --theme-primary: #60a5fa;
+  --theme-primary-dark: #3b82f6;
+  --theme-primary-light: #93c5fd;
+  --theme-primary-shadow: rgba(96, 165, 250, 0.3);
+  --theme-primary-alpha-5: rgba(96, 165, 250, 0.05);
+  --theme-primary-alpha-10: rgba(96, 165, 250, 0.1);
+  --theme-primary-alpha-15: rgba(96, 165, 250, 0.15);
+  --theme-primary-alpha-30: rgba(96, 165, 250, 0.3);
+  --theme-primary-alpha-35: rgba(96, 165, 250, 0.35);
+}
+
+:root[data-theme="navy"] {
+  --theme-primary: #1e40af;
+  --theme-primary-dark: #1e3a8a;
+  --theme-primary-light: #2563eb;
+  --theme-primary-shadow: rgba(30, 64, 175, 0.3);
+  --theme-primary-alpha-5: rgba(30, 64, 175, 0.05);
+  --theme-primary-alpha-10: rgba(30, 64, 175, 0.1);
+  --theme-primary-alpha-15: rgba(30, 64, 175, 0.15);
+  --theme-primary-alpha-30: rgba(30, 64, 175, 0.3);
+  --theme-primary-alpha-35: rgba(30, 64, 175, 0.35);
+}
+
+:root[data-theme="petroleum"] {
+  --theme-primary: #24495e;
+  --theme-primary-dark: #1a3442;
+  --theme-primary-light: #2d5a75;
+  --theme-primary-shadow: rgba(36, 73, 94, 0.3);
+  --theme-primary-alpha-5: rgba(36, 73, 94, 0.05);
+  --theme-primary-alpha-10: rgba(36, 73, 94, 0.1);
+  --theme-primary-alpha-15: rgba(36, 73, 94, 0.15);
+  --theme-primary-alpha-30: rgba(36, 73, 94, 0.3);
+  --theme-primary-alpha-35: rgba(36, 73, 94, 0.35);
 }
 
 html,
@@ -575,6 +587,29 @@ body {
   width: 100%;
   height: 100%;
   border-radius: 6px;
+}
+
+.theme-custom-color {
+  position: relative;
+}
+
+.custom-color-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05)) !important;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+}
+
+.theme-custom-color:hover .custom-color-icon {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.1)) !important;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.theme-custom-color.active .custom-color-icon {
+  border-style: solid;
+  border-color: var(--theme-primary, rgba(255, 255, 255, 0.5));
 }
 
 /* Modal */
@@ -2260,4 +2295,146 @@ body {
   .chip {
     justify-content: center;
   }
+}
+
+/* Switch para cambio automático de fondo */
+.switch-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+}
+
+.switch-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.switch-label span:first-child {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.switch-description {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-dark));
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+/* Galería de fondos */
+.background-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.gallery-loading {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+}
+
+.background-gallery-item {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.background-gallery-item:hover {
+  transform: scale(1.05);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.background-gallery-item.active {
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 0 3px var(--theme-primary-alpha-15);
+}
+
+.background-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.background-gallery-item::after {
+  content: '✓';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  background: var(--theme-primary);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.background-gallery-item.active::after {
+  opacity: 1;
 }
