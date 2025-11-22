@@ -173,640 +173,73 @@ function formatTime(timestamp) {
 function parseMarkdown(text) {
   if (!text) return '';
   
-  let html = text;
-  
-  // Proteger fórmulas matemáticas antes de procesar
-  const mathBlocks = [];
-  const mathInline = [];
-  const codeBlocks = [];
-  
-  // Detectar y convertir marcadores CODEBLOCK0, CODEBLOCK1, etc. en bloques de código
-  // Procesar cada CODEBLOCK buscando código asociado después del marcador
-  
-  // Primero encontrar todos los marcadores CODEBLOCK con sus posiciones
-  const codeBlockMatches = [];
-  let regexMatch;
-  const codeBlockRegex = /CODEBLOCK(\d+)/g;
-  while ((regexMatch = codeBlockRegex.exec(html)) !== null) {
-    codeBlockMatches.push({
-      fullMatch: regexMatch[0],
-      number: regexMatch[1],
-      index: regexMatch.index
-    });
-  }
-  
-  // Procesar de atrás hacia adelante para no afectar los índices
-  for (let i = codeBlockMatches.length - 1; i >= 0; i--) {
-    const match = codeBlockMatches[i];
-    const startIndex = match.index;
-    const endIndex = i < codeBlockMatches.length - 1 
-      ? codeBlockMatches[i + 1].index 
-      : html.length;
-    
-    // Buscar código después del marcador hasta el siguiente CODEBLOCK o fin
-    const textAfter = html.substring(startIndex + match.fullMatch.length, endIndex);
-    
-    // Buscar bloques ``` existentes primero
-    const existingCodeBlock = textAfter.match(/```[\s\S]*?```/);
-    if (existingCodeBlock) {
-      const code = existingCodeBlock[0].replace(/```/g, '').trim();
-      if (code) {
-        html = html.substring(0, startIndex) + 
-               `\`\`\`\n${code}\n\`\`\`` + 
-               html.substring(startIndex + match.fullMatch.length);
-        continue;
-      }
-    }
-    
-    // Si no hay bloque ```, buscar código en las líneas siguientes
-    const lines = textAfter.split('\n');
-    const codeLines = [];
-    let collectingCode = false;
-    let consecutiveEmpty = 0;
-    
-    for (let j = 0; j < lines.length && j < 100; j++) { // Aumentar límite a 100 líneas
-      const line = lines[j];
-      const trimmedLine = line.trim();
-      
-      if (trimmedLine === '') {
-        consecutiveEmpty++;
-        if (collectingCode && consecutiveEmpty < 3) { // Permitir hasta 3 líneas vacías consecutivas
-          codeLines.push(line);
-        }
-        continue;
-      }
-      
-      consecutiveEmpty = 0;
-      
-      // Detectar si es claramente texto explicativo (más estricto)
-      const isExplanatoryText = 
-        trimmedLine.match(/^\d+\.\s+[A-Z][a-z]+/) || // "1. Explicación" con minúsculas después
-        (trimmedLine.match(/^[A-Z][a-z]+\s*:$/) && trimmedLine.length < 30) || // "Explicación:" corto
-        (trimmedLine.length > 80 && trimmedLine.match(/^[A-Z]/) && 
-         !trimmedLine.includes('{') && !trimmedLine.includes('(') && 
-         !trimmedLine.includes(';') && !trimmedLine.includes('=') &&
-         !trimmedLine.includes('#') && !trimmedLine.includes('//') &&
-         !trimmedLine.includes('*') && !trimmedLine.includes('['));
-      
-      // Si encontramos texto explicativo claro después de código, detener
-      if (collectingCode && isExplanatoryText) {
-        break;
-      }
-      
-      // Detectar si parece código (tiene caracteres comunes de programación)
-      const looksLikeCode = 
-        trimmedLine.includes('{') || trimmedLine.includes('}') ||
-        trimmedLine.includes('(') || trimmedLine.includes(')') ||
-        trimmedLine.includes(';') || trimmedLine.includes('=') ||
-        trimmedLine.includes('#') || trimmedLine.includes('//') ||
-        trimmedLine.includes('*') || trimmedLine.includes('[') ||
-        trimmedLine.includes('function') || trimmedLine.includes('const') ||
-        trimmedLine.includes('var') || trimmedLine.includes('let') ||
-        trimmedLine.includes('return') || trimmedLine.includes('if') ||
-        trimmedLine.includes('for') || trimmedLine.includes('while') ||
-        trimmedLine.match(/^[a-z_][a-zA-Z0-9_]*\s*[=\(:]/) || // Variables/funciones
-        (line.match(/^\s{2,}/) && trimmedLine.length > 0); // Líneas con indentación
-      
-      // Si parece código o no es claramente texto explicativo, incluirlo
-      if (looksLikeCode || !isExplanatoryText) {
-        collectingCode = true;
-        codeLines.push(line);
-      }
-    }
-    
-    const codeContent = codeLines.join('\n').trim();
-    if (codeContent && codeContent.length > 0) {
-      html = html.substring(0, startIndex) + 
-             `\`\`\`\n${codeContent}\n\`\`\`` + 
-             html.substring(startIndex + match.fullMatch.length);
-    } else {
-      // Si no hay código, eliminar solo el marcador CODEBLOCK
-      html = html.substring(0, startIndex) + html.substring(startIndex + match.fullMatch.length);
-    }
-  }
-  
-  // Guardar code blocks primero para no procesarlos
-  html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
-    codeBlocks.push(code);
-    return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
-  });
-  
-  // Detectar y procesar patrones matemáticos comunes antes de proteger fórmulas explícitas
-  // Convertir símbolos matemáticos comunes a formato LaTeX
-  html = html.replace(/∫/g, '\\int')
-              .replace(/∑/g, '\\sum')
-              .replace(/∏/g, '\\prod')
-              .replace(/√/g, '\\sqrt')
-              .replace(/π/g, '\\pi')
-              .replace(/α/g, '\\alpha')
-              .replace(/β/g, '\\beta')
-              .replace(/γ/g, '\\gamma')
-              .replace(/δ/g, '\\delta')
-              .replace(/θ/g, '\\theta')
-              .replace(/λ/g, '\\lambda')
-              .replace(/μ/g, '\\mu')
-              .replace(/σ/g, '\\sigma')
-              .replace(/φ/g, '\\phi')
-              .replace(/ω/g, '\\omega')
-              .replace(/∞/g, '\\infty')
-              .replace(/≤/g, '\\leq')
-              .replace(/≥/g, '\\geq')
-              .replace(/≠/g, '\\neq')
-              .replace(/≈/g, '\\approx')
-              .replace(/±/g, '\\pm')
-              .replace(/×/g, '\\times')
-              .replace(/÷/g, '\\div')
-              .replace(/∂/g, '\\partial')
-              .replace(/∇/g, '\\nabla')
-              .replace(/∈/g, '\\in')
-              .replace(/∉/g, '\\notin')
-              .replace(/⊂/g, '\\subset')
-              .replace(/⊃/g, '\\supset')
-              .replace(/∩/g, '\\cap')
-              .replace(/∪/g, '\\cup')
-              .replace(/∅/g, '\\emptyset')
-              .replace(/∀/g, '\\forall')
-              .replace(/∃/g, '\\exists')
-              .replace(/→/g, '\\rightarrow')
-              .replace(/←/g, '\\leftarrow')
-              .replace(/↔/g, '\\Leftrightarrow')
-              .replace(/⇒/g, '\\Rightarrow')
-              .replace(/⇐/g, '\\Leftarrow');
-  
-  // Detectar fórmulas matemáticas en formato común (ej: ∫_a^b f(x) dx)
-  // Patrones como: ∫_a^b, ∫^b_a, sum_{i=1}^n, etc.
-  html = html.replace(/(\\int|\\sum|\\prod|\\lim|\\max|\\min|\\sup|\\inf)\s*_([^{]+?)\^([^{]+?)(\s|$|\\|,|;|\))/g, (match, func, sub, sup, after) => {
-    const index = mathInline.length;
-    mathInline.push(`${func}_{${sub}}^{${sup}}`);
-    return `__MATH_INLINE_${index}__${after}`;
-  });
-  
-  // Detectar expresiones matemáticas comunes que deberían ser inline
-  // Patrones como: x^2, x_1, f(x), etc. pero solo si están claramente marcadas
-  // Esto es más conservador para no romper texto normal
-  
-  // Guardar bloques de matemáticas $$...$$
-  html = html.replace(/\$\$([\s\S]+?)\$\$/g, (match, formula) => {
-    mathBlocks.push(formula.trim());
-    return `__MATH_BLOCK_${mathBlocks.length - 1}__`;
-  });
-  
-  // Guardar matemáticas inline $...$
-  html = html.replace(/\$([^\$\n]+?)\$/g, (match, formula) => {
-    mathInline.push(formula.trim());
-    return `__MATH_INLINE_${mathInline.length - 1}__`;
-  });
-  
-  // Detectar placeholders MATHBLOCK y MATHINLINE y convertirlos a fórmulas vacías o marcadores
-  // Estos placeholders indican que debería haber una fórmula matemática aquí
-  // Se procesan ANTES de proteger fórmulas explícitas para que no interfieran
-  html = html.replace(/MATHBLOCK(\d+)/g, (match, num) => {
-    const index = mathBlocks.length;
-    mathBlocks.push(''); // Fórmula vacía - se mostrará un marcador
-    return `__MATH_BLOCK_${index}__`;
-  });
-  
-  html = html.replace(/MATHINLINE(\d+)/g, (match, num) => {
-    const index = mathInline.length;
-    mathInline.push(''); // Fórmula vacía - se mostrará un marcador
-    return `__MATH_INLINE_${index}__`;
-  });
-  
-  // Escapar HTML
-  html = html.replace(/&/g, '&amp;')
-             .replace(/</g, '&lt;')
-             .replace(/>/g, '&gt;');
-  
-  // Headers (####, ###, ##, #) - procesar en orden de más específico a menos específico
-  html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
-  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-  html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-  
-  // Bold (**text** o __text__)
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
-  
-  // Italic (*text* o _text_)
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/_(.+?)_/g, '<em>$1</em>');
-  
-  // Inline code (`code`)
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-  
-  // Links [text](url)
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-  
-  // Separadores horizontales (--- o ***) - debe ir antes de convertir saltos de línea
-  html = html.replace(/^(\s*)(\*{3,}|-{3,})(\s*)$/gim, '<hr>');
-  
-  // Procesar tablas ANTES de convertir saltos de línea
-  // Las tablas en markdown tienen el formato: | col1 | col2 |\n|------|------|\n| data1 | data2 |
-  const tablePlaceholders = [];
-  const linesForTables = html.split('\n');
-  const processedLinesForTables = [];
-  let inTable = false;
-  let tableRows = [];
-  
-  for (let i = 0; i < linesForTables.length; i++) {
-    const line = linesForTables[i];
-    const isTableRow = line.trim().startsWith('|') && line.trim().endsWith('|');
-    const isTableSeparator = isTableRow && /^[\s\|:\-]+$/.test(line.replace(/\|/g, ''));
-    
-    if (isTableRow && !isTableSeparator) {
-      // Es una fila de tabla (header o data)
-      if (!inTable) {
-        inTable = true;
-        tableRows = [];
-      }
-      tableRows.push(line);
-    } else if (isTableSeparator && inTable) {
-      // Es el separador, lo ignoramos pero mantenemos la tabla abierta
-      continue;
-    } else {
-      // No es parte de una tabla
-      if (inTable && tableRows.length > 0) {
-        // Procesar la tabla acumulada
-        const tableIndex = tablePlaceholders.length;
-        let tableHtml = '<table class="markdown-table">';
-        
-        // Primera fila es el header
-        const headerCells = tableRows[0].split('|').map(cell => cell.trim()).filter(cell => cell);
-        if (headerCells.length > 0) {
-          tableHtml += '<thead><tr>';
-          headerCells.forEach(cell => {
-            // El contenido de las celdas se procesará después con el resto del markdown
-            tableHtml += `<th>${cell}</th>`;
-          });
-          tableHtml += '</tr></thead>';
-        }
-        
-        // Resto son filas de datos
-        if (tableRows.length > 1) {
-          tableHtml += '<tbody>';
-          for (let j = 1; j < tableRows.length; j++) {
-            const cells = tableRows[j].split('|').map(cell => cell.trim()).filter(cell => cell);
-            if (cells.length > 0) {
-              tableHtml += '<tr>';
-              cells.forEach(cell => {
-                tableHtml += `<td>${cell}</td>`;
-              });
-              tableHtml += '</tr>';
-            }
+  // Configurar marked y highlight.js una sola vez
+  if (!window.markedConfigured && typeof marked !== 'undefined' && typeof hljs !== 'undefined') {
+    marked.use({
+      renderer: {
+        code({text, lang}) {
+          const validLanguage = hljs.getLanguage(lang) ? lang : 'plaintext';
+          let highlighted;
+          try {
+            highlighted = hljs.highlight(text, { language: validLanguage }).value;
+          } catch (e) {
+            highlighted = text;
           }
-          tableHtml += '</tbody>';
+          
+          return `
+            <div class="code-block-wrapper">
+              <div class="code-block-header">
+                <span class="language-label">${validLanguage}</span>
+                <button class="copy-btn" onclick="window.copyCodeBlock(this)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  <span class="copy-text">Copiar</span>
+                </button>
+              </div>
+              <pre><code class="hljs language-${validLanguage}">${highlighted}</code></pre>
+            </div>
+          `;
         }
-        
-        tableHtml += '</table>';
-        tablePlaceholders.push(tableHtml);
-        processedLinesForTables.push(`__TABLE_${tableIndex}__`);
-        tableRows = [];
-        inTable = false;
-      }
-      
-      if (!isTableSeparator) {
-        processedLinesForTables.push(line);
-      }
-    }
+      },
+      breaks: true,
+      gfm: true
+    });
+    window.markedConfigured = true;
   }
-  
-  // Si terminamos dentro de una tabla, procesarla
-  if (inTable && tableRows.length > 0) {
-    const tableIndex = tablePlaceholders.length;
-    let tableHtml = '<table class="markdown-table">';
-    
-    const headerCells = tableRows[0].split('|').map(cell => cell.trim()).filter(cell => cell);
-    if (headerCells.length > 0) {
-      tableHtml += '<thead><tr>';
-      headerCells.forEach(cell => {
-        tableHtml += `<th>${cell}</th>`;
-      });
-      tableHtml += '</tr></thead>';
-    }
-    
-    if (tableRows.length > 1) {
-      tableHtml += '<tbody>';
-      for (let j = 1; j < tableRows.length; j++) {
-        const cells = tableRows[j].split('|').map(cell => cell.trim()).filter(cell => cell);
-        if (cells.length > 0) {
-          tableHtml += '<tr>';
-          cells.forEach(cell => {
-            tableHtml += `<td>${cell}</td>`;
-          });
-          tableHtml += '</tr>';
-        }
-      }
-      tableHtml += '</tbody>';
-    }
-    
-    tableHtml += '</table>';
-    tablePlaceholders.push(tableHtml);
-    processedLinesForTables.push(`__TABLE_${tableIndex}__`);
+
+
+  // Si marked no está cargado por alguna razón, devolver texto plano o un fallback simple
+  if (typeof marked === 'undefined') {
+    console.warn('Marked.js no está cargado. Usando fallback simple.');
+    return text.replace(/\n/g, '<br>');
   }
-  
-  html = processedLinesForTables.join('\n');
-  
-  // Procesar listas ANTES de convertir saltos de línea
-  // Dividir en líneas para procesar listas correctamente
-  const lines = html.split('\n');
-  const processedLines = [];
-  let inList = false;
-  let currentParagraph = [];
-  
-  function flushParagraph() {
-    if (currentParagraph.length > 0) {
-      // Unir las líneas del párrafo con <br> y agregar
-      const paragraphText = currentParagraph.join('<br>');
-      processedLines.push(paragraphText);
-      currentParagraph = [];
-    }
-  }
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Detectar si es un elemento de lista (empieza con -, *, o + seguido de espacio)
-    const listMatch = line.match(/^(\s*)([\-\*\+])\s+(.+)$/);
-    
-    if (listMatch) {
-      // Flush cualquier párrafo pendiente
-      flushParagraph();
-      
-      if (!inList) {
-        processedLines.push('<ul>');
-        inList = true;
-      }
-      processedLines.push(`<li>${listMatch[3]}</li>`);
-    } else {
-      if (inList) {
-        processedLines.push('</ul>');
-        inList = false;
-      }
-      
-      // Si la línea está vacía, flush el párrafo y agregar salto
-      if (line.trim() === '') {
-        flushParagraph();
-        if (processedLines.length > 0 && 
-            !processedLines[processedLines.length - 1].endsWith('</ul>') &&
-            !processedLines[processedLines.length - 1].endsWith('<hr>') &&
-            processedLines[processedLines.length - 1] !== '') {
-          processedLines.push('<br>');
-        }
-      } else {
-        // Agregar línea al párrafo actual
-        currentParagraph.push(line);
-      }
-    }
-  }
-  
-  // Flush cualquier párrafo pendiente
-  flushParagraph();
-  
-  // Cerrar lista si aún está abierta
-  if (inList) {
-    processedLines.push('</ul>');
-  }
-  
-  html = processedLines.join('');
-  
-  // Restaurar tablas
-  html = html.replace(/__TABLE_(\d+)__/g, (match, index) => {
-    return tablePlaceholders[parseInt(index)] || '';
+
+  // Proteger fórmulas matemáticas antes de procesar el markdown
+  // Esto evita que marked interprete los guiones bajos o asteriscos dentro de las fórmulas
+  const mathBlocks = [];
+  let protectedText = text;
+
+  // Proteger bloques $$...$$
+  protectedText = protectedText.replace(/\$\$([\s\S]+?)\$\$/g, (match) => {
+    mathBlocks.push(match);
+    return `MATH_BLOCK_PLACEHOLDER_${mathBlocks.length - 1}`;
+  });
+
+  // Proteger inline $...$
+  protectedText = protectedText.replace(/\$([^\$\n]+?)\$/g, (match) => {
+    mathBlocks.push(match);
+    return `MATH_BLOCK_PLACEHOLDER_${mathBlocks.length - 1}`;
+  });
+
+  // Parsear markdown
+  let html = marked.parse(protectedText);
+
+  // Restaurar fórmulas matemáticas
+  html = html.replace(/MATH_BLOCK_PLACEHOLDER_(\d+)/g, (match, index) => {
+    return mathBlocks[index];
   });
   
-  // Procesar el contenido de las celdas de las tablas (negritas, enlaces, etc.)
-  // Esto se hace después de restaurar las tablas pero antes de restaurar fórmulas matemáticas
-  html = html.replace(/(<t[dh]>)(.*?)(<\/t[dh]>)/g, (match, openTag, content, closeTag) => {
-    // Procesar negritas, enlaces, etc. dentro de las celdas
-    let processedContent = content;
-    
-    // Los placeholders MATHINLINE y MATHBLOCK ya fueron procesados antes de crear las tablas
-    // Solo necesitamos procesar el formato markdown básico aquí
-    
-    processedContent = processedContent.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    processedContent = processedContent.replace(/__(.+?)__/g, '<strong>$1</strong>');
-    processedContent = processedContent.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    processedContent = processedContent.replace(/_(.+?)_/g, '<em>$1</em>');
-    processedContent = processedContent.replace(/`([^`]+)`/g, '<code>$1</code>');
-    processedContent = processedContent.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-    return openTag + processedContent + closeTag;
-  });
-  
-  // Restaurar code blocks
-  html = html.replace(/__CODE_BLOCK_(\d+)__/g, (match, index) => {
-    const code = codeBlocks[parseInt(index)];
-    return `<pre><code>${code}</code></pre>`;
-  });
-  
-  // Función auxiliar para procesar fórmulas matemáticas
-  function processMathFormula(formula) {
-    // Convertir funciones comunes si no tienen backslash
-    formula = formula.replace(/\bsqrt\[/g, '\\sqrt[')
-                     .replace(/\bsqrt\(/g, '\\sqrt{')
-                     .replace(/\bfrac\(/g, '\\frac{')
-                     .replace(/\bsum\b/g, '\\sum')
-                     .replace(/\bprod\b/g, '\\prod')
-                     .replace(/\bint\b/g, '\\int')
-                     .replace(/\boint\b/g, '\\oint')
-                     .replace(/\biint\b/g, '\\iint')
-                     .replace(/\biiint\b/g, '\\iiint')
-                     .replace(/\bpartial\b/g, '\\partial')
-                     .replace(/\bnabla\b/g, '\\nabla')
-                     .replace(/\blim\b/g, '\\lim')
-                     .replace(/\bmax\b/g, '\\max')
-                     .replace(/\bmin\b/g, '\\min')
-                     .replace(/\bsup\b/g, '\\sup')
-                     .replace(/\binf\b/g, '\\inf')
-                     .replace(/\binfty\b/g, '\\infty')
-                     .replace(/\bpi\b/g, '\\pi')
-                     .replace(/\btheta\b/g, '\\theta')
-                     .replace(/\balpha\b/g, '\\alpha')
-                     .replace(/\bbeta\b/g, '\\beta')
-                     .replace(/\bgamma\b/g, '\\gamma')
-                     .replace(/\bdelta\b/g, '\\delta')
-                     .replace(/\bepsilon\b/g, '\\epsilon')
-                     .replace(/\blambda\b/g, '\\lambda')
-                     .replace(/\bmu\b/g, '\\mu')
-                     .replace(/\bsigma\b/g, '\\sigma')
-                     .replace(/\bphi\b/g, '\\phi')
-                     .replace(/\bomega\b/g, '\\omega')
-                     .replace(/\bDelta\b/g, '\\Delta')
-                     .replace(/\bGamma\b/g, '\\Gamma')
-                     .replace(/\bLambda\b/g, '\\Lambda')
-                     .replace(/\bSigma\b/g, '\\Sigma')
-                     .replace(/\bPhi\b/g, '\\Phi')
-                     .replace(/\bOmega\b/g, '\\Omega')
-                     .replace(/\bsin\b/g, '\\sin')
-                     .replace(/\bcos\b/g, '\\cos')
-                     .replace(/\btan\b/g, '\\tan')
-                     .replace(/\bsec\b/g, '\\sec')
-                     .replace(/\bcsc\b/g, '\\csc')
-                     .replace(/\bcot\b/g, '\\cot')
-                     .replace(/\barcsin\b/g, '\\arcsin')
-                     .replace(/\barccos\b/g, '\\arccos')
-                     .replace(/\barctan\b/g, '\\arctan')
-                     .replace(/\bln\b/g, '\\ln')
-                     .replace(/\blog\b/g, '\\log')
-                     .replace(/\bexp\b/g, '\\exp')
-                     .replace(/\bdet\b/g, '\\det')
-                     .replace(/\bdim\b/g, '\\dim')
-                     .replace(/\bker\b/g, '\\ker')
-                     .replace(/\bhom\b/g, '\\hom')
-                     .replace(/\bdeg\b/g, '\\deg')
-                     .replace(/\bmod\b/g, '\\mod')
-                     .replace(/\bgcd\b/g, '\\gcd')
-                     .replace(/\blcm\b/g, '\\lcm')
-                     .replace(/\bPr\b/g, '\\Pr')
-                     .replace(/\barg\b/g, '\\arg')
-                     .replace(/\bRe\b/g, '\\Re')
-                     .replace(/\bIm\b/g, '\\Im');
-    
-    // Convertir operadores comunes
-    formula = formula.replace(/\*\*/g, '^')  // ** a ^ para exponentes
-                     .replace(/\bdiv\b/g, '\\div')
-                     .replace(/\btimes\b/g, '\\times')
-                     .replace(/\bcdot\b/g, '\\cdot')
-                     .replace(/\bpm\b/g, '\\pm')
-                     .replace(/\bmp\b/g, '\\mp')
-                     .replace(/\bleq\b/g, '\\leq')
-                     .replace(/\bgeq\b/g, '\\geq')
-                     .replace(/\bneq\b/g, '\\neq')
-                     .replace(/\bapprox\b/g, '\\approx')
-                     .replace(/\bequiv\b/g, '\\equiv')
-                     .replace(/\bcong\b/g, '\\cong')
-                     .replace(/\bsim\b/g, '\\sim')
-                     .replace(/\bpropto\b/g, '\\propto')
-                     .replace(/\bin\b(?=\s)/g, '\\in')
-                     .replace(/\bnotin\b/g, '\\notin')
-                     .replace(/\bsubset\b/g, '\\subset')
-                     .replace(/\bsupset\b/g, '\\supset')
-                     .replace(/\bsubseteq\b/g, '\\subseteq')
-                     .replace(/\bsupseteq\b/g, '\\supseteq')
-                     .replace(/\bcap\b/g, '\\cap')
-                     .replace(/\bcup\b/g, '\\cup')
-                     .replace(/\bemptyset\b/g, '\\emptyset')
-                     .replace(/\bforall\b/g, '\\forall')
-                     .replace(/\bexists\b/g, '\\exists')
-                     .replace(/\bnexists\b/g, '\\nexists')
-                     .replace(/\bland\b/g, '\\land')
-                     .replace(/\blor\b/g, '\\lor')
-                     .replace(/\blnot\b/g, '\\lnot')
-                     .replace(/\brightarrow\b/g, '\\rightarrow')
-                     .replace(/\bleftarrow\b/g, '\\leftarrow')
-                     .replace(/\bLeftrightarrow\b/g, '\\Leftrightarrow')
-                     .replace(/\bRightarrow\b/g, '\\Rightarrow')
-                     .replace(/\bLeftarrow\b/g, '\\Leftarrow');
-    
-    return formula;
-  }
-  
-  // Restaurar fórmulas matemáticas en bloques
-  html = html.replace(/__MATH_BLOCK_(\d+)__/g, (match, index) => {
-    let formula = mathBlocks[parseInt(index)];
-    // Si la fórmula está vacía (placeholder), intentar buscar en el contexto
-    if (!formula || formula.trim() === '') {
-      return '<span class="math-placeholder">[Fórmula matemática]</span>';
-    }
-    formula = processMathFormula(formula);
-    return `<span class="math-block">$$${formula}$$</span>`;
-  });
-  
-  // Restaurar fórmulas matemáticas inline
-  html = html.replace(/__MATH_INLINE_(\d+)__/g, (match, index) => {
-    let formula = mathInline[parseInt(index)];
-    // Si la fórmula está vacía (placeholder), mostrar un marcador más informativo
-    if (!formula || formula.trim() === '') {
-      return '<span class="math-placeholder" title="Fórmula matemática pendiente">[Fórmula]</span>';
-    }
-    formula = processMathFormula(formula);
-    return `<span class="math-inline">$${formula}$</span>`;
-  });
-  
-  // Detectar expresiones matemáticas comunes escritas en texto plano dentro de tablas y otros contextos
-  // Esto ayuda a convertir texto matemático común a formato LaTeX automáticamente
-  
-  // Detectar integrales escritas como texto: "∫_a^b f(x) dx" o "integral de a a b"
-  html = html.replace(/(?:integral|∫)\s*(?:de|from)?\s*([a-z0-9]+)\s*(?:a|to|hasta)?\s*([a-z0-9]+)\s*(?:de|of)?\s*([^,\s\.;]+)/gi, (match, a, b, func) => {
-    return `<span class="math-inline">$\\int_{${a}}^{${b}} ${func}$</span>`;
-  });
-  
-  // Detectar fracciones escritas como texto: "a/b" cuando está en contexto matemático
-  // Mejorar la detección de fracciones comunes
-  html = html.replace(/(\d+|\w+)\s*\/\s*(\d+|\w+)(?=\s|$|,|;|\)|\.|\))/g, (match, num, den, offset, string) => {
-    // Solo convertir si está en contexto matemático claro
-    const pos = offset;
-    const before = string.substring(Math.max(0, pos - 10), pos);
-    const after = string.substring(pos + match.length, pos + match.length + 10);
-    
-    // Contexto matemático: precedido o seguido de operadores matemáticos, o contiene letras
-    const isMathContext = /[=+\-*/(\\∫∑∏]/.test(before) || 
-                          /[=+\-*/)\\]/.test(after) || 
-                          /[a-zA-Zα-ωΑ-Ω]/.test(num) || 
-                          /[a-zA-Zα-ωΑ-Ω]/.test(den) ||
-                          match.includes('∫') ||
-                          match.includes('∑') ||
-                          before.includes('MATH') ||
-                          after.includes('MATH');
-    
-    if (isMathContext && !match.includes('<span')) {
-      return `<span class="math-inline">$\\frac{${num}}{${den}}$</span>`;
-    }
-    return match;
-  });
-  
-  // Detectar expresiones con exponentes y subíndices escritas como texto
-  // Ejemplo: "x^2", "x_1", "f(x)", etc.
-  html = html.replace(/([a-zA-Zα-ωΑ-Ω])\s*\^\s*(\d+|\w+)/g, (match, base, exp) => {
-    const pos = html.indexOf(match);
-    const before = html.substring(Math.max(0, pos - 5), pos);
-    const after = html.substring(pos + match.length, pos + match.length + 5);
-    
-    // Solo convertir si está en contexto matemático
-    if (/[=+\-*/(\\∫∑∏\s]/.test(before) || /[=+\-*/)\\\s]/.test(after) || before.includes('MATH') || after.includes('MATH')) {
-      return `<span class="math-inline">$${base}^{${exp}}$</span>`;
-    }
-    return match;
-  });
-  
-  html = html.replace(/([a-zA-Zα-ωΑ-Ω])\s*_\s*(\d+|\w+)/g, (match, base, sub) => {
-    const pos = html.indexOf(match);
-    const before = html.substring(Math.max(0, pos - 5), pos);
-    const after = html.substring(pos + match.length, pos + match.length + 5);
-    
-    // Solo convertir si está en contexto matemático
-    if (/[=+\-*/(\\∫∑∏\s]/.test(before) || /[=+\-*/)\\\s]/.test(after) || before.includes('MATH') || after.includes('MATH')) {
-      return `<span class="math-inline">$${base}_{${sub}}$</span>`;
-    }
-    return match;
-  });
-  
-  // Detectar y convertir expresiones matemáticas comunes que no fueron capturadas
-  // Buscar patrones como: ∫_a^b f(x) dx, sum_{i=1}^n, etc.
-  // Esto debe hacerse después de restaurar las fórmulas protegidas
-  
-  // Detectar expresiones con subíndices y superíndices comunes
-  // Patrón: función_sub^sup (ej: int_a^b, sum_{i=1}^n)
-  html = html.replace(/(\\int|\\sum|\\prod|\\lim|\\max|\\min|\\sup|\\inf)\s*_([^{}\s]+?)\^([^{}\s]+?)(?=\s|$|\\|,|;|\)|\.|,)/g, (match, func, sub, sup) => {
-    const formula = `${func}_{${sub}}^{${sup}}`;
-    return `<span class="math-inline">$${formula}$</span>`;
-  });
-  
-  // Detectar expresiones con llaves: función_{sub}^{sup}
-  html = html.replace(/(\\int|\\sum|\\prod|\\lim|\\max|\\min|\\sup|\\inf)\s*_\{([^}]+?)\}\^\{([^}]+?)\}/g, (match, func, sub, sup) => {
-    const formula = `${func}_{${sub}}^{${sup}}`;
-    return `<span class="math-inline">$${formula}$</span>`;
-  });
-  
-  // Detectar fracciones comunes: a/b cuando está en contexto matemático
-  html = html.replace(/(\d+|\w+)\/(\d+|\w+)(?=\s|$|,|;|\)|\.)/g, (match, num, den) => {
-    // Solo convertir si está en contexto matemático claro
-    const pos = html.indexOf(match);
-    const before = html.substring(Math.max(0, pos - 5), pos);
-    const after = html.substring(pos + match.length, pos + match.length + 5);
-    if (/[=+\-*/(\\]/.test(before) || /[=+\-*/)\\]/.test(after) || /[a-zA-Z]/.test(num) || /[a-zA-Z]/.test(den)) {
-      return `<span class="math-inline">$\\frac{${num}}{${den}}$</span>`;
-    }
-    return match;
-  });
+  // Agregar clase markdown-table a todas las tablas para que se apliquen los estilos CSS
+  html = html.replace(/<table>/g, '<table class="markdown-table">');
   
   return html;
 }
@@ -815,7 +248,9 @@ async function copyToClipboard(text, button) {
   try {
     await navigator.clipboard.writeText(text);
     
-    // Feedback visual - cambiar el icono temporalmente
+    // Feedback visual
+    // Si el botón tiene la clase copy-message-btn (mensaje completo), usar el comportamiento original (solo icono)
+    if (button.classList.contains('copy-message-btn')) {
     const originalHTML = button.innerHTML;
     button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
     button.classList.add('copied');
@@ -824,38 +259,65 @@ async function copyToClipboard(text, button) {
       button.innerHTML = originalHTML;
       button.classList.remove('copied');
     }, 1500);
-  } catch (err) {
-    // Fallback para navegadores que no soportan clipboard API
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
-    textArea.style.top = '-999999px';
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    
-    try {
-      document.execCommand('copy');
+    } else {
+      // Comportamiento para botones de código (con texto)
       const originalHTML = button.innerHTML;
-      button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      const textSpan = button.querySelector('.copy-text');
+      const svg = button.querySelector('svg');
+      
+      if (textSpan) textSpan.textContent = 'Copiado!';
+      if (svg) svg.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>'; // Check icon content
       button.classList.add('copied');
       
       setTimeout(() => {
         button.innerHTML = originalHTML;
         button.classList.remove('copied');
       }, 1500);
-    } catch (err) {
-      console.error('Error al copiar:', err);
-      button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-      setTimeout(() => {
-        button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
-      }, 2000);
     }
+  } catch (err) {
+    console.error('Error al copiar:', err);
+    // Fallback simple
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-9999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
     
+    try {
+      document.execCommand('copy');
+      // Reutilizar lógica de feedback visual
+      if (button.classList.contains('copy-message-btn')) {
+      const originalHTML = button.innerHTML;
+      button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      button.classList.add('copied');
+        setTimeout(() => { button.innerHTML = originalHTML; button.classList.remove('copied'); }, 1500);
+      } else {
+        const originalHTML = button.innerHTML;
+        const textSpan = button.querySelector('.copy-text');
+        if (textSpan) textSpan.textContent = 'Copiado!';
+        button.classList.add('copied');
+        setTimeout(() => { button.innerHTML = originalHTML; button.classList.remove('copied'); }, 1500);
+      }
+    } catch (e) {
+      console.error('Fallback copy failed', e);
+    }
     document.body.removeChild(textArea);
   }
 }
+
+// Función global para copiar bloques de código
+window.copyCodeBlock = async function(button) {
+  const wrapper = button.closest('.code-block-wrapper');
+  if (!wrapper) return;
+  
+  const codeElement = wrapper.querySelector('code');
+  if (!codeElement) return;
+  
+  const text = codeElement.innerText;
+  await copyToClipboard(text, button);
+};
 
 function getFileExtension(filename) {
   return filename.split('.').pop().toUpperCase();
