@@ -1,20 +1,21 @@
-# Ollama Web Chat
+# Ollama Web Chat 🌟
 
-A modern, elegant web interface for interacting with local Ollama language models, inspired by Claude's design.
+A modern, elegant web interface for interacting with local Ollama language models.
 
-![Ollama Web Chat](https://img.shields.io/badge/Ollama-Web_Chat-blue?
-style=for-the-badge)
-![Vite](https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&
-logo=vite&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&
-logo=javascript&logoColor=black)
+![Ollama Web Chat](https://img.shields.io/badge/Ollama-Web_Chat-blue?style=for-the-badge)
+![Vite](https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 
-![Ollama Web Chat Preview](./assets/image.png)
+
+
+
 
 ## Overview
 
 Ollama Web Chat provides a beautiful, user-friendly interface to chat with your locally running Ollama models. It features real-time streaming responses, conversation management, markdown rendering, and mathematical formula support—all wrapped in a clean, dark-themed UI.
 
+
+![Ollama Web Chat Preview](./assets/image.png)
 ## What It Does
 
 ### Core Features
@@ -140,10 +141,11 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ## Acknowledgments
 
-- Inspired by [Claude's](https://claude.ai/) interface design
 - Powered by [Ollama](https://ollama.ai/)
 - Math rendering by [KaTeX](https://katex.org/)
 
 ---
 
 Made with ❤️ for the Ollama community
+
+
