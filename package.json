@@ -6,12 +6,21 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "npx pm2 start ecosystem.config.cjs",
+    "stop": "npx pm2 stop ollama-web",
+    "restart": "npx pm2 restart ollama-web",
+    "delete": "npx pm2 delete ollama-web",
+    "logs": "npx pm2 logs ollama-web",
+    "status": "npx pm2 status"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "vite": "^7.2.0"
+  },
+  "dependencies": {
+    "pm2": "^5.3.0"
   }
 }
