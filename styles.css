@@ -2171,24 +2171,44 @@ body {
 .thinking-block {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  margin: 16px 0;
+  border-radius: 8px;
+  margin: 12px 0;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.thinking-block:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.thinking-streaming {
+  margin: 8px 0;
 }
 
 .thinking-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 8px 12px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
+  position: relative;
+}
+
+.thinking-streaming .thinking-header {
+  padding: 6px 10px;
 }
 
 .thinking-header:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.thinking-header:active {
+  background: rgba(255, 255, 255, 0.06);
+  transform: scale(0.98);
 }
 
 .thinking-icon {
@@ -2196,6 +2216,17 @@ body {
   line-height: 1;
   color: #6B9FED;
   filter: brightness(1.1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease;
+  display: inline-block;
+}
+
+.thinking-header:hover .thinking-icon {
+  transform: scale(1.1);
+  filter: brightness(1.2);
+}
+
+.thinking-block.expanded .thinking-icon {
+  transform: rotate(15deg) scale(1.05);
 }
 
 .thinking-title {
@@ -2204,6 +2235,62 @@ body {
   color: rgba(255, 255, 255, 0.55);
   font-weight: 400;
   letter-spacing: 0.01em;
+  transition: color 0.2s ease;
+}
+
+.thinking-header:hover .thinking-title {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.thinking-title.thinking-active {
+  color: rgba(107, 159, 237, 0.95);
+  animation: thinking-pulse-text 2s ease-in-out infinite;
+  font-weight: 500;
+}
+
+.thinking-dots-animated {
+  display: inline-block;
+  margin-left: 2px;
+}
+
+.thinking-dots-animated .dot {
+  display: inline-block;
+  opacity: 0.3;
+  animation: thinking-dot-pulse 1.4s ease-in-out infinite;
+}
+
+.thinking-dots-animated .dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.thinking-dots-animated .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dots-animated .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes thinking-pulse-text {
+  0%, 100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.01);
+  }
+}
+
+@keyframes thinking-dot-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
 }
 
 .thinking-duration {
@@ -2212,28 +2299,45 @@ body {
 }
 
 .thinking-chevron {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  transition: transform 0.2s ease;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease;
   display: inline-block;
+  transform-origin: center;
+}
+
+.thinking-header:hover .thinking-chevron {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .thinking-block.expanded .thinking-chevron {
   transform: rotate(180deg);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .thinking-content {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.3s ease, opacity 0.3s ease;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   opacity: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0;
 }
 
 .thinking-block.expanded .thinking-content {
   max-height: 600px;
   opacity: 1;
   overflow-y: auto;
+  padding: 0;
+}
+
+.thinking-content-streaming {
+  max-height: 120px !important;
+  opacity: 1 !important;
+  overflow-y: auto !important;
+  scroll-behavior: smooth;
 }
 
 .thinking-content::-webkit-scrollbar {
@@ -2246,14 +2350,39 @@ body {
 }
 
 .thinking-text {
-  padding: 14px 16px;
-  font-size: 13px;
-  line-height: 1.65;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.5;
   color: rgba(255, 255, 255, 0.65);
   white-space: pre-wrap;
   word-wrap: break-word;
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
   background: rgba(0, 0, 0, 0.1);
+}
+
+.thinking-streaming .thinking-text {
+  padding: 6px 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.thinking-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 12px;
+  background: #6B9FED;
+  margin-left: 2px;
+  animation: cursor-blink 1s infinite;
+  vertical-align: middle;
+}
+
+@keyframes cursor-blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
 }
 
 .thinking-loading {

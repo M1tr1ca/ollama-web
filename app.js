@@ -611,11 +611,25 @@ function createThinkingBlock(thinking, duration = null, isLoading = false) {
   const durationText = duration ? `${duration} segundos` : '';
   
   if (isLoading) {
+    if (thinking) {
+      return `
+        <div class="thinking-block expanded thinking-streaming">
+          <div class="thinking-header">
+            <span class="thinking-icon">⚛</span>
+            <span class="thinking-title thinking-active">Pensando<span class="thinking-dots-animated"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span></span>
+          </div>
+          <div class="thinking-content thinking-content-streaming" style="max-height: 120px; opacity: 1;">
+            <div class="thinking-text">${escapeHtml(thinking)}<span class="thinking-cursor">▊</span></div>
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="thinking-block">
         <div class="thinking-header">
           <span class="thinking-icon">⚛</span>
-          <span class="thinking-title">Pensando...</span>
+          <span class="thinking-title thinking-active">Pensando</span>
         </div>
         <div class="thinking-loading">
           Analizando la pregunta<div class="thinking-dots"><span></span><span></span><span></span></div>
@@ -624,15 +638,9 @@ function createThinkingBlock(thinking, duration = null, isLoading = false) {
     `;
   }
   
-  // Si hay thinking real (no solo el mensaje genérico), expandirlo por defecto
-  const hasRealThinking = thinking && 
-    !thinking.includes('Procesó la solicitud en') && 
-    thinking.trim().length > 0;
-  
-  const expandedClass = hasRealThinking ? 'expanded' : '';
-  
+  // El bloque siempre empieza cerrado, el usuario debe hacer clic para expandirlo
   return `
-    <div class="thinking-block ${expandedClass}" onclick="this.classList.toggle('expanded')">
+    <div class="thinking-block" onclick="this.classList.toggle('expanded')">
       <div class="thinking-header">
         <span class="thinking-icon">⚛</span>
         <span class="thinking-title">Pensó durante ${durationText || '...'}</span>
@@ -657,7 +665,7 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
   // Agregar bloque de pensamiento si existe
   if (thinkingData) {
     if (thinkingData.isLoading) {
-      content += createThinkingBlock('', null, true);
+      content += createThinkingBlock(thinkingData.thinking, thinkingData.duration, true);
     } else if (thinkingData.thinking) {
       content += createThinkingBlock(thinkingData.thinking, thinkingData.duration, false);
     }
@@ -732,9 +740,15 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
     if (!skipScroll) {
       const now = Date.now();
       if (now - lastScrollTime >= SCROLL_INTERVAL) {
-  scrollChatToBottom();
+        scrollChatToBottom();
         lastScrollTime = now;
       }
+    }
+    
+    // Scroll automático del thinking-content hacia el final cuando está cargando
+    const thinkingContent = bubble.querySelector('.thinking-content-streaming');
+    if (thinkingContent) {
+      thinkingContent.scrollTop = thinkingContent.scrollHeight;
     }
   });
 }
@@ -902,6 +916,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
   let buffer = '';
   let isFirstChunk = true;
   let thinkingComplete = false;
+  let isThinkingStreaming = false;
   wasCancelled = false; // Resetear el flag de cancelación
   
   // Sistema de batching para actualizaciones suaves
@@ -927,7 +942,8 @@ async function streamAssistantResponse(conversation, payloadMessages) {
       if (now - lastUpdateTime >= UPDATE_INTERVAL || contentDiff > BATCH_SIZE) {
         const thinkingData = assistantMessage.thinking ? {
           thinking: assistantMessage.thinking,
-          duration: assistantMessage.thinkingDuration
+          duration: assistantMessage.thinkingDuration,
+          isLoading: isThinkingStreaming
         } : null;
         
         // Solo hacer scroll si hay mucho contenido nuevo
@@ -958,12 +974,10 @@ async function streamAssistantResponse(conversation, payloadMessages) {
 
           // Capturar el razonamiento del modelo (si está disponible)
           // Algunos modelos envían esto en diferentes campos
-          if (parsed.thinking || parsed.reasoning || parsed.thought) {
-            const thinkingText = parsed.thinking || parsed.reasoning || parsed.thought;
-            // Agregar salto de línea si ya hay thinking previo
-            if (assistantMessage.thinking && !assistantMessage.thinking.endsWith('\n')) {
-              assistantMessage.thinking += '\n';
-            }
+          if (parsed.thinking || parsed.reasoning || parsed.thought || parsed.message?.thinking) {
+            isThinkingStreaming = true;
+            const thinkingText = parsed.thinking || parsed.reasoning || parsed.thought || parsed.message?.thinking;
+            
             assistantMessage.thinking += thinkingText;
             const duration = ((Date.now() - startTime) / 1000).toFixed(0);
             assistantMessage.thinkingDuration = duration;
@@ -971,13 +985,15 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             // Actualizar inmediatamente para thinking (con scroll)
             updateAssistantBubble(bubble, assistantMessage.content, {
               thinking: assistantMessage.thinking,
-              duration: duration
+              duration: duration,
+              isLoading: true
             }, false);
             thinkingComplete = true;
             // No persistir en cada chunk de thinking, solo al final
           }
 
           if (parsed.message?.content) {
+            isThinkingStreaming = false;
             const contentChunk = parsed.message.content;
             
             // Detectar si el contenido contiene marcadores de razonamiento
