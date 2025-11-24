@@ -2,6 +2,7 @@ const API_BASE = 'http://localhost:11434';
 const STORAGE_KEY = 'ollama-web-state-v1';
 const DEFAULT_TITLE = 'Nueva conversación';
 const BACKGROUND_STORAGE_KEY = 'ollama-web-background-date';
+const DYSLEXIC_FONT_KEY = 'ollama-web-dyslexic-font';
 
 const chatList = document.getElementById('chat-list');
 const chatForm = document.getElementById('chat-form');
@@ -21,6 +22,8 @@ const chatState = document.getElementById('chat-state');
 const sidebar = document.getElementById('sidebar');
 const toggleSidebarButton = document.getElementById('toggle-sidebar');
 const layout = document.getElementById('app');
+const incognitoButton = document.getElementById('incognito-toggle');
+const incognitoButtonEmpty = document.getElementById('incognito-toggle-empty');
 
 const state = {
   conversations: {},
@@ -35,6 +38,8 @@ const attachedFiles = {};
 
 let currentStreamReader = null;
 let wasCancelled = false;
+let incognitoMode = false;
+let stateBeforeIncognito = null; // Guardar el estado antes de entrar en modo incógnito
 
 const hasLocalStorage = (() => {
   try {
@@ -79,6 +84,9 @@ function ensureConversationOrder() {
 }
 
 function persistState() {
+  // No guardar nada si estamos en modo incógnito
+  if (incognitoMode) return;
+  
   if (!hasLocalStorage) return;
   const snapshot = {
     conversations: state.conversations,
@@ -465,11 +473,17 @@ function renderActiveConversation() {
 function showEmptyState() {
   if (emptyState) emptyState.style.display = 'flex';
   if (chatState) chatState.style.display = 'none';
+  // Mostrar botón incógnito del empty-state y ocultar el del chat
+  if (incognitoButtonEmpty) incognitoButtonEmpty.style.display = 'flex';
+  if (incognitoButton) incognitoButton.style.display = 'none';
 }
 
 function showChatState() {
   if (emptyState) emptyState.style.display = 'none';
   if (chatState) chatState.style.display = 'flex';
+  // Ocultar botón incógnito del empty-state y mostrar el del chat
+  if (incognitoButtonEmpty) incognitoButtonEmpty.style.display = 'none';
+  if (incognitoButton) incognitoButton.style.display = 'flex';
 }
 
 function renderConversationList() {
@@ -1947,11 +1961,97 @@ function loadSidebarState() {
   }
 }
 
+function toggleIncognitoMode() {
+  incognitoMode = !incognitoMode;
+  
+  // Actualizar estado visual de ambos botones
+  const buttons = [incognitoButton, incognitoButtonEmpty].filter(Boolean);
+  buttons.forEach(button => {
+    if (incognitoMode) {
+      button.classList.add('active');
+      button.title = 'Desactivar modo incógnito';
+    } else {
+      button.classList.remove('active');
+      button.title = 'Activar modo incógnito';
+    }
+  });
+  
+  // Ocultar/mostrar la barra lateral
+  if (sidebar && layout) {
+    if (incognitoMode) {
+      // ENTRANDO en modo incógnito
+      sidebar.classList.add('hidden');
+      layout.classList.add('sidebar-hidden');
+      
+      // Guardar el estado actual antes de entrar en modo incógnito
+      stateBeforeIncognito = {
+        conversations: JSON.parse(JSON.stringify(state.conversations)),
+        order: [...state.order],
+        activeId: state.activeId,
+        currentModel: state.currentModel,
+        attachedFiles: JSON.parse(JSON.stringify(attachedFiles))
+      };
+      
+      // Limpiar el estado actual y crear una conversación temporal
+      state.conversations = {};
+      state.order = [];
+      state.activeId = null;
+      
+      // Limpiar archivos adjuntos
+      Object.keys(attachedFiles).forEach(key => delete attachedFiles[key]);
+      
+      // Crear una nueva conversación temporal para el modo incógnito
+      createConversation();
+      renderConversationList();
+      renderActiveConversation();
+      
+    } else {
+      // SALIENDO del modo incógnito
+      sidebar.classList.remove('hidden');
+      layout.classList.remove('sidebar-hidden');
+      
+      // Restaurar el estado anterior (sin guardar las conversaciones incógnito)
+      if (stateBeforeIncognito) {
+        state.conversations = stateBeforeIncognito.conversations;
+        state.order = stateBeforeIncognito.order;
+        state.activeId = stateBeforeIncognito.activeId;
+        state.currentModel = stateBeforeIncognito.currentModel;
+        
+        // Restaurar archivos adjuntos
+        Object.keys(attachedFiles).forEach(key => delete attachedFiles[key]);
+        Object.assign(attachedFiles, stateBeforeIncognito.attachedFiles);
+        
+        stateBeforeIncognito = null;
+        
+        // Renderizar el estado restaurado
+        renderConversationList();
+        if (state.activeId && state.conversations[state.activeId]) {
+          renderActiveConversation();
+        } else if (state.order.length > 0) {
+          setActiveConversation(state.order[0]);
+        } else {
+          createConversation();
+        }
+        
+        // Sincronizar los selectores de modelo
+        syncModelSelects();
+      }
+      
+      // Restaurar el estado del sidebar si estaba minimizado
+      loadSidebarState();
+    }
+  }
+}
+
 function init() {
   if (!chatList) return;
 
   loadState();
   loadSidebarState();
+  
+  // Cargar preferencia de fuente disléxica al iniciar
+  const dyslexicFontEnabled = getDyslexicFontEnabled();
+  applyDyslexicFont(dyslexicFontEnabled);
   
   if (!state.activeId || !state.conversations[state.activeId]) {
     createConversation();
@@ -1995,6 +2095,8 @@ function init() {
   deleteConversationButton?.addEventListener('click', handleDeleteActive);
   
   toggleSidebarButton?.addEventListener('click', toggleSidebar);
+  incognitoButton?.addEventListener('click', toggleIncognitoMode);
+  incognitoButtonEmpty?.addEventListener('click', toggleIncognitoMode);
   
   // Atajos de teclado
   document.addEventListener('keydown', (e) => {
@@ -2007,6 +2109,11 @@ function init() {
     if (e.ctrlKey && e.key === 'm') {
       e.preventDefault();
       createConversation();
+    }
+    // Control+Shift+; para activar/desactivar modo incógnito
+    if (e.ctrlKey && e.shiftKey && e.key === ';') {
+      e.preventDefault();
+      toggleIncognitoMode();
     }
   });
   
@@ -2358,6 +2465,35 @@ function getStyleInstructions(style) {
   return styleInstructions[style] || '';
 }
 
+// Funciones para manejar la fuente disléxica
+function getDyslexicFontEnabled() {
+  if (!hasLocalStorage) return false;
+  try {
+    const stored = window.localStorage.getItem(DYSLEXIC_FONT_KEY);
+    return stored === 'true';
+  } catch (error) {
+    console.warn('No se pudo obtener la preferencia de fuente disléxica', error);
+    return false;
+  }
+}
+
+function saveDyslexicFontEnabled(enabled) {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(DYSLEXIC_FONT_KEY, enabled ? 'true' : 'false');
+  } catch (error) {
+    console.warn('No se pudo guardar la preferencia de fuente disléxica', error);
+  }
+}
+
+function applyDyslexicFont(enabled) {
+  if (enabled) {
+    document.body.classList.add('dyslexic-font-enabled');
+  } else {
+    document.body.classList.remove('dyslexic-font-enabled');
+  }
+}
+
 function updateGreeting() {
   const greetingElement = document.getElementById('greeting-text');
   const subtitleElement = document.getElementById('greeting-subtitle');
@@ -2491,8 +2627,41 @@ function initUserMenu() {
               option.classList.remove('active');
             }
           });
+          
+          // Marcar la fuente actual como seleccionada
+          const isDyslexicEnabled = getDyslexicFontEnabled();
+          const fontOptions = settingsMenu.querySelectorAll('.font-option');
+          fontOptions.forEach(option => {
+            const isCurrentFont = (option.dataset.font === 'dyslexic' && isDyslexicEnabled) ||
+                                  (option.dataset.font === 'normal' && !isDyslexicEnabled);
+            if (isCurrentFont) {
+              option.classList.add('active');
+            } else {
+              option.classList.remove('active');
+            }
+          });
         }
       }
+    });
+  }
+  
+  // Manejar selección de fuente en el submenú
+  const fontOptions = settingsMenu?.querySelectorAll('.font-option');
+  if (fontOptions) {
+    fontOptions.forEach(option => {
+      option.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const fontType = option.dataset.font;
+        const enableDyslexic = fontType === 'dyslexic';
+        
+        // Guardar y aplicar la preferencia
+        saveDyslexicFontEnabled(enableDyslexic);
+        applyDyslexicFont(enableDyslexic);
+        
+        // Actualizar estado visual
+        fontOptions.forEach(opt => opt.classList.remove('active'));
+        option.classList.add('active');
+      });
     });
   }
   

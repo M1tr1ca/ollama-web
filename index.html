@@ -95,6 +95,18 @@
               </button>
               <input type="color" id="custom-color-picker" style="display: none;" />
             </div>
+            <div class="settings-divider"></div>
+            <div class="settings-themes-label">Fuente:</div>
+            <div class="font-selector">
+              <button class="font-option" data-font="normal" title="Fuente normal">
+                <span class="font-preview font-normal">Aa</span>
+                <span class="font-name">Normal</span>
+              </button>
+              <button class="font-option" data-font="dyslexic" title="OpenDyslexic - Facilita la lectura">
+                <span class="font-preview font-dyslexic">Aa</span>
+                <span class="font-name">Dislexia</span>
+              </button>
+            </div>
           </div>
         </footer>
         
@@ -254,6 +266,19 @@
 
       <div class="main-column">
         <div id="background-image" class="background-image"></div>
+        <div id="empty-state-header" class="empty-state-header">
+          <button id="incognito-toggle-empty" class="incognito-button icon-button" title="Activar modo incógnito">
+            <svg class="incognito-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Sombrero -->
+              <path d="M8 8C8 6 9 5 10 5H14C15 5 16 6 16 8V9H8V8Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M6 9H18C18.5 9 19 9.5 19 10V11H5V10C5 9.5 5.5 9 6 9Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <!-- Gafas -->
+              <circle cx="9" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+              <circle cx="15" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+              <line x1="11.5" y1="14" x2="12.5" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
         <div id="empty-state" class="empty-state">
           <div class="greeting">
             <h1 id="greeting-text">Buenas noches, <span class="user-name">Default</span></h1>
@@ -301,6 +326,17 @@
               </button>
               <button id="rename-conversation" class="icon-button" type="button" title="Renombrar conversación">✎</button>
               <button id="delete-conversation" class="icon-button" type="button" title="Eliminar conversación">🗑</button>
+              <button id="incognito-toggle" class="incognito-button icon-button" title="Activar modo incógnito">
+                <svg class="incognito-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Sombrero -->
+                  <path d="M8 8C8 6 9 5 10 5H14C15 5 16 6 16 8V9H8V8Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M6 9H18C18.5 9 19 9.5 19 10V11H5V10C5 9.5 5.5 9 6 9Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <!-- Gafas -->
+                  <circle cx="9" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                  <circle cx="15" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                  <line x1="11.5" y1="14" x2="12.5" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </button>
             </div>
             <div id="attachments-dropdown" class="attachments-dropdown" style="display: none;">
               <div class="attachments-dropdown-header">

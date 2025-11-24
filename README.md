@@ -73,6 +73,12 @@ Navigate to `http://localhost:5173`
    - Click the edit icon (✎) to rename a conversation
    - Click the delete icon (🗑) to remove a conversation
 
+## Keyboard Shortcuts
+
+- **Ctrl+B**: Toggle sidebar (show/hide)
+- **Ctrl+M**: Create new conversation
+- **Ctrl+Shift+;**: Toggle incognito mode (private chat without saving)
+
 ## Mathematical Expressions
 
 The app supports LaTeX-style mathematical notation:
