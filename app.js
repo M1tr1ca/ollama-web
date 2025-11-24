@@ -1097,6 +1097,34 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             renderConversationList();
             currentStreamReader = null;
             updateStopButtonToSend();
+            
+            // Extraer información importante automáticamente
+            const lastUserMessage = conversation.messages.filter(m => m.role === 'user').pop();
+            if (lastUserMessage && assistantMessage.content) {
+              // Usar extracción simple primero (más rápida)
+              const simpleExtracted = extractInfoSimple(lastUserMessage.content, assistantMessage.content);
+              let addedCount = 0;
+              simpleExtracted.forEach(info => {
+                if (info && !memoryExists(info)) {
+                  addMemory(info);
+                  addedCount++;
+                }
+              });
+              
+              // Actualizar lista si se añadieron memorias
+              if (addedCount > 0 && typeof window.renderMemoriesList === 'function') {
+                window.renderMemoriesList();
+              }
+              
+              // Si no se encontró nada con el método simple y hay suficiente contenido, usar IA
+              if (simpleExtracted.length === 0 && assistantMessage.content.length > 100) {
+                // Ejecutar en segundo plano sin bloquear
+                setTimeout(() => {
+                  extractImportantInfoFromConversation(lastUserMessage.content, assistantMessage.content);
+                }, 500);
+              }
+            }
+            
             // Scroll final garantizado
             setTimeout(() => scrollChatToBottom(), 0);
             return;
@@ -1119,6 +1147,34 @@ async function streamAssistantResponse(conversation, payloadMessages) {
         duration: assistantMessage.thinkingDuration
       } : null;
       updateAssistantBubble(bubble, assistantMessage.content, thinkingData, false);
+      
+      // Extraer información importante automáticamente al finalizar
+      const lastUserMessage = conversation.messages.filter(m => m.role === 'user').pop();
+      if (lastUserMessage && assistantMessage.content) {
+        // Usar extracción simple primero (más rápida)
+        const simpleExtracted = extractInfoSimple(lastUserMessage.content, assistantMessage.content);
+        let addedCount = 0;
+        simpleExtracted.forEach(info => {
+          if (info && !memoryExists(info)) {
+            addMemory(info);
+            addedCount++;
+          }
+        });
+        
+        // Actualizar lista si se añadieron memorias
+        if (addedCount > 0 && typeof window.renderMemoriesList === 'function') {
+          window.renderMemoriesList();
+        }
+        
+        // Si no se encontró nada con el método simple y hay suficiente contenido, usar IA
+        if (simpleExtracted.length === 0 && assistantMessage.content.length > 100) {
+          // Ejecutar en segundo plano sin bloquear
+          setTimeout(() => {
+            extractImportantInfoFromConversation(lastUserMessage.content, assistantMessage.content);
+          }, 500);
+        }
+      }
+      
       // Scroll final garantizado
       setTimeout(() => scrollChatToBottom(), 0);
     }
@@ -1255,9 +1311,15 @@ async function handleSubmit(event) {
   const imageFiles = hasFiles ? attachedFiles[conversation.id].filter(f => f.isImage) : [];
   const textFiles = hasFiles ? attachedFiles[conversation.id].filter(f => !f.isImage) : [];
   
-  // Construir mensaje del sistema combinando información personal, estilo y archivos (solo en el primer mensaje)
+  // Construir mensaje del sistema combinando información personal, estilo, memorias y archivos (solo en el primer mensaje)
   if (isFirstMessage) {
     let systemContent = '';
+    
+    // Agregar contexto de memorias si está habilitado
+    const memoryContext = buildMemoryContext();
+    if (memoryContext) {
+      systemContent += memoryContext + '\n\n';
+    }
     
     // Agregar información personal si existe
     if (personalInfo.trim()) {
@@ -1278,9 +1340,9 @@ async function handleSubmit(event) {
     
     // Agregar instrucciones finales
     let instructions = '';
-    if (personalInfo.trim() && textFiles.length > 0) {
+    if ((personalInfo.trim() || memoryContext) && textFiles.length > 0) {
       instructions = 'Ten en cuenta esta información sobre el usuario y el contenido de estos archivos al responder sus preguntas. Proporciona respuestas más personalizadas cuando sea relevante.';
-    } else if (personalInfo.trim()) {
+    } else if (personalInfo.trim() || memoryContext) {
       instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas y proporciona respuestas más personalizadas cuando sea relevante.';
     } else if (textFiles.length > 0) {
       instructions = 'Responde las preguntas del usuario basándote en el contenido de estos archivos cuando sea relevante.';
@@ -2465,6 +2527,308 @@ function getStyleInstructions(style) {
   return styleInstructions[style] || '';
 }
 
+// ========================================
+// Sistema de Memoria
+// ========================================
+const MEMORY_STORAGE_KEY = 'ollama-web-memories';
+const MEMORY_ENABLED_KEY = 'ollama-web-memory-enabled';
+
+function getMemoryEnabled() {
+  if (!hasLocalStorage) return true;
+  try {
+    const stored = window.localStorage.getItem(MEMORY_ENABLED_KEY);
+    return stored === null ? true : stored === 'true';
+  } catch (error) {
+    console.warn('No se pudo obtener la preferencia de memoria', error);
+    return true;
+  }
+}
+
+function setMemoryEnabled(enabled) {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(MEMORY_ENABLED_KEY, enabled ? 'true' : 'false');
+  } catch (error) {
+    console.warn('No se pudo guardar la preferencia de memoria', error);
+  }
+}
+
+function getMemories() {
+  if (!hasLocalStorage) return [];
+  try {
+    const stored = window.localStorage.getItem(MEMORY_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.warn('No se pudieron cargar las memorias', error);
+    return [];
+  }
+}
+
+function saveMemories(memories) {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(memories));
+  } catch (error) {
+    console.warn('No se pudieron guardar las memorias', error);
+  }
+}
+
+function addMemory(content) {
+  if (!content || !content.trim()) return null;
+  
+  const memories = getMemories();
+  const newMemory = {
+    id: generateId('mem'),
+    content: content.trim(),
+    createdAt: Date.now()
+  };
+  memories.unshift(newMemory);
+  saveMemories(memories);
+  return newMemory;
+}
+
+function deleteMemory(memoryId) {
+  const memories = getMemories();
+  const filtered = memories.filter(m => m.id !== memoryId);
+  saveMemories(filtered);
+  return filtered;
+}
+
+function clearAllMemories() {
+  saveMemories([]);
+}
+
+function formatMemoryDate(timestamp) {
+  const date = new Date(timestamp);
+  const options = { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+  return date.toLocaleDateString('es-ES', options);
+}
+
+// Función para construir el contexto de memorias para el modelo
+function buildMemoryContext() {
+  if (!getMemoryEnabled()) return '';
+  
+  const memories = getMemories();
+  if (memories.length === 0) return '';
+  
+  let context = 'Recuerdos guardados sobre el usuario:\n';
+  memories.forEach((memory, index) => {
+    context += `- ${memory.content}\n`;
+  });
+  context += '\nUsa estos recuerdos para personalizar tus respuestas cuando sea relevante, pero no los menciones explícitamente a menos que el usuario pregunte.';
+  
+  return context;
+}
+
+// Función para contar palabras en un texto
+function countWords(text) {
+  return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+}
+
+// Función para mostrar notificación cuando se añade una memoria automáticamente
+function showMemoryNotification(message) {
+  // Crear elemento de notificación si no existe
+  let notification = document.getElementById('memory-notification');
+  if (!notification) {
+    notification = document.createElement('div');
+    notification.id = 'memory-notification';
+    notification.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(42, 42, 42, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s ease;
+      max-width: 300px;
+    `;
+    document.body.appendChild(notification);
+  }
+  
+  notification.innerHTML = `<span>🧠</span><span>${escapeHtml(message)}</span>`;
+  notification.style.opacity = '1';
+  notification.style.transform = 'translateY(0)';
+  
+  // Ocultar después de 3 segundos
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateY(20px)';
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 300);
+  }, 3000);
+}
+
+// Función para verificar si una memoria ya existe (evitar duplicados)
+function memoryExists(content) {
+  const memories = getMemories();
+  const normalizedContent = content.trim().toLowerCase();
+  return memories.some(m => m.content.trim().toLowerCase() === normalizedContent);
+}
+
+// Función para extraer información importante de una conversación usando la IA
+async function extractImportantInfoFromConversation(userMessage, assistantResponse) {
+  if (!getMemoryEnabled() || !state.currentModel) return;
+  
+  // Solo procesar si hay contenido suficiente
+  if (!userMessage || !assistantResponse || assistantResponse.length < 20) return;
+  
+  try {
+    // Crear un prompt para extraer información importante
+    const extractionPrompt = `Analiza esta conversación y extrae SOLO información importante sobre el usuario (nombres, preferencias, hechos personales, conclusiones). 
+
+Reglas:
+- Máximo 10 palabras por frase
+- Solo información sobre el usuario, no sobre temas generales
+- Frases cortas y concisas
+- Si no hay información relevante sobre el usuario, responde solo "NINGUNA"
+
+Usuario dijo: "${userMessage.substring(0, 200)}"
+Asistente respondió: "${assistantResponse.substring(0, 500)}"
+
+Extrae frases cortas (máximo 10 palabras cada una) con información importante sobre el usuario. Si hay múltiples, sepáralas con "|". Si no hay información relevante, responde "NINGUNA":`;
+
+    const response = await fetch(`${API_BASE}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: state.currentModel,
+        prompt: extractionPrompt,
+        stream: false,
+        options: {
+          temperature: 0.3, // Baja temperatura para respuestas más precisas
+          num_predict: 200 // Respuesta corta
+        }
+      })
+    });
+
+    if (!response.ok) return;
+
+    const data = await response.json();
+    const extractedText = data.response?.trim() || '';
+
+    // Si no hay información, salir
+    if (!extractedText || extractedText === 'NINGUNA' || extractedText.toLowerCase().includes('ninguna')) {
+      return;
+    }
+
+    // Procesar las frases extraídas (separadas por |)
+    const phrases = extractedText
+      .split('|')
+      .map(p => p.trim())
+      .filter(p => {
+        // Filtrar frases válidas
+        const wordCount = countWords(p);
+        return p.length > 0 && 
+               wordCount <= 10 && 
+               wordCount >= 2 && 
+               !p.toLowerCase().includes('ninguna') &&
+               !p.toLowerCase().includes('no hay') &&
+               !memoryExists(p); // Evitar duplicados
+      });
+
+    // Añadir cada frase como memoria
+    phrases.forEach(phrase => {
+      if (phrase && phrase.length > 5) { // Mínimo 5 caracteres
+        addMemory(phrase);
+      }
+    });
+
+    // Si se añadieron memorias, actualizar la lista en el modal si está abierto
+    if (phrases.length > 0 && typeof window.renderMemoriesList === 'function') {
+      window.renderMemoriesList();
+    }
+  } catch (error) {
+    console.warn('Error al extraer información importante:', error);
+    // No mostrar error al usuario, solo registrar
+  }
+}
+
+// Función mejorada para extraer información usando análisis de texto simple
+function extractInfoSimple(userMessage, assistantResponse) {
+  if (!getMemoryEnabled()) return [];
+  
+  const extracted = [];
+  const userMsgLower = userMessage.toLowerCase();
+  const assistantMsgLower = assistantResponse.toLowerCase();
+  
+  // Extraer información del mensaje del usuario directamente
+  // Si el usuario dice algo sobre sí mismo, es información importante
+  const userSelfPatterns = [
+    /(?:soy|me llamo|mi nombre es|estudio|trabajo|vivo|soy de|me gusta|no me gusta|prefiero|disfruto|odio)\s+([^.,!?]{5,60})/gi,
+    /(?:tengo|tengo\s+\d+|tengo\s+[a-z]+)\s+([^.,!?]{5,60})/gi
+  ];
+  
+  userSelfPatterns.forEach(pattern => {
+    const matches = userMessage.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        const parts = match.split(/\s+/);
+        if (parts.length >= 2) {
+          const info = parts.slice(1).join(' ').trim();
+          const wordCount = countWords(info);
+          
+          if (wordCount <= 10 && wordCount >= 2 && info.length > 5 && !memoryExists(info)) {
+            // Limpiar la frase
+            const cleaned = info.replace(/[.,!?;:]+$/, '').trim();
+            if (cleaned.length > 5) {
+              extracted.push(cleaned);
+            }
+          }
+        }
+      });
+    }
+  });
+  
+  // Extraer información de la respuesta del asistente cuando menciona al usuario
+  const assistantPatterns = [
+    // "Tu nombre es X", "Te llamas X", "Eres X"
+    /(?:tu nombre es|te llamas|eres|tu nombre)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/gi,
+    // "Estudias X", "Trabajas en X", "Vives en X"
+    /(?:estudias|trabajas|vives|eres de)\s+([^.,!?]{5,60})/gi,
+    // "Prefieres X", "Te gusta X"
+    /(?:prefieres|te gusta|no te gusta|disfrutas)\s+([^.,!?]{5,60})/gi,
+    // Conclusiones sobre el usuario
+    /(?:así que|por lo tanto|entonces|en resumen)\s+(?:eres|tienes|estás|haces)\s+([^.,!?]{5,60})/gi
+  ];
+  
+  assistantPatterns.forEach(pattern => {
+    const matches = assistantResponse.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        const parts = match.split(/\s+/);
+        if (parts.length >= 2) {
+          const info = parts.slice(1).join(' ').trim();
+          const wordCount = countWords(info);
+          
+          if (wordCount <= 10 && wordCount >= 2 && info.length > 5 && !memoryExists(info)) {
+            // Limpiar la frase
+            const cleaned = info.replace(/[.,!?;:]+$/, '').trim();
+            if (cleaned.length > 5) {
+              extracted.push(cleaned);
+            }
+          }
+        }
+      });
+    }
+  });
+  
+  // Eliminar duplicados
+  return [...new Set(extracted)];
+}
+
 // Funciones para manejar la fuente disléxica
 function getDyslexicFontEnabled() {
   if (!hasLocalStorage) return false;
@@ -2711,6 +3075,160 @@ function initUserMenu() {
         }
         userMenu.style.display = 'none';
         userCard.classList.remove('active');
+      }
+    });
+  }
+  
+  // ========================================
+  // Modal de Memoria
+  // ========================================
+  const memoryBtn = document.getElementById('memory-btn');
+  const memoryModal = document.getElementById('memory-modal');
+  const closeMemoryModal = document.getElementById('close-memory-modal');
+  const closeMemoryModalBtn = document.getElementById('close-memory-modal-btn');
+  const memoryEnabledToggle = document.getElementById('memory-enabled-toggle');
+  const newMemoryInput = document.getElementById('new-memory-input');
+  const addMemoryBtn = document.getElementById('add-memory-btn');
+  const clearAllMemoriesBtn = document.getElementById('clear-all-memories-btn');
+  const memoriesList = document.getElementById('memories-list');
+  
+  // Función para renderizar la lista de memorias (accesible globalmente)
+  window.renderMemoriesList = function() {
+    const memoriesListEl = document.getElementById('memories-list');
+    if (!memoriesListEl) return;
+    
+    const memories = getMemories();
+    
+    if (memories.length === 0) {
+      memoriesListEl.innerHTML = `
+        <div class="memory-empty-state">
+          <span class="memory-empty-icon">💭</span>
+          <p>No hay recuerdos guardados</p>
+          <p class="memory-empty-hint">Añade información que quieras que la IA recuerde sobre ti</p>
+        </div>
+      `;
+      return;
+    }
+    
+    memoriesListEl.innerHTML = memories.map(memory => `
+      <div class="memory-item" data-memory-id="${memory.id}">
+        <div class="memory-icon">💡</div>
+        <div class="memory-content">
+          <div class="memory-text">${escapeHtml(memory.content)}</div>
+          <div class="memory-date">${formatMemoryDate(memory.createdAt)}</div>
+        </div>
+        <button class="memory-delete-btn" title="Eliminar recuerdo" data-memory-id="${memory.id}">×</button>
+      </div>
+    `).join('');
+    
+    // Añadir handlers de eliminación
+    memoriesListEl.querySelectorAll('.memory-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const memoryId = btn.dataset.memoryId;
+        deleteMemory(memoryId);
+        window.renderMemoriesList();
+      });
+    });
+  };
+  
+  const renderMemoriesList = window.renderMemoriesList;
+  
+  // Abrir modal de memoria
+  if (memoryBtn) {
+    memoryBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (memoryModal) {
+        memoryModal.style.display = 'flex';
+        
+        // Cargar estado del toggle
+        if (memoryEnabledToggle) {
+          memoryEnabledToggle.checked = getMemoryEnabled();
+        }
+        
+        // Renderizar lista de memorias
+        if (typeof window.renderMemoriesList === 'function') {
+          window.renderMemoriesList();
+        }
+        
+        if (settingsMenu) {
+          settingsMenu.style.display = 'none';
+        }
+        userMenu.style.display = 'none';
+        userCard.classList.remove('active');
+      }
+    });
+  }
+  
+  // Cerrar modal de memoria
+  const closeMemoryModalFunc = () => {
+    if (memoryModal) {
+      memoryModal.style.display = 'none';
+      if (newMemoryInput) {
+        newMemoryInput.value = '';
+      }
+    }
+  };
+  
+  if (closeMemoryModal) {
+    closeMemoryModal.addEventListener('click', closeMemoryModalFunc);
+  }
+  
+  if (closeMemoryModalBtn) {
+    closeMemoryModalBtn.addEventListener('click', closeMemoryModalFunc);
+  }
+  
+  // Cerrar modal al hacer clic fuera
+  if (memoryModal) {
+    memoryModal.addEventListener('click', (e) => {
+      if (e.target === memoryModal) {
+        closeMemoryModalFunc();
+      }
+    });
+  }
+  
+  // Guardar estado del toggle de memoria
+  if (memoryEnabledToggle) {
+    memoryEnabledToggle.addEventListener('change', (e) => {
+      setMemoryEnabled(e.target.checked);
+    });
+  }
+  
+  // Añadir nuevo recuerdo
+  if (addMemoryBtn && newMemoryInput) {
+    const addNewMemory = () => {
+      const content = newMemoryInput.value.trim();
+      if (content) {
+        addMemory(content);
+        newMemoryInput.value = '';
+        if (typeof window.renderMemoriesList === 'function') {
+          window.renderMemoriesList();
+        }
+      }
+    };
+    
+    addMemoryBtn.addEventListener('click', addNewMemory);
+    
+    // Permitir añadir con Enter
+    newMemoryInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        addNewMemory();
+      }
+      if (e.key === 'Escape') {
+        closeMemoryModalFunc();
+      }
+    });
+  }
+  
+  // Borrar todas las memorias
+  if (clearAllMemoriesBtn) {
+    clearAllMemoriesBtn.addEventListener('click', () => {
+      if (confirm('¿Estás seguro de que quieres borrar todos los recuerdos?')) {
+        clearAllMemories();
+        if (typeof window.renderMemoriesList === 'function') {
+          window.renderMemoriesList();
+        }
       }
     });
   }
