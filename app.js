@@ -2205,6 +2205,116 @@ function init() {
   });
 }
 
+// Función para manejar pegado de imágenes desde el portapapeles (Ctrl+V)
+function setupClipboardPaste() {
+  // Escuchar eventos de pegado en todo el documento
+  document.addEventListener('paste', async (e) => {
+    // Verificar si hay items en el portapapeles
+    const clipboardItems = e.clipboardData?.items;
+    if (!clipboardItems) return;
+    
+    // Buscar imágenes en el portapapeles
+    const imageItems = [];
+    for (let i = 0; i < clipboardItems.length; i++) {
+      const item = clipboardItems[i];
+      if (item.type.startsWith('image/')) {
+        imageItems.push(item);
+      }
+    }
+    
+    // Si no hay imágenes, permitir el comportamiento normal (pegar texto)
+    if (imageItems.length === 0) return;
+    
+    // Prevenir el comportamiento por defecto solo si hay imágenes
+    e.preventDefault();
+    
+    // Verificar que hay una conversación activa
+    if (!state.activeId) {
+      // Si no hay conversación activa, crear una
+      createConversation();
+    }
+    
+    // Procesar cada imagen del portapapeles
+    const files = [];
+    for (const item of imageItems) {
+      const file = item.getAsFile();
+      if (file) {
+        // Generar un nombre único para la imagen pegada
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const extension = file.type.split('/')[1] || 'png';
+        const fileName = `imagen-pegada-${timestamp}.${extension}`;
+        
+        // Crear un nuevo File con nombre personalizado
+        const renamedFile = new File([file], fileName, { type: file.type });
+        files.push(renamedFile);
+      }
+    }
+    
+    // Si hay archivos, procesarlos
+    if (files.length > 0) {
+      const isEmptyState = emptyState?.style.display !== 'none';
+      await handleFiles(files, !isEmptyState);
+      
+      // Enfocar el input correspondiente después de pegar
+      const activeInput = isEmptyState ? promptInput : promptInputInline;
+      activeInput?.focus();
+      
+      // Mostrar notificación visual
+      showPasteNotification(files.length);
+    }
+  });
+}
+
+// Función para mostrar notificación cuando se pega una imagen
+function showPasteNotification(count) {
+  // Crear elemento de notificación si no existe
+  let notification = document.getElementById('paste-notification');
+  if (!notification) {
+    notification = document.createElement('div');
+    notification.id = 'paste-notification';
+    notification.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(42, 42, 42, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s ease;
+      max-width: 300px;
+    `;
+    document.body.appendChild(notification);
+  }
+  
+  const message = count === 1 
+    ? 'Imagen pegada desde el portapapeles' 
+    : `${count} imágenes pegadas desde el portapapeles`;
+  
+  notification.innerHTML = `<span>📋</span><span>${message}</span>`;
+  notification.style.opacity = '1';
+  notification.style.transform = 'translateY(0)';
+  
+  // Ocultar después de 2.5 segundos
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateY(20px)';
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 300);
+  }, 2500);
+}
+
 function setupFileHandlers() {
   const fileInput = document.getElementById('file-input');
   const fileInputInline = document.getElementById('file-input-inline');
@@ -2216,6 +2326,9 @@ function setupFileHandlers() {
   // Botones para abrir selector de archivos
   attachFileBtn?.addEventListener('click', () => fileInput?.click());
   attachFileBtnInline?.addEventListener('click', () => fileInputInline?.click());
+  
+  // Manejar pegado de imágenes desde el portapapeles (Ctrl+V)
+  setupClipboardPaste();
   
   // Manejar selección de archivos
   fileInput?.addEventListener('change', (e) => {
