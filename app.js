@@ -2611,11 +2611,12 @@ function buildMemoryContext() {
   const memories = getMemories();
   if (memories.length === 0) return '';
   
-  let context = 'Recuerdos guardados sobre el usuario:\n';
+  // Construir un contexto más estructurado y claro
+  let context = 'INFORMACIÓN IMPORTANTE SOBRE EL USUARIO (usa estos datos para personalizar tus respuestas):\n';
   memories.forEach((memory, index) => {
-    context += `- ${memory.content}\n`;
+    context += `• ${memory.content}\n`;
   });
-  context += '\nUsa estos recuerdos para personalizar tus respuestas cuando sea relevante, pero no los menciones explícitamente a menos que el usuario pregunte.';
+  context += '\nIMPORTANTE: Ten en cuenta esta información al responder. Úsala naturalmente cuando sea relevante, pero no la menciones explícitamente ni digas que tienes esta información guardada.';
   
   return context;
 }
@@ -2686,19 +2687,27 @@ async function extractImportantInfoFromConversation(userMessage, assistantRespon
   if (!userMessage || !assistantResponse || assistantResponse.length < 20) return;
   
   try {
-    // Crear un prompt para extraer información importante
-    const extractionPrompt = `Analiza esta conversación y extrae SOLO información importante sobre el usuario (nombres, preferencias, hechos personales, conclusiones). 
+    // Crear un prompt más preciso para extraer información personal del usuario
+    const extractionPrompt = `Eres un extractor de información personal. Analiza lo que el USUARIO dijo y extrae SOLO datos personales sobre él/ella.
 
-Reglas:
-- Máximo 10 palabras por frase
-- Solo información sobre el usuario, no sobre temas generales
-- Frases cortas y concisas
-- Si no hay información relevante sobre el usuario, responde solo "NINGUNA"
+REGLAS ESTRICTAS:
+1. Solo extraer información personal del usuario (nombre, trabajo, estudios, gustos, familia, ubicación)
+2. NO extraer información general, definiciones o explicaciones
+3. Cada dato debe ser UNA FRASE CORTA en tercera persona (ej: "Estudia medicina", "Vive en Madrid")
+4. Máximo 8 palabras por frase
+5. Si el usuario pregunta algo pero NO revela información personal, responde: NINGUNA
+6. Separar múltiples datos con |
 
-Usuario dijo: "${userMessage.substring(0, 200)}"
-Asistente respondió: "${assistantResponse.substring(0, 500)}"
+EJEMPLOS:
+- Usuario: "Me llamo Juan y estudio derecho" → "Se llama Juan|Estudia derecho"
+- Usuario: "¿Qué es Python?" → "NINGUNA" (solo pregunta, no hay info personal)
+- Usuario: "Trabajo en Google como programador" → "Trabaja en Google|Es programador"
+- Usuario: "Me gusta mucho el café" → "Le gusta el café"
+- Usuario: "Tengo 2 hijos y un perro" → "Tiene 2 hijos|Tiene un perro"
 
-Extrae frases cortas (máximo 10 palabras cada una) con información importante sobre el usuario. Si hay múltiples, sepáralas con "|". Si no hay información relevante, responde "NINGUNA":`;
+MENSAJE DEL USUARIO: "${userMessage.substring(0, 300)}"
+
+Extrae información personal del usuario (o responde NINGUNA si no hay):`;
 
     const response = await fetch(`${API_BASE}/api/generate`, {
       method: 'POST',
@@ -2708,8 +2717,8 @@ Extrae frases cortas (máximo 10 palabras cada una) con información importante 
         prompt: extractionPrompt,
         stream: false,
         options: {
-          temperature: 0.3, // Baja temperatura para respuestas más precisas
-          num_predict: 200 // Respuesta corta
+          temperature: 0.1, // Muy baja temperatura para respuestas más precisas
+          num_predict: 150 // Respuesta corta
         }
       })
     });
@@ -2720,34 +2729,47 @@ Extrae frases cortas (máximo 10 palabras cada una) con información importante 
     const extractedText = data.response?.trim() || '';
 
     // Si no hay información, salir
-    if (!extractedText || extractedText === 'NINGUNA' || extractedText.toLowerCase().includes('ninguna')) {
+    if (!extractedText || 
+        extractedText.toUpperCase() === 'NINGUNA' || 
+        extractedText.toLowerCase().includes('ninguna') ||
+        extractedText.toLowerCase().includes('no hay información') ||
+        extractedText.toLowerCase().includes('no se menciona')) {
       return;
     }
 
-    // Procesar las frases extraídas (separadas por |)
+    // Procesar las frases extraídas (separadas por | o saltos de línea)
     const phrases = extractedText
-      .split('|')
-      .map(p => p.trim())
+      .split(/[|\n]/)
+      .map(p => p.trim().replace(/^[-•*]\s*/, '')) // Limpiar bullets
       .filter(p => {
-        // Filtrar frases válidas
         const wordCount = countWords(p);
-        return p.length > 0 && 
-               wordCount <= 10 && 
+        const pLower = p.toLowerCase();
+        
+        // Filtrar frases válidas
+        return p.length >= 5 && 
+               p.length <= 80 &&
                wordCount >= 2 && 
-               !p.toLowerCase().includes('ninguna') &&
-               !p.toLowerCase().includes('no hay') &&
-               !memoryExists(p); // Evitar duplicados
+               wordCount <= 10 && 
+               !pLower.includes('ninguna') &&
+               !pLower.includes('no hay') &&
+               !pLower.includes('no se') &&
+               !pLower.includes('el usuario') &&
+               !pLower.includes('información personal') &&
+               !memoryExists(p);
       });
 
-    // Añadir cada frase como memoria
-    phrases.forEach(phrase => {
-      if (phrase && phrase.length > 5) { // Mínimo 5 caracteres
+    // Añadir cada frase como memoria (máximo 3 por mensaje)
+    let addedCount = 0;
+    for (const phrase of phrases) {
+      if (addedCount >= 3) break;
+      if (phrase && phrase.length >= 5) {
         addMemory(phrase);
+        addedCount++;
       }
-    });
+    }
 
     // Si se añadieron memorias, actualizar la lista en el modal si está abierto
-    if (phrases.length > 0 && typeof window.renderMemoriesList === 'function') {
+    if (addedCount > 0 && typeof window.renderMemoriesList === 'function') {
       window.renderMemoriesList();
     }
   } catch (error) {
@@ -2761,72 +2783,88 @@ function extractInfoSimple(userMessage, assistantResponse) {
   if (!getMemoryEnabled()) return [];
   
   const extracted = [];
-  const userMsgLower = userMessage.toLowerCase();
-  const assistantMsgLower = assistantResponse.toLowerCase();
   
-  // Extraer información del mensaje del usuario directamente
-  // Si el usuario dice algo sobre sí mismo, es información importante
-  const userSelfPatterns = [
-    /(?:soy|me llamo|mi nombre es|estudio|trabajo|vivo|soy de|me gusta|no me gusta|prefiero|disfruto|odio)\s+([^.,!?]{5,60})/gi,
-    /(?:tengo|tengo\s+\d+|tengo\s+[a-z]+)\s+([^.,!?]{5,60})/gi
+  // Patrones para extraer información COMPLETA del mensaje del usuario
+  // Capturamos la frase completa incluyendo el verbo introductorio
+  const userPatterns = [
+    // Nombres y presentaciones
+    /(?:me llamo|mi nombre es|soy)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/gi,
+    // Estudios y trabajo - captura completa
+    /(?:estudio|estudié|trabajo en|trabajo como|trabajé en|trabajé como)\s+([^.,!?\n]{3,50})/gi,
+    // Ubicación
+    /(?:vivo en|soy de|vengo de|nací en)\s+([^.,!?\n]{3,40})/gi,
+    // Gustos y preferencias - captura completa
+    /(?:me gusta|me gustan|me encanta|me encantan|adoro|amo)\s+([^.,!?\n]{3,50})/gi,
+    /(?:no me gusta|no me gustan|odio|detesto)\s+([^.,!?\n]{3,50})/gi,
+    /(?:prefiero|mi favorito es|mi favorita es|mis favoritos son)\s+([^.,!?\n]{3,50})/gi,
+    // Edad y datos personales
+    /tengo\s+(\d+\s+años)/gi,
+    // Hobbies y actividades
+    /(?:practico|juego|hago|suelo)\s+([^.,!?\n]{3,40})/gi,
+    // Familia y relaciones
+    /(?:mi (?:esposa|esposo|pareja|novio|novia|hermano|hermana|hijo|hija|padre|madre|familia))\s+([^.,!?\n]{3,40})/gi,
+    /tengo\s+((?:\d+\s+)?(?:hijos?|hermanos?|mascotas?|perros?|gatos?))/gi,
+    // Profesión directa
+    /soy\s+(programador|ingeniero|médico|profesor|estudiante|diseñador|abogado|arquitecto|enfermero|contador|[a-záéíóúñ]+(?:or|ero|ista|ente|dor)(?:a)?)/gi,
   ];
   
-  userSelfPatterns.forEach(pattern => {
-    const matches = userMessage.match(pattern);
-    if (matches) {
-      matches.forEach(match => {
-        const parts = match.split(/\s+/);
-        if (parts.length >= 2) {
-          const info = parts.slice(1).join(' ').trim();
-          const wordCount = countWords(info);
-          
-          if (wordCount <= 10 && wordCount >= 2 && info.length > 5 && !memoryExists(info)) {
-            // Limpiar la frase
-            const cleaned = info.replace(/[.,!?;:]+$/, '').trim();
-            if (cleaned.length > 5) {
-              extracted.push(cleaned);
-            }
+  userPatterns.forEach(pattern => {
+    let match;
+    // Usar exec para obtener grupos de captura correctamente
+    const regex = new RegExp(pattern.source, pattern.flags);
+    while ((match = regex.exec(userMessage)) !== null) {
+      if (match[1]) {
+        // Reconstruir la frase completa con contexto
+        const fullMatch = match[0].trim();
+        const captured = match[1].trim();
+        
+        // Limpiar y validar
+        const cleaned = captured.replace(/[.,!?;:]+$/, '').trim();
+        const wordCount = countWords(cleaned);
+        
+        // Para nombres, usar solo el nombre capturado
+        if (pattern.source.includes('me llamo|mi nombre es')) {
+          if (cleaned.length >= 2 && !memoryExists(`Se llama ${cleaned}`)) {
+            extracted.push(`Se llama ${cleaned}`);
           }
         }
-      });
+        // Para otros, incluir el contexto
+        else if (wordCount >= 1 && wordCount <= 12 && cleaned.length >= 3) {
+          // Crear frase con contexto
+          let contextPhrase = fullMatch.replace(/[.,!?;:]+$/, '').trim();
+          
+          // Convertir a tercera persona si es necesario
+          contextPhrase = contextPhrase
+            .replace(/^me llamo\s+/i, 'Se llama ')
+            .replace(/^mi nombre es\s+/i, 'Se llama ')
+            .replace(/^soy\s+/i, 'Es ')
+            .replace(/^estudio\s+/i, 'Estudia ')
+            .replace(/^estudié\s+/i, 'Estudió ')
+            .replace(/^trabajo en\s+/i, 'Trabaja en ')
+            .replace(/^trabajo como\s+/i, 'Trabaja como ')
+            .replace(/^vivo en\s+/i, 'Vive en ')
+            .replace(/^soy de\s+/i, 'Es de ')
+            .replace(/^me gusta\s+/i, 'Le gusta ')
+            .replace(/^me gustan\s+/i, 'Le gustan ')
+            .replace(/^me encanta\s+/i, 'Le encanta ')
+            .replace(/^no me gusta\s+/i, 'No le gusta ')
+            .replace(/^prefiero\s+/i, 'Prefiere ')
+            .replace(/^tengo\s+/i, 'Tiene ')
+            .replace(/^practico\s+/i, 'Practica ')
+            .replace(/^juego\s+/i, 'Juega ')
+            .replace(/^hago\s+/i, 'Hace ');
+          
+          if (!memoryExists(contextPhrase) && contextPhrase.length >= 5) {
+            extracted.push(contextPhrase);
+          }
+        }
+      }
     }
   });
   
-  // Extraer información de la respuesta del asistente cuando menciona al usuario
-  const assistantPatterns = [
-    // "Tu nombre es X", "Te llamas X", "Eres X"
-    /(?:tu nombre es|te llamas|eres|tu nombre)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/gi,
-    // "Estudias X", "Trabajas en X", "Vives en X"
-    /(?:estudias|trabajas|vives|eres de)\s+([^.,!?]{5,60})/gi,
-    // "Prefieres X", "Te gusta X"
-    /(?:prefieres|te gusta|no te gusta|disfrutas)\s+([^.,!?]{5,60})/gi,
-    // Conclusiones sobre el usuario
-    /(?:así que|por lo tanto|entonces|en resumen)\s+(?:eres|tienes|estás|haces)\s+([^.,!?]{5,60})/gi
-  ];
-  
-  assistantPatterns.forEach(pattern => {
-    const matches = assistantResponse.match(pattern);
-    if (matches) {
-      matches.forEach(match => {
-        const parts = match.split(/\s+/);
-        if (parts.length >= 2) {
-          const info = parts.slice(1).join(' ').trim();
-          const wordCount = countWords(info);
-          
-          if (wordCount <= 10 && wordCount >= 2 && info.length > 5 && !memoryExists(info)) {
-            // Limpiar la frase
-            const cleaned = info.replace(/[.,!?;:]+$/, '').trim();
-            if (cleaned.length > 5) {
-              extracted.push(cleaned);
-            }
-          }
-        }
-      });
-    }
-  });
-  
-  // Eliminar duplicados
-  return [...new Set(extracted)];
+  // Eliminar duplicados y limitar cantidad
+  const unique = [...new Set(extracted)];
+  return unique.slice(0, 3); // Máximo 3 memorias por mensaje
 }
 
 // Funciones para manejar la fuente disléxica
