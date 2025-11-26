@@ -921,16 +921,33 @@ async function streamAssistantResponse(conversation, payloadMessages) {
   
   const startTime = Date.now();
 
+  // Calcular el tamaño del contexto necesario basado en los mensajes
+  const totalContentLength = payloadMessages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0);
+  
+  // Configurar num_ctx dinámicamente según el contenido
+  // 1 token ≈ 4 caracteres en promedio
+  const estimatedTokens = Math.ceil(totalContentLength / 4);
+  // Añadir margen para la respuesta (al menos 2000 tokens extra)
+  const recommendedContext = Math.max(4096, estimatedTokens + 2000);
+  // Limitar a un máximo razonable
+  const numCtx = Math.min(recommendedContext, 32768);
+
   const body = {
     model: state.currentModel,
     stream: true,
     messages: payloadMessages,
+    options: {
+      num_ctx: numCtx // Ajustar el tamaño del contexto dinámicamente
+    }
   };
 
   // Log para depuración (solo mostrar estructura, no el contenido completo de imágenes)
-  console.log('Enviando mensajes al modelo:', {
+  console.log('📤 Enviando mensajes al modelo:', {
     model: body.model,
     messageCount: body.messages.length,
+    totalContentLength: totalContentLength,
+    estimatedTokens: estimatedTokens,
+    num_ctx: numCtx,
     messages: body.messages.map(msg => ({
       role: msg.role,
       contentLength: msg.content?.length || 0,
@@ -1345,6 +1362,17 @@ async function handleSubmit(event) {
   const activeProject = getActiveProject();
   const projectContext = activeProject ? buildProjectContext(activeProject) : '';
   
+  // Log de depuración para proyecto activo
+  if (activeProject) {
+    console.log('📂 Proyecto activo:', activeProject.name);
+    console.log(`   - Archivos en proyecto: ${activeProject.files?.length || 0}`);
+    const projectTextFiles = (activeProject.files || []).filter(f => !f.isImage);
+    projectTextFiles.forEach(f => {
+      console.log(`   📄 ${f.name}: ${f.content?.length || 0} caracteres`);
+    });
+    console.log(`   - Contexto del proyecto: ${projectContext.length} caracteres totales`);
+  }
+  
   // Si hay archivos adjuntos, añadir el contexto al primer mensaje del usuario
   // Solo añadir el contexto una vez al inicio de la conversación con archivos
   const hasFiles = attachedFiles[conversation.id] && attachedFiles[conversation.id].length > 0;
@@ -1354,46 +1382,74 @@ async function handleSubmit(event) {
   const imageFiles = hasFiles ? attachedFiles[conversation.id].filter(f => f.isImage) : [];
   const textFiles = hasFiles ? attachedFiles[conversation.id].filter(f => !f.isImage) : [];
   
-  // Construir mensaje del sistema combinando proyecto, información personal, estilo, memorias y archivos (solo en el primer mensaje)
+  // Log de depuración para archivos adjuntos al chat
+  if (hasFiles) {
+    console.log('📎 Archivos adjuntos al chat:');
+    console.log(`   - Imágenes: ${imageFiles.length}`);
+    console.log(`   - Archivos de texto/PDF: ${textFiles.length}`);
+    textFiles.forEach(f => {
+      console.log(`   📄 ${f.name}: ${f.content?.length || 0} caracteres`);
+    });
+  }
+  
+  // Construir mensaje del sistema combinando proyecto, información personal, estilo, memorias y archivos
+  // NOTA: Para proyectos, SIEMPRE enviamos el contexto ya que los archivos son persistentes
+  const shouldIncludeProjectContext = projectContext && projectContext.length > 0;
+  
+  // Variables para contexto adicional
+  let memoryContext = '';
   if (isFirstMessage) {
+    memoryContext = buildMemoryContext() || '';
+  }
+  
+  // Si es el primer mensaje O hay un proyecto activo, construir el mensaje del sistema
+  if (isFirstMessage || shouldIncludeProjectContext) {
     let systemContent = '';
     
-    // PRIMERO: Agregar contexto del proyecto (máxima prioridad)
+    // PRIMERO: Agregar contexto del proyecto (máxima prioridad) - SIEMPRE si hay proyecto
     if (projectContext) {
       systemContent += projectContext + '\n\n';
+      console.log('📂 Contexto del proyecto incluido en el mensaje del sistema');
     }
     
-    // Agregar contexto de memorias si está habilitado
-    const memoryContext = buildMemoryContext();
-    if (memoryContext) {
-      systemContent += memoryContext + '\n\n';
+    // Agregar memorias e info personal (solo en primer mensaje)
+    if (isFirstMessage) {
+      if (memoryContext) {
+        systemContent += memoryContext + '\n\n';
+      }
+      
+      if (personalInfo.trim()) {
+        systemContent += `Información personal del usuario: ${personalInfo.trim()}\n\n`;
+      }
     }
     
-    // Agregar información personal si existe
-    if (personalInfo.trim()) {
-      systemContent += `Información personal del usuario: ${personalInfo.trim()}\n\n`;
-    }
-    
-    // Agregar contexto de archivos si existen
+    // Agregar contexto de archivos adjuntos al chat si existen
     if (textFiles.length > 0) {
-      systemContent += 'Contexto de archivos adjuntos:\n\n';
-      textFiles.forEach(file => {
-        systemContent += `--- Archivo: ${file.name} ---\n${file.content}\n\n`;
+      systemContent += '=== DOCUMENTOS ADJUNTOS AL CHAT (DEBES LEER Y USAR ESTE CONTENIDO) ===\n\n';
+      textFiles.forEach((file, index) => {
+        const totalChars = file.content?.length || 0;
+        console.log(`📄 Incluyendo archivo del chat ${index + 1}: ${file.name} (${totalChars} caracteres)`);
+        systemContent += `══════════════════════════════════════════════════════════════\n`;
+        systemContent += `📄 DOCUMENTO ${index + 1}: ${file.name}\n`;
+        systemContent += `══════════════════════════════════════════════════════════════\n\n`;
+        systemContent += `${file.content}\n\n`;
       });
+      systemContent += '=== FIN DE DOCUMENTOS ADJUNTOS ===\n\n';
     }
     
     // Agregar instrucciones del estilo de respuesta
     const responseStyle = getAIResponseStyle();
     const styleInstructions = getStyleInstructions(responseStyle);
     
-    // Agregar instrucciones finales
+    // Determinar las instrucciones finales
     let instructions = '';
-    if ((personalInfo.trim() || memoryContext) && textFiles.length > 0) {
-      instructions = 'Ten en cuenta esta información sobre el usuario y el contenido de estos archivos al responder sus preguntas. Proporciona respuestas más personalizadas cuando sea relevante.';
-    } else if (personalInfo.trim() || memoryContext) {
+    const hasDocuments = textFiles.length > 0 || shouldIncludeProjectContext;
+    const hasPersonalContext = personalInfo.trim() || memoryContext;
+    
+    if (hasDocuments) {
+      instructions = 'IMPORTANTE: Se te han proporcionado documentos arriba. DEBES leer y usar el contenido de estos documentos para responder las preguntas del usuario. Responde basándote en la información de los documentos. Si el usuario pregunta sobre el contenido de los documentos, resume o explica lo que contienen.';
+    } else if (hasPersonalContext) {
       instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas y proporciona respuestas más personalizadas cuando sea relevante.';
-    } else if (textFiles.length > 0) {
-      instructions = 'Responde las preguntas del usuario basándote en el contenido de estos archivos cuando sea relevante.';
     }
     
     // Combinar todas las instrucciones
@@ -1415,21 +1471,33 @@ async function handleSubmit(event) {
       }
       
       if (finalContent.trim()) {
-      payloadMessages.push({
-        role: 'system',
+        payloadMessages.push({
+          role: 'system',
           content: finalContent.trim()
-      });
+        });
+      
+        // Log de depuración del mensaje del sistema
+        console.log('📋 Mensaje del sistema enviado:');
+        console.log(`   - Longitud total: ${finalContent.length} caracteres`);
+        console.log(`   - Primeros 500 chars: ${finalContent.substring(0, 500)}...`);
+        if (finalContent.length > 10000) {
+          console.warn('⚠️ El contexto es muy largo (>10000 chars). Algunos modelos locales pueden tener problemas.');
+        }
       }
     }
-    } else if (textFiles.length > 0) {
-    // Para mensajes posteriores, añadir el contexto de archivos al mensaje del usuario actual
-    let contextContent = 'Contexto de archivos adjuntos:\n\n';
-    textFiles.forEach(file => {
-      contextContent += `--- Archivo: ${file.name} ---\n${file.content}\n\n`;
+  } else if (textFiles.length > 0) {
+    // Para mensajes posteriores SIN proyecto, añadir el contexto de archivos al mensaje del usuario actual
+    let contextContent = '=== DOCUMENTOS ADJUNTOS (USA ESTE CONTENIDO PARA RESPONDER) ===\n\n';
+    textFiles.forEach((file, index) => {
+      contextContent += `══════════════════════════════════════════════════════════════\n`;
+      contextContent += `📄 DOCUMENTO ${index + 1}: ${file.name}\n`;
+      contextContent += `══════════════════════════════════════════════════════════════\n\n`;
+      contextContent += `${file.content}\n\n`;
     });
-      const lastUserMessage = conversation.messages[conversation.messages.length - 1];
-      if (lastUserMessage && lastUserMessage.role === 'user') {
-        lastUserMessage.content = contextContent + '\n\nPregunta del usuario: ' + lastUserMessage.content;
+    contextContent += '=== FIN DE DOCUMENTOS ===\n\n';
+    const lastUserMessage = conversation.messages[conversation.messages.length - 1];
+    if (lastUserMessage && lastUserMessage.role === 'user') {
+      lastUserMessage.content = contextContent + '\n\nPregunta del usuario: ' + lastUserMessage.content;
     }
   }
   
@@ -4250,20 +4318,32 @@ function buildProjectContext(project) {
   
   // Añadir instrucciones del proyecto
   if (project.instructions) {
-    context += `INSTRUCCIONES DEL PROYECTO "${project.name}":\n${project.instructions}\n\n`;
+    context += `══════════════════════════════════════════════════════════════\n`;
+    context += `📋 INSTRUCCIONES DEL PROYECTO: "${project.name}"\n`;
+    context += `══════════════════════════════════════════════════════════════\n\n`;
+    context += `${project.instructions}\n\n`;
   }
   
-  // Añadir contenido de archivos (solo texto, no imágenes)
-  const textFiles = project.files.filter(f => !f.isImage);
+  // Añadir contenido de archivos del proyecto (solo texto/PDF, no imágenes)
+  const textFiles = (project.files || []).filter(f => !f.isImage);
   if (textFiles.length > 0) {
-    context += 'ARCHIVOS DE CONTEXTO DEL PROYECTO:\n\n';
-    textFiles.forEach(file => {
-      context += `--- ${file.name} ---\n${file.content}\n\n`;
+    context += `=== DOCUMENTOS DEL PROYECTO (DEBES LEER Y USAR ESTE CONTENIDO) ===\n\n`;
+    
+    textFiles.forEach((file, index) => {
+      const contentLength = file.content?.length || 0;
+      console.log(`📂 Proyecto - Incluyendo archivo ${index + 1}: ${file.name} (${contentLength} caracteres)`);
+      
+      context += `══════════════════════════════════════════════════════════════\n`;
+      context += `📄 DOCUMENTO ${index + 1}: ${file.name}\n`;
+      context += `══════════════════════════════════════════════════════════════\n\n`;
+      context += `${file.content}\n\n`;
     });
+    
+    context += `=== FIN DE DOCUMENTOS DEL PROYECTO ===\n\n`;
   }
   
   if (context) {
-    context += 'IMPORTANTE: Sigue las instrucciones del proyecto y ten en cuenta los archivos de contexto proporcionados al responder.\n';
+    context += 'IMPORTANTE: Debes seguir las instrucciones del proyecto y USAR el contenido de los documentos proporcionados para responder las preguntas del usuario. Si el usuario pregunta sobre los documentos, resume o explica lo que contienen.\n';
   }
   
   return context;
@@ -4518,8 +4598,19 @@ async function handleProjectFiles(files) {
         continue;
       }
       
+      const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      console.log(`📂 Proyecto - Procesando archivo: ${file.name} (${isPDF ? 'PDF' : 'texto'})`);
+      
       const content = await readFileContent(file);
       const isImage = isImageFile(file);
+      
+      // Log de depuración para verificar el contenido extraído
+      console.log(`📂 Proyecto - Archivo procesado: ${file.name}`);
+      console.log(`   - Tipo: ${isImage ? 'Imagen' : (isPDF ? 'PDF' : 'Texto')}`);
+      console.log(`   - Contenido extraído: ${content?.length || 0} caracteres`);
+      if (!isImage && content) {
+        console.log(`   - Primeros 200 chars: ${content.substring(0, 200)}...`);
+      }
       
       projectsState.tempProjectFiles.push({
         id: generateId('pfile'),
