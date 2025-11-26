@@ -434,6 +434,19 @@ function appendMessageElement(message) {
     copyContainer.appendChild(regenerateButton);
   }
   
+  // Crear botón de editar (solo para mensajes del usuario)
+  if (message.role === 'user') {
+    const editButton = document.createElement('button');
+    editButton.className = 'edit-message-btn';
+    editButton.title = 'Editar mensaje';
+    editButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+    editButton.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      openEditMessageModal(message.id);
+    });
+    copyContainer.insertBefore(editButton, copyContainer.firstChild);
+  }
+  
   // Crear elemento para la hora
   const timeElement = document.createElement('span');
   timeElement.className = 'message-time';
@@ -1530,6 +1543,227 @@ function stopStream() {
         }
       }
     }
+  }
+}
+
+// Variable para almacenar el ID del mensaje a editar
+let messageToEdit = null;
+
+// Función para abrir el modal de edición de mensaje
+function openEditMessageModal(messageId) {
+  const conversation = state.conversations[state.activeId];
+  if (!conversation) return;
+  
+  const message = conversation.messages.find(msg => msg.id === messageId);
+  if (!message || message.role !== 'user') return;
+  
+  messageToEdit = messageId;
+  const modal = document.getElementById('edit-message-modal');
+  const textarea = document.getElementById('edit-message-textarea');
+  
+  if (modal && textarea) {
+    textarea.value = message.content || '';
+    modal.style.display = 'flex';
+    
+    // Animar la entrada del modal
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.animation = 'none';
+      content.offsetHeight; // Forzar reflow
+      content.style.animation = 'slideDown 0.3s ease';
+    }
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    }, 100);
+  }
+}
+
+// Función para cerrar el modal de edición
+function closeEditMessageModal() {
+  const modal = document.getElementById('edit-message-modal');
+  if (modal) {
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.animation = 'slideUp 0.2s ease reverse';
+      setTimeout(() => {
+        modal.style.display = 'none';
+        content.style.animation = '';
+      }, 200);
+    } else {
+      modal.style.display = 'none';
+    }
+  }
+  messageToEdit = null;
+}
+
+// Función para confirmar la edición y regenerar desde ese punto
+async function confirmEditMessage() {
+  if (!messageToEdit || state.loading) return;
+  
+  const conversation = state.conversations[state.activeId];
+  if (!conversation) return;
+  
+  const textarea = document.getElementById('edit-message-textarea');
+  if (!textarea) return;
+  
+  const newContent = textarea.value.trim();
+  if (!newContent) return;
+  
+  // Encontrar el índice del mensaje a editar
+  const messageIndex = conversation.messages.findIndex(msg => msg.id === messageToEdit);
+  if (messageIndex === -1) return;
+  
+  const message = conversation.messages[messageIndex];
+  if (message.role !== 'user') return;
+  
+  // Cerrar el modal
+  closeEditMessageModal();
+  
+  // Actualizar el contenido del mensaje
+  message.content = newContent;
+  
+  // Eliminar todos los mensajes posteriores (respuestas del asistente y mensajes siguientes)
+  const messagesToRemove = conversation.messages.length - messageIndex - 1;
+  conversation.messages.splice(messageIndex + 1, messagesToRemove);
+  
+  // Re-renderizar la conversación completa
+  renderActiveConversation();
+  
+  // Guardar el estado
+  persistState();
+  
+  // Preparar los mensajes para la solicitud
+  const payloadMessages = [];
+  
+  // Agregar información personal del usuario como contexto del sistema
+  const personalInfo = getAIPersonalization();
+  
+  // Obtener contexto del proyecto activo
+  const activeProject = getActiveProject();
+  const projectContext = activeProject ? buildProjectContext(activeProject) : '';
+  
+  // Obtener archivos adjuntos
+  const currentFiles = attachedFiles[conversation.id] || [];
+  const imageFiles = currentFiles.filter(f => f.isImage);
+  const textFiles = currentFiles.filter(f => !f.isImage);
+  
+  // Construir mensaje del sistema
+  const shouldIncludeProjectContext = projectContext && projectContext.length > 0;
+  let memoryContext = '';
+  const isFirstUserMessage = messageIndex === 0;
+  
+  if (isFirstUserMessage) {
+    memoryContext = buildMemoryContext() || '';
+  }
+  
+  if (isFirstUserMessage || shouldIncludeProjectContext) {
+    let systemContent = '';
+    
+    if (projectContext) {
+      systemContent += projectContext + '\n\n';
+    }
+    
+    if (isFirstUserMessage) {
+      if (memoryContext) {
+        systemContent += memoryContext + '\n\n';
+      }
+      
+      if (personalInfo.trim()) {
+        systemContent += `Información personal del usuario: ${personalInfo.trim()}\n\n`;
+      }
+    }
+    
+    if (textFiles.length > 0) {
+      systemContent += '=== DOCUMENTOS ADJUNTOS AL CHAT (DEBES LEER Y USAR ESTE CONTENIDO) ===\n\n';
+      textFiles.forEach((file, index) => {
+        systemContent += `══════════════════════════════════════════════════════════════\n`;
+        systemContent += `📄 DOCUMENTO ${index + 1}: ${file.name}\n`;
+        systemContent += `══════════════════════════════════════════════════════════════\n\n`;
+        systemContent += `${file.content}\n\n`;
+      });
+      systemContent += '=== FIN DE DOCUMENTOS ADJUNTOS ===\n\n';
+    }
+    
+    const responseStyle = getAIResponseStyle();
+    const styleInstructions = getStyleInstructions(responseStyle);
+    
+    let instructions = '';
+    const hasDocuments = textFiles.length > 0 || shouldIncludeProjectContext;
+    const hasPersonalContext = personalInfo.trim() || memoryContext;
+    
+    if (hasDocuments) {
+      instructions = 'IMPORTANTE: Se te han proporcionado documentos arriba. DEBES leer y usar el contenido de estos documentos para responder las preguntas del usuario.';
+    } else if (hasPersonalContext) {
+      instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas.';
+    }
+    
+    if (systemContent || styleInstructions || instructions) {
+      let finalContent = systemContent;
+      
+      if (styleInstructions) {
+        if (finalContent) finalContent += '\n';
+        finalContent += `Instrucciones de estilo de respuesta: ${styleInstructions}`;
+      }
+      
+      if (instructions) {
+        if (finalContent) finalContent += '\n\n';
+        finalContent += instructions;
+      }
+      
+      if (finalContent.trim()) {
+        payloadMessages.push({
+          role: 'system',
+          content: finalContent.trim()
+        });
+      }
+    }
+  }
+  
+  // Añadir los mensajes de la conversación (hasta el mensaje editado, inclusive)
+  for (let i = 0; i <= messageIndex; i++) {
+    const msg = conversation.messages[i];
+    const payloadMessage = {
+      role: msg.role,
+      content: msg.content || '',
+    };
+    
+    // Solo añadir imágenes al último mensaje del usuario
+    const isLastUserMessage = msg.role === 'user' && i === messageIndex && imageFiles.length > 0;
+    
+    if (isLastUserMessage) {
+      payloadMessage.images = imageFiles.map(file => {
+        if (file.content && file.content.startsWith('data:')) {
+          return file.content.split(',')[1];
+        }
+        return file.content;
+      }).filter(img => img !== null);
+    }
+    
+    payloadMessages.push(payloadMessage);
+  }
+  
+  state.loading = true;
+  
+  try {
+    await streamAssistantResponse(conversation, payloadMessages);
+  } catch (error) {
+    console.error(error);
+    const assistantMessage = conversation.messages[conversation.messages.length - 1];
+    if (assistantMessage?.role === 'assistant') {
+      if (error.name !== 'AbortError' && !error.message.includes('cancel')) {
+        assistantMessage.content = `⚠️ ${error.message}`;
+        const chatListElement = document.getElementById('chat-list');
+        const lastBubble = chatListElement?.lastElementChild?.querySelector('.message-bubble');
+        updateAssistantBubble(lastBubble, assistantMessage.content);
+        persistState();
+      }
+    }
+  } finally {
+    state.loading = false;
+    currentStreamReader = null;
+    updateStopButtonToSend();
   }
 }
 
@@ -2790,6 +3024,31 @@ function setupConversationModals() {
   
   deleteAllModal?.addEventListener('click', (e) => {
     if (e.target === deleteAllModal) closeDeleteAllModal();
+  });
+  
+  // Modal de editar mensaje
+  const editMessageModal = document.getElementById('edit-message-modal');
+  const closeEditMessageBtn = document.getElementById('close-edit-message-modal');
+  const cancelEditMessageBtn = document.getElementById('cancel-edit-message');
+  const confirmEditMessageBtn = document.getElementById('confirm-edit-message');
+  const editMessageTextarea = document.getElementById('edit-message-textarea');
+  
+  closeEditMessageBtn?.addEventListener('click', closeEditMessageModal);
+  cancelEditMessageBtn?.addEventListener('click', closeEditMessageModal);
+  confirmEditMessageBtn?.addEventListener('click', confirmEditMessage);
+  
+  editMessageTextarea?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      confirmEditMessage();
+    }
+    if (e.key === 'Escape') {
+      closeEditMessageModal();
+    }
+  });
+  
+  editMessageModal?.addEventListener('click', (e) => {
+    if (e.target === editMessageModal) closeEditMessageModal();
   });
 }
 
