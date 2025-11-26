@@ -504,6 +504,11 @@ function renderConversationList() {
 
     const item = document.createElement('li');
     item.className = `conversation-item${id === state.activeId ? ' active' : ''}`;
+    
+    // Añadir clase si pertenece a un proyecto
+    if (conversation.projectId && projectsState?.projects[conversation.projectId]) {
+      item.classList.add('has-project');
+    }
 
     const textBlock = document.createElement('div');
     textBlock.className = 'conversation-text';
@@ -511,6 +516,14 @@ function renderConversationList() {
     const name = document.createElement('p');
     name.className = 'conversation-name';
     name.textContent = conversation.title ?? DEFAULT_TITLE;
+    
+    // Mostrar etiqueta del proyecto si existe
+    if (conversation.projectId && projectsState?.projects[conversation.projectId]) {
+      const projectTag = document.createElement('span');
+      projectTag.className = 'conversation-project-tag';
+      projectTag.textContent = projectsState.projects[conversation.projectId].name;
+      name.appendChild(projectTag);
+    }
 
     const preview = document.createElement('p');
     preview.className = 'conversation-preview';
@@ -559,6 +572,31 @@ function setActiveConversation(id) {
   if (!attachedFiles[id]) {
     attachedFiles[id] = [];
   }
+  
+  // Activar el proyecto asociado a la conversación (si tiene)
+  const conversation = state.conversations[id];
+  if (conversation.projectId && projectsState?.projects[conversation.projectId]) {
+    // La conversación pertenece a un proyecto
+    projectsState.activeProjectId = conversation.projectId;
+    saveActiveProject(conversation.projectId);
+    updateProjectBadge();
+    renderProjectsList();
+    
+    const chatState = document.getElementById('chat-state');
+    if (chatState) chatState.classList.add('in-project');
+  } else {
+    // Conversación normal, sin proyecto
+    if (projectsState) {
+      projectsState.activeProjectId = null;
+      saveActiveProject(null);
+      updateProjectBadge();
+      renderProjectsList();
+    }
+    
+    const chatState = document.getElementById('chat-state');
+    if (chatState) chatState.classList.remove('in-project');
+  }
+  
   renderConversationList();
   renderActiveConversation();
   renderAttachedFiles();
@@ -573,11 +611,12 @@ function createConversation() {
     createdAt: Date.now(),
     updatedAt: Date.now(),
     messages: [],
+    projectId: null, // Conversación sin proyecto
   };
   state.conversations[id] = conversation;
   attachedFiles[id] = []; // Inicializar array de archivos para esta conversación
   touchConversation(id);
-  setActiveConversation(id);
+  setActiveConversation(id); // Esto desactivará el proyecto automáticamente
   if (promptInput) promptInput.focus();
 }
 
@@ -1302,6 +1341,10 @@ async function handleSubmit(event) {
   const isFirstMessage = conversation.messages.length === 1;
   const personalInfo = getAIPersonalization();
   
+  // Obtener contexto del proyecto activo
+  const activeProject = getActiveProject();
+  const projectContext = activeProject ? buildProjectContext(activeProject) : '';
+  
   // Si hay archivos adjuntos, añadir el contexto al primer mensaje del usuario
   // Solo añadir el contexto una vez al inicio de la conversación con archivos
   const hasFiles = attachedFiles[conversation.id] && attachedFiles[conversation.id].length > 0;
@@ -1311,9 +1354,14 @@ async function handleSubmit(event) {
   const imageFiles = hasFiles ? attachedFiles[conversation.id].filter(f => f.isImage) : [];
   const textFiles = hasFiles ? attachedFiles[conversation.id].filter(f => !f.isImage) : [];
   
-  // Construir mensaje del sistema combinando información personal, estilo, memorias y archivos (solo en el primer mensaje)
+  // Construir mensaje del sistema combinando proyecto, información personal, estilo, memorias y archivos (solo en el primer mensaje)
   if (isFirstMessage) {
     let systemContent = '';
+    
+    // PRIMERO: Agregar contexto del proyecto (máxima prioridad)
+    if (projectContext) {
+      systemContent += projectContext + '\n\n';
+    }
     
     // Agregar contexto de memorias si está habilitado
     const memoryContext = buildMemoryContext();
@@ -3982,5 +4030,621 @@ document.addEventListener('DOMContentLoaded', () => {
   init();
   initBackgroundSystem();
   initUserMenu();
+  initProjectSystem();
 });
+
+// ========================================
+// Sistema de Proyectos
+// ========================================
+const PROJECTS_STORAGE_KEY = 'ollama-web-projects';
+
+// Estado de proyectos
+const projectsState = {
+  projects: {},
+  activeProjectId: null,
+  editingProjectId: null,
+  tempProjectFiles: [] // Archivos temporales mientras se edita/crea
+};
+
+function getProjects() {
+  if (!hasLocalStorage) return {};
+  try {
+    const stored = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch (error) {
+    console.warn('No se pudieron cargar los proyectos', error);
+    return {};
+  }
+}
+
+function saveProjects(projects) {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+  } catch (error) {
+    console.warn('No se pudieron guardar los proyectos', error);
+  }
+}
+
+function loadProjectsState() {
+  projectsState.projects = getProjects();
+  
+  // Limpiar proyectos corruptos o con estructura incompleta
+  Object.keys(projectsState.projects).forEach(id => {
+    const project = projectsState.projects[id];
+    if (!project || typeof project !== 'object') {
+      delete projectsState.projects[id];
+      return;
+    }
+    // Asegurar que tenga todas las propiedades necesarias
+    if (!project.files) project.files = [];
+    if (!project.conversationIds) project.conversationIds = [];
+    if (!project.name) project.name = 'Proyecto sin nombre';
+    if (!project.instructions) project.instructions = '';
+  });
+  
+  // Guardar proyectos limpios
+  saveProjects(projectsState.projects);
+  
+  // Cargar proyecto activo si había uno guardado
+  if (hasLocalStorage) {
+    try {
+      const activeProjectId = window.localStorage.getItem('ollama-web-active-project');
+      if (activeProjectId && projectsState.projects[activeProjectId]) {
+        projectsState.activeProjectId = activeProjectId;
+      }
+    } catch (error) {
+      console.warn('No se pudo cargar el proyecto activo', error);
+    }
+  }
+}
+
+function saveActiveProject(projectId) {
+  if (!hasLocalStorage) return;
+  try {
+    if (projectId) {
+      window.localStorage.setItem('ollama-web-active-project', projectId);
+    } else {
+      window.localStorage.removeItem('ollama-web-active-project');
+    }
+  } catch (error) {
+    console.warn('No se pudo guardar el proyecto activo', error);
+  }
+}
+
+function createProject(name, instructions, files = []) {
+  const id = generateId('proj');
+  const project = {
+    id,
+    name: name.trim() || 'Proyecto sin nombre',
+    instructions: instructions.trim(),
+    files: files.map(f => ({
+      id: f.id || generateId('pfile'),
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      content: f.content,
+      isImage: f.isImage || false
+    })),
+    conversationIds: [], // IDs de conversaciones asociadas
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  
+  projectsState.projects[id] = project;
+  saveProjects(projectsState.projects);
+  return project;
+}
+
+function updateProject(projectId, updates) {
+  const project = projectsState.projects[projectId];
+  if (!project) return null;
+  
+  if (updates.name !== undefined) project.name = updates.name.trim() || 'Proyecto sin nombre';
+  if (updates.instructions !== undefined) project.instructions = updates.instructions.trim();
+  if (updates.files !== undefined) {
+    project.files = updates.files.map(f => ({
+      id: f.id || generateId('pfile'),
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      content: f.content,
+      isImage: f.isImage || false
+    }));
+  }
+  
+  project.updatedAt = Date.now();
+  saveProjects(projectsState.projects);
+  return project;
+}
+
+function deleteProject(projectId) {
+  const project = projectsState.projects[projectId];
+  if (!project) return false;
+  
+  // Eliminar conversaciones asociadas al proyecto
+  project.conversationIds.forEach(convId => {
+    if (state.conversations[convId]) {
+      delete state.conversations[convId];
+      state.order = state.order.filter(id => id !== convId);
+    }
+  });
+  
+  // Si era el proyecto activo, desactivarlo
+  if (projectsState.activeProjectId === projectId) {
+    projectsState.activeProjectId = null;
+    saveActiveProject(null);
+    updateProjectBadge();
+  }
+  
+  delete projectsState.projects[projectId];
+  saveProjects(projectsState.projects);
+  persistState();
+  
+  return true;
+}
+
+function setActiveProject(projectId) {
+  if (projectId && !projectsState.projects[projectId]) return false;
+  
+  projectsState.activeProjectId = projectId;
+  saveActiveProject(projectId);
+  updateProjectBadge();
+  renderProjectsList();
+  
+  // Actualizar clase del chat-state
+  const chatState = document.getElementById('chat-state');
+  if (chatState) {
+    if (projectId) {
+      chatState.classList.add('in-project');
+    } else {
+      chatState.classList.remove('in-project');
+    }
+  }
+  
+  // Si hay un proyecto activo, crear una nueva conversación para él
+  if (projectId) {
+    createProjectConversation(projectId);
+  }
+  
+  return true;
+}
+
+function createProjectConversation(projectId) {
+  const project = projectsState.projects[projectId];
+  if (!project) return null;
+  
+  // Crear nueva conversación
+  const convId = generateId('conv');
+  const conversation = {
+    id: convId,
+    title: `${project.name} - Nueva conversación`,
+    projectId: projectId, // Asociar con el proyecto
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    messages: [],
+  };
+  
+  state.conversations[convId] = conversation;
+  attachedFiles[convId] = [];
+  
+  // Añadir a la lista de conversaciones del proyecto
+  project.conversationIds.push(convId);
+  saveProjects(projectsState.projects);
+  
+  touchConversation(convId);
+  setActiveConversation(convId);
+  
+  return conversation;
+}
+
+function getActiveProject() {
+  if (!projectsState.activeProjectId) return null;
+  return projectsState.projects[projectsState.activeProjectId] || null;
+}
+
+function buildProjectContext(project) {
+  if (!project) return '';
+  
+  let context = '';
+  
+  // Añadir instrucciones del proyecto
+  if (project.instructions) {
+    context += `INSTRUCCIONES DEL PROYECTO "${project.name}":\n${project.instructions}\n\n`;
+  }
+  
+  // Añadir contenido de archivos (solo texto, no imágenes)
+  const textFiles = project.files.filter(f => !f.isImage);
+  if (textFiles.length > 0) {
+    context += 'ARCHIVOS DE CONTEXTO DEL PROYECTO:\n\n';
+    textFiles.forEach(file => {
+      context += `--- ${file.name} ---\n${file.content}\n\n`;
+    });
+  }
+  
+  if (context) {
+    context += 'IMPORTANTE: Sigue las instrucciones del proyecto y ten en cuenta los archivos de contexto proporcionados al responder.\n';
+  }
+  
+  return context;
+}
+
+function updateProjectBadge() {
+  // Badge en el chat header
+  const badge = document.getElementById('project-badge');
+  const badgeName = document.getElementById('project-badge-name');
+  
+  // Badge en el empty state (pantalla principal)
+  const badgeEmpty = document.getElementById('project-badge-empty');
+  const badgeNameEmpty = document.getElementById('project-badge-name-empty');
+  
+  const project = getActiveProject();
+  
+  if (project) {
+    // Mostrar badge en chat header
+    if (badge && badgeName) {
+      badgeName.textContent = project.name;
+      badge.style.display = 'flex';
+    }
+    // Mostrar badge en empty state
+    if (badgeEmpty && badgeNameEmpty) {
+      badgeNameEmpty.textContent = project.name;
+      badgeEmpty.style.display = 'flex';
+    }
+  } else {
+    // Ocultar ambos badges
+    if (badge) badge.style.display = 'none';
+    if (badgeEmpty) badgeEmpty.style.display = 'none';
+  }
+}
+
+function renderProjectsList() {
+  const listElement = document.getElementById('projects-list');
+  if (!listElement) return;
+  
+  const projects = Object.values(projectsState.projects);
+  
+  if (projects.length === 0) {
+    listElement.innerHTML = `
+      <li class="projects-empty">
+        No hay proyectos aún.<br>
+        <span style="font-size: 11px; opacity: 0.7;">Crea uno para organizar tus chats</span>
+      </li>
+    `;
+    return;
+  }
+  
+  // Ordenar por fecha de actualización (más reciente primero)
+  projects.sort((a, b) => b.updatedAt - a.updatedAt);
+  
+  listElement.innerHTML = projects.map(project => {
+    const isActive = project.id === projectsState.activeProjectId;
+    const fileCount = (project.files || []).length;
+    const convCount = (project.conversationIds || []).length;
+    
+    return `
+      <li class="project-item ${isActive ? 'active' : ''}" data-project-id="${project.id}">
+        <div class="project-item-icon">📂</div>
+        <div class="project-item-info">
+          <p class="project-item-name">${escapeHtml(project.name || 'Sin nombre')}</p>
+          <p class="project-item-meta">${fileCount} archivo${fileCount !== 1 ? 's' : ''} · ${convCount} chat${convCount !== 1 ? 's' : ''}</p>
+        </div>
+        <div class="project-item-actions">
+          <button class="project-action-btn edit" title="Editar proyecto" data-action="edit">✎</button>
+          <button class="project-action-btn delete" title="Eliminar proyecto" data-action="delete">🗑</button>
+        </div>
+      </li>
+    `;
+  }).join('');
+  
+  // Añadir event listeners
+  listElement.querySelectorAll('.project-item').forEach(item => {
+    const projectId = item.dataset.projectId;
+    
+    // Click en el item para activar el proyecto
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.project-action-btn')) return; // Ignorar clicks en botones de acción
+      setActiveProject(projectId);
+    });
+    
+    // Botón editar
+    const editBtn = item.querySelector('.project-action-btn.edit');
+    editBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openProjectModal(projectId);
+    });
+    
+    // Botón eliminar
+    const deleteBtn = item.querySelector('.project-action-btn.delete');
+    deleteBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDeleteProjectModal(projectId);
+    });
+  });
+}
+
+function renderProjectFiles() {
+  const listElement = document.getElementById('project-files-list');
+  if (!listElement) return;
+  
+  if (projectsState.tempProjectFiles.length === 0) {
+    listElement.innerHTML = '';
+    return;
+  }
+  
+  listElement.innerHTML = projectsState.tempProjectFiles.map(file => {
+    const ext = getFileExtension(file.name);
+    const size = formatFileSize(file.size);
+    
+    return `
+      <div class="project-file-item" data-file-id="${file.id}">
+        <div class="project-file-icon">${ext}</div>
+        <div class="project-file-info">
+          <div class="project-file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
+          <div class="project-file-size">${size}</div>
+        </div>
+        <button class="project-file-remove" title="Eliminar archivo" data-file-id="${file.id}">×</button>
+      </div>
+    `;
+  }).join('');
+  
+  // Añadir event listeners para eliminar
+  listElement.querySelectorAll('.project-file-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const fileId = btn.dataset.fileId;
+      projectsState.tempProjectFiles = projectsState.tempProjectFiles.filter(f => f.id !== fileId);
+      renderProjectFiles();
+    });
+  });
+}
+
+function openProjectModal(projectId = null) {
+  const modal = document.getElementById('project-modal');
+  const title = document.getElementById('project-modal-title');
+  const nameInput = document.getElementById('project-name-input');
+  const instructionsInput = document.getElementById('project-instructions-input');
+  
+  if (!modal || !nameInput || !instructionsInput) return;
+  
+  projectsState.editingProjectId = projectId;
+  
+  if (projectId) {
+    // Modo edición
+    const project = projectsState.projects[projectId];
+    if (!project) return;
+    
+    title.textContent = 'Editar Proyecto';
+    nameInput.value = project.name;
+    instructionsInput.value = project.instructions;
+    projectsState.tempProjectFiles = [...project.files];
+  } else {
+    // Modo creación
+    title.textContent = 'Nuevo Proyecto';
+    nameInput.value = '';
+    instructionsInput.value = '';
+    projectsState.tempProjectFiles = [];
+  }
+  
+  renderProjectFiles();
+  modal.style.display = 'flex';
+  setTimeout(() => nameInput.focus(), 100);
+}
+
+function closeProjectModal() {
+  const modal = document.getElementById('project-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  projectsState.editingProjectId = null;
+  projectsState.tempProjectFiles = [];
+}
+
+function saveProjectFromModal() {
+  const nameInput = document.getElementById('project-name-input');
+  const instructionsInput = document.getElementById('project-instructions-input');
+  
+  if (!nameInput || !instructionsInput) return;
+  
+  const name = nameInput.value.trim();
+  const instructions = instructionsInput.value.trim();
+  const files = [...projectsState.tempProjectFiles];
+  
+  if (!name) {
+    nameInput.focus();
+    return;
+  }
+  
+  if (projectsState.editingProjectId) {
+    // Actualizar proyecto existente
+    updateProject(projectsState.editingProjectId, { name, instructions, files });
+  } else {
+    // Crear nuevo proyecto
+    createProject(name, instructions, files);
+  }
+  
+  closeProjectModal();
+  renderProjectsList();
+  updateProjectBadge();
+}
+
+function openDeleteProjectModal(projectId) {
+  const modal = document.getElementById('delete-project-modal');
+  const nameElement = document.getElementById('delete-project-name');
+  
+  if (!modal || !nameElement) return;
+  
+  const project = projectsState.projects[projectId];
+  if (!project) return;
+  
+  projectsState.editingProjectId = projectId;
+  nameElement.textContent = project.name;
+  modal.style.display = 'flex';
+}
+
+function closeDeleteProjectModal() {
+  const modal = document.getElementById('delete-project-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  projectsState.editingProjectId = null;
+}
+
+function confirmDeleteProject() {
+  if (projectsState.editingProjectId) {
+    deleteProject(projectsState.editingProjectId);
+    renderProjectsList();
+    renderConversationList();
+    
+    // Si no hay conversación activa, crear una nueva
+    if (!state.activeId || !state.conversations[state.activeId]) {
+      if (state.order.length > 0) {
+        setActiveConversation(state.order[0]);
+      } else {
+        createConversation();
+      }
+    }
+  }
+  closeDeleteProjectModal();
+}
+
+async function handleProjectFiles(files) {
+  const fileArray = Array.from(files);
+  
+  for (const file of fileArray) {
+    try {
+      // Límite de tamaño
+      if (file.size > 50 * 1024 * 1024) {
+        alert(`El archivo ${file.name} es demasiado grande. El tamaño máximo es 50MB.`);
+        continue;
+      }
+      
+      const content = await readFileContent(file);
+      const isImage = isImageFile(file);
+      
+      projectsState.tempProjectFiles.push({
+        id: generateId('pfile'),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        content: content,
+        isImage: isImage
+      });
+    } catch (error) {
+      console.error(`Error al leer el archivo ${file.name}:`, error);
+      alert(`Error al leer el archivo ${file.name}: ${error.message}`);
+    }
+  }
+  
+  renderProjectFiles();
+}
+
+function initProjectSystem() {
+  loadProjectsState();
+  renderProjectsList();
+  updateProjectBadge();
+  
+  // Botón nuevo proyecto
+  const newProjectBtn = document.getElementById('new-project-btn');
+  if (newProjectBtn) {
+    newProjectBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openProjectModal();
+    });
+  }
+  
+  // Modal de proyecto
+  const closeProjectModalBtn = document.getElementById('close-project-modal');
+  const cancelProjectBtn = document.getElementById('cancel-project');
+  const saveProjectBtn = document.getElementById('save-project');
+  
+  closeProjectModalBtn?.addEventListener('click', closeProjectModal);
+  cancelProjectBtn?.addEventListener('click', closeProjectModal);
+  saveProjectBtn?.addEventListener('click', saveProjectFromModal);
+  
+  // Modal de proyecto - cerrar al hacer clic fuera
+  const projectModal = document.getElementById('project-modal');
+  projectModal?.addEventListener('click', (e) => {
+    if (e.target === projectModal) {
+      closeProjectModal();
+    }
+  });
+  
+  // Modal de eliminar proyecto
+  const closeDeleteBtn = document.getElementById('close-delete-project-modal');
+  const cancelDeleteBtn = document.getElementById('cancel-delete-project');
+  const confirmDeleteBtn = document.getElementById('confirm-delete-project');
+  
+  closeDeleteBtn?.addEventListener('click', closeDeleteProjectModal);
+  cancelDeleteBtn?.addEventListener('click', closeDeleteProjectModal);
+  confirmDeleteBtn?.addEventListener('click', confirmDeleteProject);
+  
+  // Modal de eliminar - cerrar al hacer clic fuera
+  const deleteModal = document.getElementById('delete-project-modal');
+  deleteModal?.addEventListener('click', (e) => {
+    if (e.target === deleteModal) {
+      closeDeleteProjectModal();
+    }
+  });
+  
+  // Dropzone de archivos del proyecto
+  const dropzone = document.getElementById('project-files-dropzone');
+  const fileInput = document.getElementById('project-file-input');
+  
+  if (dropzone && fileInput) {
+    dropzone.addEventListener('click', () => fileInput.click());
+    
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.add('drag-over');
+    });
+    
+    dropzone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove('drag-over');
+    });
+    
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove('drag-over');
+      
+      if (e.dataTransfer.files.length > 0) {
+        handleProjectFiles(e.dataTransfer.files);
+      }
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleProjectFiles(e.target.files);
+        e.target.value = ''; // Reset
+      }
+    });
+  }
+  
+  // Botón salir del proyecto (en chat header)
+  const exitProjectBtn = document.getElementById('exit-project-btn');
+  exitProjectBtn?.addEventListener('click', () => {
+    setActiveProject(null);
+  });
+  
+  // Botón salir del proyecto (en empty state)
+  const exitProjectBtnEmpty = document.getElementById('exit-project-btn-empty');
+  exitProjectBtnEmpty?.addEventListener('click', () => {
+    setActiveProject(null);
+  });
+  
+  // Si había un proyecto activo, actualizarlo
+  if (projectsState.activeProjectId) {
+    updateProjectBadge();
+    
+    // Actualizar clase del chat-state
+    const chatState = document.getElementById('chat-state');
+    if (chatState) {
+      chatState.classList.add('in-project');
+    }
+  }
+}
 

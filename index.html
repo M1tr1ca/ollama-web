@@ -32,6 +32,15 @@
           Nueva conversación
         </button>
 
+        <!-- Sección de Proyectos -->
+        <section class="projects-section" aria-label="Proyectos">
+          <header class="projects-header">
+            <h2>Proyectos</h2>
+            <button id="new-project-btn" class="new-project-btn" title="Nuevo proyecto">＋</button>
+          </header>
+          <ul id="projects-list" class="projects-list"></ul>
+        </section>
+
         <section class="conversation-section" aria-label="Conversaciones recientes">
           <header class="conversation-header">
             <h2>Recientes</h2>
@@ -318,6 +327,69 @@
             </div>
           </div>
         </div>
+        
+        <!-- Modal para gestión de proyectos -->
+        <div id="project-modal" class="modal-overlay" style="display: none;">
+          <div class="modal-content modal-content-project">
+            <div class="modal-header">
+              <h3 id="project-modal-title">Nuevo Proyecto</h3>
+              <button class="modal-close" id="close-project-modal">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="personalization-section">
+                <label for="project-name-input" class="section-label">
+                  Nombre del proyecto
+                </label>
+                <input type="text" id="project-name-input" class="modal-input" placeholder="Ej: Desarrollo Web, Tesis, etc." />
+              </div>
+              
+              <div class="personalization-section">
+                <label for="project-instructions-input" class="section-label">
+                  Instrucciones personalizadas para la IA
+                </label>
+                <textarea id="project-instructions-input" class="modal-textarea-compact" rows="4" placeholder="Ej: Responde siempre en español técnico. Cuando expliques código, incluye comentarios detallados. Prioriza soluciones eficientes..."></textarea>
+                <span class="input-hint">Estas instrucciones se enviarán a la IA en cada mensaje de este proyecto</span>
+              </div>
+              
+              <div class="personalization-section">
+                <label class="section-label">
+                  Archivos de contexto
+                </label>
+                <div class="project-files-area">
+                  <div class="project-files-dropzone" id="project-files-dropzone">
+                    <span class="dropzone-icon">📁</span>
+                    <span class="dropzone-text">Arrastra archivos aquí o haz clic para seleccionar</span>
+                    <span class="dropzone-hint">Estos archivos se usarán como contexto en todas las conversaciones del proyecto</span>
+                    <input type="file" id="project-file-input" multiple accept=".txt,.md,.json,.csv,.py,.js,.html,.css,.xml,.pdf,.jpg,.jpeg,.png,.gif,.webp" style="display: none;">
+                  </div>
+                  <div id="project-files-list" class="project-files-list"></div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="modal-button secondary" id="cancel-project">Cancelar</button>
+              <button class="modal-button primary" id="save-project">Guardar proyecto</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Modal para confirmar eliminación de proyecto -->
+        <div id="delete-project-modal" class="modal-overlay" style="display: none;">
+          <div class="modal-content modal-content-small">
+            <div class="modal-header">
+              <h3>Eliminar proyecto</h3>
+              <button class="modal-close" id="close-delete-project-modal">×</button>
+            </div>
+            <div class="modal-body">
+              <p class="delete-warning">¿Estás seguro de que quieres eliminar este proyecto? Se eliminarán también todas las conversaciones asociadas.</p>
+              <p class="delete-project-name" id="delete-project-name"></p>
+            </div>
+            <div class="modal-footer">
+              <button class="modal-button secondary" id="cancel-delete-project">Cancelar</button>
+              <button class="modal-button danger" id="confirm-delete-project">Eliminar</button>
+            </div>
+          </div>
+        </div>
       </aside>
 
       <div class="main-column">
@@ -336,6 +408,12 @@
           </button>
         </div>
         <div id="empty-state" class="empty-state">
+          <!-- Badge de proyecto activo en empty state -->
+          <div id="project-badge-empty" class="project-badge project-badge-floating" style="display: none;">
+            <span class="project-badge-icon">📂</span>
+            <span id="project-badge-name-empty" class="project-badge-name"></span>
+          </div>
+          
           <div class="greeting">
             <h1 id="greeting-text">Buenas noches, <span class="user-name">Default</span></h1>
             <p id="greeting-subtitle" class="subtitle">¿Cómo puedo ayudarle hoy?</p>
@@ -373,6 +451,11 @@
         <div id="chat-state" class="chat-state" style="display: none;">
           <header class="chat-header">
             <div class="chat-header-left">
+              <!-- Etiqueta de proyecto activo -->
+              <div id="project-badge" class="project-badge" style="display: none;">
+                <span class="project-badge-icon">📂</span>
+                <span id="project-badge-name" class="project-badge-name"></span>
+              </div>
               <h2 id="conversation-title">Nueva conversación</h2>
             </div>
             <div class="chat-actions">
