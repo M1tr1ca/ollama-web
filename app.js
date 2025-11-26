@@ -1349,6 +1349,12 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             currentStreamReader = null;
             updateStopButtonToSend();
             
+            // Registrar estadísticas de uso
+            const responseTime = (Date.now() - startTime) / 1000;
+            trackModelUsage(state.currentModel);
+            trackDailyMessage();
+            trackResponseTime(responseTime);
+            
             // Extraer información importante automáticamente
             const lastUserMessage = conversation.messages.filter(m => m.role === 'user').pop();
             if (lastUserMessage && assistantMessage.content) {
@@ -1398,6 +1404,12 @@ async function streamAssistantResponse(conversation, payloadMessages) {
         duration: assistantMessage.thinkingDuration
       } : null;
       updateAssistantBubble(bubble, assistantMessage.content, thinkingData, false);
+      
+      // Registrar estadísticas de uso
+      const responseTime = (Date.now() - startTime) / 1000;
+      trackModelUsage(state.currentModel);
+      trackDailyMessage();
+      trackResponseTime(responseTime);
       
       // Extraer información importante automáticamente al finalizar
       const lastUserMessage = conversation.messages.filter(m => m.role === 'user').pop();
@@ -4350,11 +4362,470 @@ function initThemeSystem() {
   }
 }
 
+// ========================================
+// Dashboard de Uso
+// ========================================
+
+const USAGE_STATS_KEY = 'ollama-web-usage-stats';
+
+// Estructura para guardar estadísticas de uso
+function getUsageStats() {
+  if (!hasLocalStorage) return { modelUsage: {}, dailyMessages: {}, responseTimes: [] };
+  try {
+    const stored = window.localStorage.getItem(USAGE_STATS_KEY);
+    return stored ? JSON.parse(stored) : { modelUsage: {}, dailyMessages: {}, responseTimes: [] };
+  } catch (error) {
+    console.warn('No se pudieron cargar las estadísticas de uso', error);
+    return { modelUsage: {}, dailyMessages: {}, responseTimes: [] };
+  }
+}
+
+function saveUsageStats(stats) {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(USAGE_STATS_KEY, JSON.stringify(stats));
+  } catch (error) {
+    console.warn('No se pudieron guardar las estadísticas de uso', error);
+  }
+}
+
+// Registrar uso de modelo
+function trackModelUsage(modelName) {
+  const stats = getUsageStats();
+  if (!stats.modelUsage) stats.modelUsage = {};
+  stats.modelUsage[modelName] = (stats.modelUsage[modelName] || 0) + 1;
+  saveUsageStats(stats);
+}
+
+// Registrar mensaje diario
+function trackDailyMessage() {
+  const stats = getUsageStats();
+  if (!stats.dailyMessages) stats.dailyMessages = {};
+  const today = getTodayDateString();
+  stats.dailyMessages[today] = (stats.dailyMessages[today] || 0) + 1;
+  saveUsageStats(stats);
+}
+
+// Registrar tiempo de respuesta
+function trackResponseTime(seconds) {
+  const stats = getUsageStats();
+  if (!stats.responseTimes) stats.responseTimes = [];
+  // Guardar solo los últimos 100 tiempos de respuesta
+  stats.responseTimes.push(seconds);
+  if (stats.responseTimes.length > 100) {
+    stats.responseTimes = stats.responseTimes.slice(-100);
+  }
+  saveUsageStats(stats);
+}
+
+// Calcular estadísticas generales
+function calculateDashboardStats() {
+  const conversations = Object.values(state.conversations);
+  const stats = {
+    totalMessages: 0,
+    userMessages: 0,
+    assistantMessages: 0,
+    totalConversations: conversations.length,
+    charsSent: 0,
+    charsReceived: 0,
+    filesAttached: 0,
+    projectsCount: Object.keys(projectsState?.projects || {}).length,
+    avgResponseTime: 0,
+    tokensEstimated: 0,
+    modelUsage: {},
+    dailyMessages: {}
+  };
+  
+  // Contar mensajes y caracteres de las conversaciones
+  conversations.forEach(conv => {
+    if (!conv.messages) return;
+    
+    conv.messages.forEach(msg => {
+      stats.totalMessages++;
+      const contentLength = msg.content?.length || 0;
+      
+      if (msg.role === 'user') {
+        stats.userMessages++;
+        stats.charsSent += contentLength;
+        
+        // Contar archivos adjuntos
+        if (msg.attachedFiles && msg.attachedFiles.length > 0) {
+          stats.filesAttached += msg.attachedFiles.length;
+        }
+      } else if (msg.role === 'assistant') {
+        stats.assistantMessages++;
+        stats.charsReceived += contentLength;
+      }
+    });
+  });
+  
+  // Estimar tokens (1 token ≈ 4 caracteres en promedio)
+  stats.tokensEstimated = Math.round((stats.charsSent + stats.charsReceived) / 4);
+  
+  // Obtener estadísticas guardadas
+  const usageStats = getUsageStats();
+  stats.modelUsage = usageStats.modelUsage || {};
+  stats.dailyMessages = usageStats.dailyMessages || {};
+  
+  // Calcular tiempo promedio de respuesta
+  if (usageStats.responseTimes && usageStats.responseTimes.length > 0) {
+    const sum = usageStats.responseTimes.reduce((a, b) => a + b, 0);
+    stats.avgResponseTime = (sum / usageStats.responseTimes.length).toFixed(1);
+  }
+  
+  return stats;
+}
+
+// Formatear número grande
+function formatNumber(num) {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M';
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K';
+  }
+  return num.toString();
+}
+
+// Renderizar el gráfico de actividad
+function renderActivityChart(dailyMessages) {
+  const chartContainer = document.getElementById('activity-chart');
+  if (!chartContainer) return;
+  
+  // Obtener los últimos 7 días
+  const days = [];
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    days.push({
+      date: dateStr,
+      label: dayNames[date.getDay()],
+      count: dailyMessages[dateStr] || 0
+    });
+  }
+  
+  const maxCount = Math.max(...days.map(d => d.count), 1);
+  
+  if (maxCount === 0 || days.every(d => d.count === 0)) {
+    chartContainer.innerHTML = '<div class="activity-empty">No hay actividad registrada en los últimos 7 días</div>';
+    return;
+  }
+  
+  chartContainer.innerHTML = days.map(day => {
+    const height = Math.max(4, (day.count / maxCount) * 80);
+    return `
+      <div class="activity-bar">
+        <div class="activity-bar-fill" style="height: ${height}px" data-count="${day.count}"></div>
+        <span class="activity-bar-label">${day.label}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// Renderizar ranking de modelos
+function renderModelsRanking(modelUsage) {
+  const container = document.getElementById('models-ranking');
+  if (!container) return;
+  
+  const models = Object.entries(modelUsage)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  
+  if (models.length === 0) {
+    container.innerHTML = '<div class="models-ranking-empty">No hay datos de uso de modelos aún</div>';
+    return;
+  }
+  
+  const maxCount = models[0].count;
+  
+  container.innerHTML = models.map((model, index) => {
+    const positionClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : 'normal';
+    const percentage = Math.round((model.count / maxCount) * 100);
+    
+    // Formatear nombre del modelo
+    let displayName = model.name;
+    if (model.name.includes(':')) {
+      const parts = model.name.split(':');
+      displayName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+      if (parts[1]) {
+        displayName += ' ' + parts[1].split('-')[0].toUpperCase();
+      }
+    }
+    
+    return `
+      <div class="model-rank-item">
+        <div class="model-rank-position ${positionClass}">${index + 1}</div>
+        <div class="model-rank-info">
+          <div class="model-rank-name">${escapeHtml(displayName)}</div>
+          <div class="model-rank-count">${model.count} mensaje${model.count !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="model-rank-bar">
+          <div class="model-rank-bar-fill" style="width: ${percentage}%"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Formatear tamaño de modelo
+function formatModelSize(size) {
+  if (!size) return 'Desconocido';
+  const gb = size / (1024 * 1024 * 1024);
+  if (gb >= 1) {
+    return gb.toFixed(2) + ' GB';
+  }
+  const mb = size / (1024 * 1024);
+  return mb.toFixed(2) + ' MB';
+}
+
+// Cargar información de modelos
+async function loadModelsInfo() {
+  const container = document.getElementById('models-info-list');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div class="models-loading">
+      <div class="loading-spinner"></div>
+      <span>Cargando información de modelos...</span>
+    </div>
+  `;
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/tags`);
+    if (!response.ok) throw new Error('Error al cargar modelos');
+    
+    const data = await response.json();
+    const models = data?.models ?? [];
+    
+    if (models.length === 0) {
+      container.innerHTML = `
+        <div class="models-empty">
+          <div class="models-empty-icon">🤖</div>
+          <p>No hay modelos instalados</p>
+        </div>
+      `;
+      return;
+    }
+    
+    container.innerHTML = models.map(model => {
+      // Formatear nombre
+      let displayName = model.name;
+      if (model.name.includes(':')) {
+        const parts = model.name.split(':');
+        displayName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+      }
+      
+      // Extraer información del modelo
+      const details = model.details || {};
+      const size = formatModelSize(model.size);
+      const family = details.family || 'Desconocido';
+      const parameterSize = details.parameter_size || 'N/A';
+      const quantization = details.quantization_level || 'N/A';
+      const format = details.format || 'N/A';
+      
+      // Detectar capacidades del modelo basándose en el nombre
+      const capabilities = [];
+      const nameLower = model.name.toLowerCase();
+      if (nameLower.includes('vision') || nameLower.includes('llava')) {
+        capabilities.push('Visión');
+      }
+      if (nameLower.includes('code') || nameLower.includes('coder') || nameLower.includes('codellama')) {
+        capabilities.push('Código');
+      }
+      if (nameLower.includes('instruct') || nameLower.includes('chat')) {
+        capabilities.push('Chat');
+      }
+      if (nameLower.includes('embed')) {
+        capabilities.push('Embeddings');
+      }
+      if (nameLower.includes('deepseek') && nameLower.includes('r1')) {
+        capabilities.push('Razonamiento');
+      }
+      if (nameLower.includes('math')) {
+        capabilities.push('Matemáticas');
+      }
+      
+      if (capabilities.length === 0) {
+        capabilities.push('General');
+      }
+      
+      return `
+        <div class="model-info-card" data-model="${escapeHtml(model.name)}">
+          <div class="model-info-header">
+            <div class="model-info-title">
+              <div class="model-info-icon">🤖</div>
+              <div>
+                <div class="model-info-name">${escapeHtml(displayName)}</div>
+                <div class="model-info-size">${size}</div>
+              </div>
+            </div>
+            <span class="model-info-chevron">▼</span>
+          </div>
+          <div class="model-info-details">
+            <div class="model-detail-grid">
+              <div class="model-detail-item">
+                <div class="model-detail-label">Familia</div>
+                <div class="model-detail-value">${escapeHtml(family)}</div>
+              </div>
+              <div class="model-detail-item">
+                <div class="model-detail-label">Parámetros</div>
+                <div class="model-detail-value highlight">${escapeHtml(parameterSize)}</div>
+              </div>
+              <div class="model-detail-item">
+                <div class="model-detail-label">Cuantización</div>
+                <div class="model-detail-value">${escapeHtml(quantization)}</div>
+              </div>
+              <div class="model-detail-item">
+                <div class="model-detail-label">Formato</div>
+                <div class="model-detail-value">${escapeHtml(format)}</div>
+              </div>
+            </div>
+            <div class="model-capabilities">
+              ${capabilities.map(cap => `<span class="model-capability-tag">${cap}</span>`).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    // Añadir event listeners para expandir/colapsar
+    container.querySelectorAll('.model-info-card').forEach(card => {
+      const header = card.querySelector('.model-info-header');
+      header?.addEventListener('click', () => {
+        card.classList.toggle('expanded');
+      });
+    });
+    
+  } catch (error) {
+    console.error('Error cargando modelos:', error);
+    container.innerHTML = `
+      <div class="models-empty">
+        <div class="models-empty-icon">⚠️</div>
+        <p>Error al cargar los modelos</p>
+        <p style="font-size: 12px; opacity: 0.6;">Verifica que Ollama esté en ejecución</p>
+      </div>
+    `;
+  }
+}
+
+// Actualizar estadísticas del dashboard
+function updateDashboardStats() {
+  const stats = calculateDashboardStats();
+  
+  // Actualizar valores en las tarjetas
+  const elements = {
+    'stat-total-messages': formatNumber(stats.totalMessages),
+    'stat-total-conversations': formatNumber(stats.totalConversations),
+    'stat-total-tokens': '~' + formatNumber(stats.tokensEstimated),
+    'stat-avg-response-time': stats.avgResponseTime + 's',
+    'stat-user-messages': formatNumber(stats.userMessages),
+    'stat-assistant-messages': formatNumber(stats.assistantMessages),
+    'stat-chars-sent': formatNumber(stats.charsSent),
+    'stat-chars-received': formatNumber(stats.charsReceived),
+    'stat-files-attached': formatNumber(stats.filesAttached),
+    'stat-projects-count': formatNumber(stats.projectsCount)
+  };
+  
+  Object.entries(elements).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  });
+  
+  // Renderizar gráfico de actividad
+  renderActivityChart(stats.dailyMessages);
+  
+  // Renderizar ranking de modelos
+  renderModelsRanking(stats.modelUsage);
+}
+
+// Abrir dashboard
+function openDashboard() {
+  const modal = document.getElementById('dashboard-modal');
+  if (!modal) return;
+  
+  modal.style.display = 'flex';
+  
+  // Actualizar estadísticas
+  updateDashboardStats();
+  
+  // Cargar información de modelos si está en esa pestaña
+  const activeTab = modal.querySelector('.dashboard-tab.active');
+  if (activeTab?.dataset.tab === 'models') {
+    loadModelsInfo();
+  }
+}
+
+// Cerrar dashboard
+function closeDashboard() {
+  const modal = document.getElementById('dashboard-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
+// Inicializar dashboard
+function initDashboard() {
+  // Botón para abrir el dashboard
+  const dashboardBtn = document.getElementById('dashboard-btn');
+  dashboardBtn?.addEventListener('click', () => {
+    // Cerrar menús
+    const settingsMenu = document.getElementById('settings-menu');
+    const userMenu = document.getElementById('user-menu');
+    if (settingsMenu) settingsMenu.style.display = 'none';
+    if (userMenu) userMenu.style.display = 'none';
+    
+    openDashboard();
+  });
+  
+  // Botones para cerrar
+  const closeBtn = document.getElementById('close-dashboard-modal');
+  const closeBtn2 = document.getElementById('close-dashboard-modal-btn');
+  
+  closeBtn?.addEventListener('click', closeDashboard);
+  closeBtn2?.addEventListener('click', closeDashboard);
+  
+  // Cerrar al hacer clic fuera
+  const modal = document.getElementById('dashboard-modal');
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) closeDashboard();
+  });
+  
+  // Pestañas
+  const tabs = document.querySelectorAll('.dashboard-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      // Cambiar pestaña activa
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      
+      // Cambiar contenido activo
+      const tabName = tab.dataset.tab;
+      document.querySelectorAll('.dashboard-content').forEach(content => {
+        content.classList.remove('active');
+      });
+      const content = document.getElementById(`dashboard-${tabName}`);
+      if (content) {
+        content.classList.add('active');
+        
+        // Si es la pestaña de modelos, cargar la info
+        if (tabName === 'models') {
+          loadModelsInfo();
+        }
+      }
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   init();
   initBackgroundSystem();
   initUserMenu();
   initProjectSystem();
+  initDashboard();
 });
 
 // ========================================
