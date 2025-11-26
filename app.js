@@ -421,6 +421,19 @@ function appendMessageElement(message) {
     await copyToClipboard(textToCopy, copyButton);
   });
   
+  // Crear botón de regenerar respuesta (solo para mensajes del asistente)
+  if (message.role === 'assistant') {
+    const regenerateButton = document.createElement('button');
+    regenerateButton.className = 'regenerate-message-btn';
+    regenerateButton.title = 'Regenerar respuesta';
+    regenerateButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M23 20v-6h-6"></path><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>';
+    regenerateButton.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await regenerateResponse(message.id);
+    });
+    copyContainer.appendChild(regenerateButton);
+  }
+  
   // Crear elemento para la hora
   const timeElement = document.createElement('span');
   timeElement.className = 'message-time';
@@ -428,7 +441,7 @@ function appendMessageElement(message) {
   timeElement.textContent = formatTime(messageTime);
   
   copyContainer.appendChild(copyButton);
-  copyContainer.appendChild(timeElement);
+  copyContainer.appendChild(timeElement)
   
   // Agregar contenido y luego el contenedor de copiar dentro del bubble
   bubble.innerHTML = content;
@@ -948,6 +961,12 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
       copyContainer = document.createElement('div');
       copyContainer.className = 'copy-message-container';
       
+      // Crear botón de regenerar
+      const regenerateButton = document.createElement('button');
+      regenerateButton.className = 'regenerate-message-btn';
+      regenerateButton.title = 'Regenerar respuesta';
+      regenerateButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M23 20v-6h-6"></path><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>';
+      
       const copyButton = document.createElement('button');
       copyButton.className = 'copy-message-btn';
       copyButton.title = 'Copiar mensaje';
@@ -956,9 +975,26 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
       const timeElement = document.createElement('span');
       timeElement.className = 'message-time';
       
+      copyContainer.appendChild(regenerateButton);
       copyContainer.appendChild(copyButton);
       copyContainer.appendChild(timeElement);
       bubble.appendChild(copyContainer);
+    }
+    
+    // Actualizar el evento de regenerar
+    const regenerateButton = copyContainer.querySelector('.regenerate-message-btn');
+    if (regenerateButton) {
+      regenerateButton.onclick = async (e) => {
+        e.stopPropagation();
+        // Obtener el ID del mensaje del asistente actual
+        const conversation = state.conversations[state.activeId];
+        if (conversation) {
+          const assistantMessage = conversation.messages[conversation.messages.length - 1];
+          if (assistantMessage && assistantMessage.role === 'assistant') {
+            await regenerateResponse(assistantMessage.id);
+          }
+        }
+      };
     }
     
     // Actualizar el evento de copiar con el texto actual
@@ -1494,6 +1530,174 @@ function stopStream() {
         }
       }
     }
+  }
+}
+
+// Función para regenerar la respuesta de un mensaje del asistente
+async function regenerateResponse(messageId) {
+  if (state.loading) return;
+  
+  const conversation = state.conversations[state.activeId];
+  if (!conversation) return;
+  
+  // Encontrar el índice del mensaje del asistente
+  const messageIndex = conversation.messages.findIndex(msg => msg.id === messageId);
+  if (messageIndex === -1) return;
+  
+  const assistantMessage = conversation.messages[messageIndex];
+  if (assistantMessage.role !== 'assistant') return;
+  
+  // Verificar que hay un mensaje de usuario antes de este mensaje del asistente
+  const userMessageIndex = messageIndex - 1;
+  if (userMessageIndex < 0 || conversation.messages[userMessageIndex].role !== 'user') {
+    console.warn('No se encontró un mensaje de usuario antes del mensaje del asistente');
+    return;
+  }
+  
+  // Eliminar el mensaje del asistente del estado
+  conversation.messages.splice(messageIndex, 1);
+  
+  // Eliminar el elemento del DOM
+  const chatListElement = document.getElementById('chat-list');
+  if (chatListElement) {
+    const messageElements = chatListElement.querySelectorAll('.message');
+    if (messageElements[messageIndex]) {
+      messageElements[messageIndex].remove();
+    }
+  }
+  
+  // Guardar el estado
+  persistState();
+  
+  // Preparar los mensajes para la solicitud (hasta el mensaje del usuario, inclusive)
+  const payloadMessages = [];
+  
+  // Agregar información personal del usuario como contexto del sistema
+  const personalInfo = getAIPersonalization();
+  
+  // Obtener contexto del proyecto activo
+  const activeProject = getActiveProject();
+  const projectContext = activeProject ? buildProjectContext(activeProject) : '';
+  
+  // Obtener archivos adjuntos
+  const currentFiles = attachedFiles[conversation.id] || [];
+  const imageFiles = currentFiles.filter(f => f.isImage);
+  const textFiles = currentFiles.filter(f => !f.isImage);
+  
+  // Construir mensaje del sistema
+  const shouldIncludeProjectContext = projectContext && projectContext.length > 0;
+  let memoryContext = '';
+  const isFirstMessage = messageIndex === 1; // Si el mensaje a regenerar es el primero del asistente
+  
+  if (isFirstMessage) {
+    memoryContext = buildMemoryContext() || '';
+  }
+  
+  if (isFirstMessage || shouldIncludeProjectContext) {
+    let systemContent = '';
+    
+    if (projectContext) {
+      systemContent += projectContext + '\n\n';
+    }
+    
+    if (isFirstMessage) {
+      if (memoryContext) {
+        systemContent += memoryContext + '\n\n';
+      }
+      
+      if (personalInfo.trim()) {
+        systemContent += `Información personal del usuario: ${personalInfo.trim()}\n\n`;
+      }
+    }
+    
+    if (textFiles.length > 0) {
+      systemContent += '=== DOCUMENTOS ADJUNTOS AL CHAT (DEBES LEER Y USAR ESTE CONTENIDO) ===\n\n';
+      textFiles.forEach((file, index) => {
+        systemContent += `══════════════════════════════════════════════════════════════\n`;
+        systemContent += `📄 DOCUMENTO ${index + 1}: ${file.name}\n`;
+        systemContent += `══════════════════════════════════════════════════════════════\n\n`;
+        systemContent += `${file.content}\n\n`;
+      });
+      systemContent += '=== FIN DE DOCUMENTOS ADJUNTOS ===\n\n';
+    }
+    
+    const responseStyle = getAIResponseStyle();
+    const styleInstructions = getStyleInstructions(responseStyle);
+    
+    let instructions = '';
+    const hasDocuments = textFiles.length > 0 || shouldIncludeProjectContext;
+    const hasPersonalContext = personalInfo.trim() || memoryContext;
+    
+    if (hasDocuments) {
+      instructions = 'IMPORTANTE: Se te han proporcionado documentos arriba. DEBES leer y usar el contenido de estos documentos para responder las preguntas del usuario.';
+    } else if (hasPersonalContext) {
+      instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas.';
+    }
+    
+    if (systemContent || styleInstructions || instructions) {
+      let finalContent = systemContent;
+      
+      if (styleInstructions) {
+        if (finalContent) finalContent += '\n';
+        finalContent += `Instrucciones de estilo de respuesta: ${styleInstructions}`;
+      }
+      
+      if (instructions) {
+        if (finalContent) finalContent += '\n\n';
+        finalContent += instructions;
+      }
+      
+      if (finalContent.trim()) {
+        payloadMessages.push({
+          role: 'system',
+          content: finalContent.trim()
+        });
+      }
+    }
+  }
+  
+  // Añadir los mensajes de la conversación (hasta el mensaje del usuario)
+  for (let i = 0; i <= userMessageIndex; i++) {
+    const message = conversation.messages[i];
+    const payloadMessage = {
+      role: message.role,
+      content: message.content || '',
+    };
+    
+    // Solo añadir imágenes al último mensaje del usuario
+    const isLastUserMessage = message.role === 'user' && i === userMessageIndex && imageFiles.length > 0;
+    
+    if (isLastUserMessage) {
+      payloadMessage.images = imageFiles.map(file => {
+        if (file.content && file.content.startsWith('data:')) {
+          return file.content.split(',')[1];
+        }
+        return file.content;
+      }).filter(img => img !== null);
+    }
+    
+    payloadMessages.push(payloadMessage);
+  }
+  
+  state.loading = true;
+  
+  try {
+    await streamAssistantResponse(conversation, payloadMessages);
+  } catch (error) {
+    console.error(error);
+    const assistantMessage = conversation.messages[conversation.messages.length - 1];
+    if (assistantMessage?.role === 'assistant') {
+      if (error.name !== 'AbortError' && !error.message.includes('cancel')) {
+        assistantMessage.content = `⚠️ ${error.message}`;
+        const lastBubble = chatListElement?.lastElementChild?.querySelector('.message-bubble');
+        updateAssistantBubble(lastBubble, assistantMessage.content);
+        persistState();
+      }
+    }
+  } finally {
+    state.loading = false;
+    currentStreamReader = null;
+    updateStopButtonToSend();
   }
 }
 

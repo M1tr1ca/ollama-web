@@ -2382,6 +2382,55 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   transform: scale(0.95);
 }
 
+/* Botón de regenerar respuesta */
+.regenerate-message-btn {
+  padding: 4px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.regenerate-message-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.regenerate-message-btn:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #3b82f6;
+}
+
+.regenerate-message-btn:active {
+  transform: scale(0.95);
+}
+
+.regenerate-message-btn.regenerating {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #3b82f6;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Hora del mensaje */
 .message-time {
   font-size: 11px;
