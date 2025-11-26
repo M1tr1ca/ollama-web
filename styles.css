@@ -340,6 +340,9 @@ body {
 .conversation-header {
   padding: 8px 0;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .conversation-header h2 {
@@ -349,6 +352,22 @@ body {
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
+}
+
+/* Botón borrar todos los chats */
+.conversation-header .delete-all-btn {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.conversation-header:hover .delete-all-btn {
+  opacity: 0.6;
+}
+
+.conversation-header .delete-all-btn:hover {
+  opacity: 1;
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
 }
 
 .conversation-list {
@@ -3483,7 +3502,14 @@ input:checked + .slider:before {
   margin: 0 0 12px 0;
 }
 
-.delete-project-name {
+.delete-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+.delete-project-name,
+.delete-conversation-name {
   font-size: 15px;
   font-weight: 600;
   color: var(--theme-primary);
@@ -3491,6 +3517,75 @@ input:checked + .slider:before {
   padding: 10px 14px;
   border-radius: 8px;
   margin: 0;
+}
+
+/* Modal pequeño */
+.modal-content-small {
+  max-width: 400px;
+}
+
+/* Animación de salida para elementos de conversación */
+.conversation-item.deleting {
+  animation: slideOutLeft 0.3s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes slideOutLeft {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-100%);
+    height: 0;
+    padding: 0;
+    margin: 0;
+  }
+}
+
+/* Animación de entrada para elementos de conversación */
+.conversation-item.entering {
+  animation: slideInRight 0.3s ease forwards;
+}
+
+@keyframes slideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Animación de renombrado */
+.conversation-item.renaming .conversation-name {
+  animation: highlightRename 0.5s ease;
+}
+
+@keyframes highlightRename {
+  0% {
+    background: var(--theme-primary-alpha-30);
+    border-radius: 4px;
+    padding: 0 4px;
+  }
+  100% {
+    background: transparent;
+    padding: 0;
+  }
+}
+
+/* Animación de shake para confirmación */
+.modal-content.shake {
+  animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
 }
 
 /* Botón de peligro */

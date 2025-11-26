@@ -620,33 +620,228 @@ function createConversation() {
   if (promptInput) promptInput.focus();
 }
 
+// Variables para almacenar el ID de la conversación a modificar
+let conversationToRename = null;
+let conversationToDelete = null;
+
 function handleRenameConversation(id) {
   const conversation = state.conversations[id];
   if (!conversation) return;
-  const newTitle = window.prompt('Nombre de la conversación', conversation.title ?? DEFAULT_TITLE);
+  
+  conversationToRename = id;
+  const modal = document.getElementById('rename-conversation-modal');
+  const input = document.getElementById('rename-conversation-input');
+  
+  if (modal && input) {
+    input.value = conversation.title ?? DEFAULT_TITLE;
+    modal.style.display = 'flex';
+    
+    // Animar la entrada del modal
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.animation = 'none';
+      content.offsetHeight; // Forzar reflow
+      content.style.animation = 'slideDown 0.3s ease';
+    }
+    
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 100);
+  }
+}
+
+function confirmRenameConversation() {
+  if (!conversationToRename) return;
+  
+  const conversation = state.conversations[conversationToRename];
+  const input = document.getElementById('rename-conversation-input');
+  
+  if (!conversation || !input) return;
+  
+  const newTitle = input.value.trim();
   if (!newTitle) return;
-  conversation.title = newTitle.trim() || DEFAULT_TITLE;
-  touchConversation(id);
+  
+  conversation.title = newTitle || DEFAULT_TITLE;
+  touchConversation(conversationToRename);
+  
+  // Añadir animación de highlight al elemento renombrado
+  const conversationItem = document.querySelector(`.conversation-item.active`);
+  if (conversationItem) {
+    conversationItem.classList.add('renaming');
+    setTimeout(() => conversationItem.classList.remove('renaming'), 500);
+  }
+  
   renderConversationList();
-  if (id === state.activeId) renderActiveConversation();
+  if (conversationToRename === state.activeId) renderActiveConversation();
   persistState();
+  
+  closeRenameModal();
+}
+
+function closeRenameModal() {
+  const modal = document.getElementById('rename-conversation-modal');
+  if (modal) {
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.animation = 'slideUp 0.2s ease reverse';
+      setTimeout(() => {
+        modal.style.display = 'none';
+        content.style.animation = '';
+      }, 200);
+    } else {
+      modal.style.display = 'none';
+    }
+  }
+  conversationToRename = null;
 }
 
 function handleDeleteConversation(id) {
   if (!state.conversations[id]) return;
-  const confirmDelete = window.confirm('¿Eliminar esta conversación? Esta acción no se puede deshacer.');
-  if (!confirmDelete) return;
-  delete state.conversations[id];
-  state.order = state.order.filter((convId) => convId !== id);
-  if (state.activeId === id) {
-    state.activeId = state.order[0] ?? null;
+  
+  conversationToDelete = id;
+  const modal = document.getElementById('delete-conversation-modal');
+  const nameElement = document.getElementById('delete-conversation-name');
+  const conversation = state.conversations[id];
+  
+  if (modal && nameElement) {
+    nameElement.textContent = conversation.title ?? DEFAULT_TITLE;
+    modal.style.display = 'flex';
+    
+    // Animar la entrada del modal
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.animation = 'none';
+      content.offsetHeight;
+      content.style.animation = 'slideDown 0.3s ease';
+    }
   }
-  if (!state.activeId) {
-    createConversation();
+}
+
+function confirmDeleteConversation() {
+  if (!conversationToDelete) return;
+  
+  // Encontrar el elemento de la conversación y animarlo
+  const conversationItems = document.querySelectorAll('.conversation-item');
+  const index = state.order.indexOf(conversationToDelete);
+  
+  if (conversationItems[index]) {
+    conversationItems[index].classList.add('deleting');
+    
+    // Esperar a que termine la animación antes de eliminar
+    setTimeout(() => {
+      delete state.conversations[conversationToDelete];
+      state.order = state.order.filter((convId) => convId !== conversationToDelete);
+      
+      if (state.activeId === conversationToDelete) {
+        state.activeId = state.order[0] ?? null;
+      }
+      
+      if (!state.activeId) {
+        createConversation();
+      } else {
+        renderConversationList();
+        renderActiveConversation();
+        persistState();
+      }
+      
+      conversationToDelete = null;
+    }, 300);
   } else {
-    renderConversationList();
-    renderActiveConversation();
+    // Si no se encuentra el elemento, eliminar directamente
+    delete state.conversations[conversationToDelete];
+    state.order = state.order.filter((convId) => convId !== conversationToDelete);
+    
+    if (state.activeId === conversationToDelete) {
+      state.activeId = state.order[0] ?? null;
+    }
+    
+    if (!state.activeId) {
+      createConversation();
+    } else {
+      renderConversationList();
+      renderActiveConversation();
+      persistState();
+    }
+    
+    conversationToDelete = null;
+  }
+  
+  closeDeleteConversationModal();
+}
+
+function closeDeleteConversationModal() {
+  const modal = document.getElementById('delete-conversation-modal');
+  if (modal) {
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.animation = 'slideUp 0.2s ease reverse';
+      setTimeout(() => {
+        modal.style.display = 'none';
+        content.style.animation = '';
+      }, 200);
+    } else {
+      modal.style.display = 'none';
+    }
+  }
+}
+
+function handleDeleteAllConversations() {
+  if (state.order.length === 0) return;
+  
+  const modal = document.getElementById('delete-all-conversations-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    
+    // Animar la entrada del modal
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.animation = 'none';
+      content.offsetHeight;
+      content.style.animation = 'slideDown 0.3s ease';
+    }
+  }
+}
+
+function confirmDeleteAllConversations() {
+  // Animar todos los elementos saliendo
+  const conversationItems = document.querySelectorAll('.conversation-item');
+  conversationItems.forEach((item, index) => {
+    setTimeout(() => {
+      item.classList.add('deleting');
+    }, index * 50); // Escalonar la animación
+  });
+  
+  // Esperar a que terminen todas las animaciones
+  const totalAnimationTime = (conversationItems.length * 50) + 300;
+  
+  setTimeout(() => {
+    // Limpiar estado
+    state.conversations = {};
+    state.order = [];
+    state.activeId = null;
+    
+    // Crear nueva conversación
+    createConversation();
     persistState();
+  }, totalAnimationTime);
+  
+  closeDeleteAllModal();
+}
+
+function closeDeleteAllModal() {
+  const modal = document.getElementById('delete-all-conversations-modal');
+  if (modal) {
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.animation = 'slideUp 0.2s ease reverse';
+      setTimeout(() => {
+        modal.style.display = 'none';
+        content.style.animation = '';
+      }, 200);
+    } else {
+      modal.style.display = 'none';
+    }
   }
 }
 
@@ -2318,6 +2513,67 @@ function init() {
     if (dropdown && badge && !dropdown.contains(e.target) && !badge.contains(e.target)) {
       hideAttachmentsDropdown();
     }
+  });
+  
+  // Event listeners para modales de conversación
+  setupConversationModals();
+}
+
+// Configurar modales de renombrar, eliminar y eliminar todos
+function setupConversationModals() {
+  // Modal de renombrar conversación
+  const renameModal = document.getElementById('rename-conversation-modal');
+  const closeRenameBtn = document.getElementById('close-rename-modal');
+  const cancelRenameBtn = document.getElementById('cancel-rename-conversation');
+  const confirmRenameBtn = document.getElementById('confirm-rename-conversation');
+  const renameInput = document.getElementById('rename-conversation-input');
+  
+  closeRenameBtn?.addEventListener('click', closeRenameModal);
+  cancelRenameBtn?.addEventListener('click', closeRenameModal);
+  confirmRenameBtn?.addEventListener('click', confirmRenameConversation);
+  
+  renameInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      confirmRenameConversation();
+    }
+    if (e.key === 'Escape') {
+      closeRenameModal();
+    }
+  });
+  
+  renameModal?.addEventListener('click', (e) => {
+    if (e.target === renameModal) closeRenameModal();
+  });
+  
+  // Modal de eliminar conversación
+  const deleteModal = document.getElementById('delete-conversation-modal');
+  const closeDeleteBtn = document.getElementById('close-delete-conversation-modal');
+  const cancelDeleteBtn = document.getElementById('cancel-delete-conversation');
+  const confirmDeleteBtn = document.getElementById('confirm-delete-conversation');
+  
+  closeDeleteBtn?.addEventListener('click', closeDeleteConversationModal);
+  cancelDeleteBtn?.addEventListener('click', closeDeleteConversationModal);
+  confirmDeleteBtn?.addEventListener('click', confirmDeleteConversation);
+  
+  deleteModal?.addEventListener('click', (e) => {
+    if (e.target === deleteModal) closeDeleteConversationModal();
+  });
+  
+  // Modal de eliminar todas las conversaciones
+  const deleteAllBtn = document.getElementById('delete-all-conversations-btn');
+  const deleteAllModal = document.getElementById('delete-all-conversations-modal');
+  const closeDeleteAllBtn = document.getElementById('close-delete-all-modal');
+  const cancelDeleteAllBtn = document.getElementById('cancel-delete-all');
+  const confirmDeleteAllBtn = document.getElementById('confirm-delete-all');
+  
+  deleteAllBtn?.addEventListener('click', handleDeleteAllConversations);
+  closeDeleteAllBtn?.addEventListener('click', closeDeleteAllModal);
+  cancelDeleteAllBtn?.addEventListener('click', closeDeleteAllModal);
+  confirmDeleteAllBtn?.addEventListener('click', confirmDeleteAllConversations);
+  
+  deleteAllModal?.addEventListener('click', (e) => {
+    if (e.target === deleteAllModal) closeDeleteAllModal();
   });
 }
 

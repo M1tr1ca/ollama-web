@@ -44,6 +44,7 @@
         <section class="conversation-section" aria-label="Conversaciones recientes">
           <header class="conversation-header">
             <h2>Recientes</h2>
+            <button id="delete-all-conversations-btn" class="delete-all-btn icon-button small" title="Borrar todas las conversaciones">🗑</button>
           </header>
           <ul id="conversation-list" class="conversation-list"></ul>
         </section>
@@ -369,6 +370,60 @@
             <div class="modal-footer">
               <button class="modal-button secondary" id="cancel-project">Cancelar</button>
               <button class="modal-button primary" id="save-project">Guardar proyecto</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Modal para renombrar conversación -->
+        <div id="rename-conversation-modal" class="modal-overlay" style="display: none;">
+          <div class="modal-content modal-content-small">
+            <div class="modal-header">
+              <h3>Renombrar conversación</h3>
+              <button class="modal-close" id="close-rename-modal">×</button>
+            </div>
+            <div class="modal-body">
+              <label for="rename-conversation-input">Nuevo nombre:</label>
+              <input type="text" id="rename-conversation-input" class="modal-input" placeholder="Nombre de la conversación" />
+            </div>
+            <div class="modal-footer">
+              <button class="modal-button secondary" id="cancel-rename-conversation">Cancelar</button>
+              <button class="modal-button primary" id="confirm-rename-conversation">Guardar</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Modal para confirmar eliminación de conversación -->
+        <div id="delete-conversation-modal" class="modal-overlay" style="display: none;">
+          <div class="modal-content modal-content-small">
+            <div class="modal-header">
+              <h3>Eliminar conversación</h3>
+              <button class="modal-close" id="close-delete-conversation-modal">×</button>
+            </div>
+            <div class="modal-body">
+              <p class="delete-warning">¿Estás seguro de que quieres eliminar esta conversación?</p>
+              <p class="delete-conversation-name" id="delete-conversation-name"></p>
+            </div>
+            <div class="modal-footer">
+              <button class="modal-button secondary" id="cancel-delete-conversation">Cancelar</button>
+              <button class="modal-button danger" id="confirm-delete-conversation">Eliminar</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Modal para confirmar eliminación de todas las conversaciones -->
+        <div id="delete-all-conversations-modal" class="modal-overlay" style="display: none;">
+          <div class="modal-content modal-content-small">
+            <div class="modal-header">
+              <h3>Borrar todas las conversaciones</h3>
+              <button class="modal-close" id="close-delete-all-modal">×</button>
+            </div>
+            <div class="modal-body">
+              <p class="delete-warning">⚠️ ¿Estás seguro de que quieres eliminar <strong>todas</strong> las conversaciones?</p>
+              <p class="delete-hint">Esta acción no se puede deshacer.</p>
+            </div>
+            <div class="modal-footer">
+              <button class="modal-button secondary" id="cancel-delete-all">Cancelar</button>
+              <button class="modal-button danger" id="confirm-delete-all">Eliminar todas</button>
             </div>
           </div>
         </div>
