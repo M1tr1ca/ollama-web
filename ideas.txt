@@ -1,0 +1,50 @@
+deepresearch
+
+Enfoque del Deep Research
+El concepto es descomponer una pregunta compleja en múltiples sub-investigaciones, ejecutarlas iterativamente y sintetizar los resultados.
+Flujo básico:
+
+Planificación: El modelo genera un plan de investigación con sub-preguntas
+Investigación iterativa: Cada sub-pregunta se responde, los resultados alimentan nuevas preguntas
+Síntesis: Se combina toda la información en un informe final
+
+Gestión de contexto: mantener un "knowledge graph" temporal de hallazgos
+Control de profundidad: límite de iteraciones para no eternizarse
+Streaming progresivo: mostrar avances en tiempo real
+
+
+async function deepResearch(userQuery) {
+  // Fase 1: Crear plan de investigación
+  const plan = await generateResearchPlan(userQuery);
+  
+  // Fase 2: Ejecutar investigación iterativa
+  const findings = [];
+  for (const step of plan.steps) {
+    const result = await investigateStep(step, findings);
+    findings.push(result);
+    
+    // Opcional: generar follow-ups dinámicos
+    const followUps = await generateFollowUps(result, findings);
+    plan.steps.push(...followUps);
+  }
+  
+  // Fase 3: Sintetizar resultados
+  const report = await synthesizeFindings(userQuery, findings);
+  return report;
+}
+
+
+que sea un botón bonito al lado de
+
+
+<div class="input-controls">
+                  <div class="input-controls-left">
+                    <button type="button" class="input-icon-button" id="attach-file-btn" title="Adjuntar archivo">📎</button>
+                  </div>
+                  <div class="input-controls-right">
+                    <div class="model-select-wrapper">
+                      <select id="model-select" name="model" class="model-select"><option value="kimi-k2-thinking:cloud">Kimi-k2-thinking CLOUD</option><option value="llama3.2:1b">Llama3.2 1B</option><option value="gpt-oss:20b">Gpt-oss 20B</option><option value="qwen3-vl:4b">Qwen3-vl 4B</option><option value="qwen3:4b">Qwen3 4B</option><option value="deepseek-r1:8b">Deepseek-r1 8B</option><option value="qwen2.5-coder:7b">Qwen2.5-coder 7B</option><option value="deepseek-coder:6.7b">Deepseek-coder 6.7B</option><option value="mathstral:7b">Mathstral 7B</option></select>
+                    </div>
+                    <button class="send-button" type="submit" title="Enviar">↑</button>
+                  </div>
+                </div>
