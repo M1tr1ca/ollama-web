@@ -1390,7 +1390,7 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
 
 .input-controls {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   margin-top: 8px;
   padding-top: 8px;
@@ -1400,6 +1400,7 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
 .input-controls-left {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 /* File Drop Area */
@@ -4214,50 +4215,110 @@ input:checked + .slider:before {
   }
 }
 
-/* ==================== DEEP RESEARCH BUTTON ==================== */
-.deep-research-btn {
+/* ==================== CHAT MODE TOGGLE ==================== */
+.chat-mode-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  border-radius: 8px;
-  color: rgba(139, 92, 246, 0.9);
-  font-size: 12px;
-  font-weight: 600;
+  position: relative;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 3px;
+  gap: 2px;
+  height: 38px;
+}
+
+.chat-mode-option {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
   cursor: pointer;
-  transition: all 0.2s ease;
-  height: 36px;
-  white-space: nowrap;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.deep-research-btn:hover {
-  background: rgba(139, 92, 246, 0.2);
-  border-color: rgba(139, 92, 246, 0.4);
-  color: rgba(139, 92, 246, 1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+.chat-mode-option:hover {
+  color: rgba(255, 255, 255, 0.75);
 }
 
-.deep-research-btn.active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(124, 58, 237, 0.3));
-  border-color: rgba(139, 92, 246, 0.6);
-  color: #a78bfa;
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2), 0 4px 12px rgba(139, 92, 246, 0.3);
+.chat-mode-option.active {
+  color: var(--theme-primary);
 }
 
-.deep-research-btn.active .deep-research-icon {
-  animation: pulse-glow 2s ease-in-out infinite;
+.chat-mode-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.2s ease;
 }
 
-@keyframes pulse-glow {
+.chat-mode-option:hover .chat-mode-icon {
+  transform: scale(1.1);
+}
+
+.chat-mode-option.active .chat-mode-icon {
+  transform: scale(1.05);
+  filter: drop-shadow(0 0 4px var(--theme-primary-alpha-30));
+}
+
+/* Slider indicator */
+.chat-mode-slider {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 32px;
+  height: 32px;
+  background: var(--theme-primary-alpha-15);
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+  box-shadow: 0 0 12px var(--theme-primary-alpha-30);
+}
+
+/* Posiciones del slider según modo */
+.chat-mode-toggle[data-active-mode="normal"] .chat-mode-slider {
+  transform: translateX(0);
+}
+
+.chat-mode-toggle[data-active-mode="deep"] .chat-mode-slider {
+  transform: translateX(34px);
+}
+
+.chat-mode-toggle[data-active-mode="study"] .chat-mode-slider {
+  transform: translateX(68px);
+}
+
+/* Efecto de brillo para el toggle cuando no está en modo normal */
+.chat-mode-toggle[data-active-mode="deep"],
+.chat-mode-toggle[data-active-mode="study"] {
+  border-color: var(--theme-primary-alpha-35);
+  box-shadow: 0 0 0 1px var(--theme-primary-alpha-10);
+}
+
+/* Animación de pulso para el modo activo (Deep o Study) */
+.chat-mode-toggle[data-active-mode="deep"] .chat-mode-option[data-mode="deep"] .chat-mode-icon,
+.chat-mode-toggle[data-active-mode="study"] .chat-mode-option[data-mode="study"] .chat-mode-icon {
+  animation: modePulse 2s ease-in-out infinite;
+}
+
+@keyframes modePulse {
   0%, 100% {
-    filter: drop-shadow(0 0 2px rgba(139, 92, 246, 0.5));
+    filter: drop-shadow(0 0 2px var(--theme-primary-alpha-30));
   }
   50% {
-    filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.8));
+    filter: drop-shadow(0 0 8px var(--theme-primary));
   }
+}
+
+/* Legacy deep-research-btn support (para compatibilidad) */
+.deep-research-btn {
+  display: none;
 }
 
 .deep-research-icon {
@@ -4527,14 +4588,36 @@ input:checked + .slider:before {
   color: rgba(139, 92, 246, 0.9);
 }
 
-/* Responsive para Deep Research */
+/* Responsive para Chat Mode Toggle */
 @media (max-width: 600px) {
-  .deep-research-btn .deep-research-label {
-    display: none;
+  .chat-mode-toggle {
+    padding: 2px;
+    height: 34px;
   }
   
-  .deep-research-btn {
-    padding: 6px 10px;
+  .chat-mode-option {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .chat-mode-slider {
+    width: 28px;
+    height: 28px;
+    top: 2px;
+    left: 2px;
+  }
+  
+  .chat-mode-toggle[data-active-mode="deep"] .chat-mode-slider {
+    transform: translateX(30px);
+  }
+  
+  .chat-mode-toggle[data-active-mode="study"] .chat-mode-slider {
+    transform: translateX(60px);
+  }
+  
+  .chat-mode-icon {
+    width: 16px;
+    height: 16px;
   }
   
   .deep-research-step {

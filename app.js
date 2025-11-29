@@ -2162,6 +2162,34 @@ async function handleSubmit(event) {
     const responseStyle = getAIResponseStyle();
     const styleInstructions = getStyleInstructions(responseStyle);
     
+    // Instrucciones especiales para modo estudio
+    const studyModeInstructions = window._studyModeActive ? `
+MODO ESTUDIO ACTIVADO - Eres un tutor educativo experto. Tu rol es:
+
+1. **Explicar paso a paso**: Desglosa conceptos complejos en partes simples y manejables.
+
+2. **Hacer preguntas**: En lugar de dar respuestas directas, guía al estudiante con preguntas que le ayuden a descubrir la respuesta por sí mismo.
+
+3. **Proporcionar ejemplos**: Usa analogías y ejemplos del mundo real para ilustrar conceptos.
+
+4. **Verificar comprensión**: Después de explicar algo, pregunta si el estudiante ha entendido y ofrece ejercicios de práctica.
+
+5. **Fomentar el pensamiento crítico**: Invita a reflexionar sobre por qué algo funciona de cierta manera.
+
+6. **Adaptar el nivel**: Ajusta la complejidad según las respuestas del estudiante.
+
+7. **Usar formato claro**: 
+   - Utiliza viñetas y numeración
+   - Resalta conceptos clave en **negrita**
+   - Incluye ejemplos de código con explicaciones
+
+8. **Al final de cada respuesta**: Sugiere el siguiente paso de aprendizaje o un ejercicio para practicar.
+
+9. **Al final del todo haz 2 preguntas al usuario relacionados con el tema, que va a tener que responder, para mejorar su comprensión. Para que compruebes que tal lo ha entendido el usuario
+
+Responde de manera paciente, alentadora y didáctica. Tu objetivo es que el estudiante realmente ENTIENDA el tema, no solo memorice información.
+` : '';
+    
     // Determinar las instrucciones finales
     let instructions = '';
     const hasDocuments = textFiles.length > 0 || shouldIncludeProjectContext;
@@ -2174,10 +2202,20 @@ async function handleSubmit(event) {
     }
     
     // Combinar todas las instrucciones
-    if (systemContent || styleInstructions || instructions) {
+    if (systemContent || styleInstructions || instructions || studyModeInstructions) {
       let finalContent = systemContent;
       
-      if (styleInstructions) {
+      // Añadir instrucciones del modo estudio primero (alta prioridad)
+      if (studyModeInstructions) {
+        if (finalContent) {
+          finalContent += '\n\n';
+        }
+        finalContent += studyModeInstructions;
+        console.log('📚 Modo Estudio activado - Añadiendo instrucciones de tutor');
+      }
+      
+      if (styleInstructions && !studyModeInstructions) {
+        // Solo añadir estilo si no está en modo estudio (el modo estudio tiene su propio estilo)
         if (finalContent) {
           finalContent += '\n';
         }
@@ -6106,33 +6144,70 @@ function unlockInputsDuringResearch() {
 function toggleDeepResearch(button) {
   deepResearchMode = !deepResearchMode;
   
-  // Actualizar ambos botones
-  const buttons = document.querySelectorAll('.deep-research-btn');
-  buttons.forEach(btn => {
+  // Actualizar los toggles de modo de chat
+  const toggles = document.querySelectorAll('.chat-mode-toggle');
+  toggles.forEach(toggle => {
     if (deepResearchMode) {
-      btn.classList.add('active');
-      btn.title = 'Deep Research activado - Haz clic para desactivar';
+      toggle.setAttribute('data-active-mode', 'deep');
+      // Actualizar botones activos
+      toggle.querySelectorAll('.chat-mode-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.mode === 'deep');
+      });
     } else {
-      btn.classList.remove('active');
-      btn.title = 'Activar Deep Research - Investigación profunda con múltiples iteraciones';
+      toggle.setAttribute('data-active-mode', 'normal');
+      // Actualizar botones activos
+      toggle.querySelectorAll('.chat-mode-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.mode === 'normal');
+      });
     }
   });
   
   console.log(`🔬 Deep Research: ${deepResearchMode ? 'activado' : 'desactivado'}`);
 }
 
-function initDeepResearch() {
-  const deepResearchBtn = document.getElementById('deep-research-btn');
-  const deepResearchBtnInline = document.getElementById('deep-research-btn-inline');
+// Variable para modo estudio
+let studyMode = false;
+
+// Función para cambiar el modo de chat
+function setChatMode(mode) {
+  // Actualizar estados globales
+  deepResearchMode = mode === 'deep';
+  studyMode = mode === 'study';
   
-  deepResearchBtn?.addEventListener('click', (e) => {
-    e.preventDefault();
-    toggleDeepResearch(deepResearchBtn);
+  // Actualizar todos los toggles
+  const toggles = document.querySelectorAll('.chat-mode-toggle');
+  toggles.forEach(toggle => {
+    toggle.setAttribute('data-active-mode', mode);
+    toggle.querySelectorAll('.chat-mode-option').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.mode === mode);
+    });
   });
   
-  deepResearchBtnInline?.addEventListener('click', (e) => {
-    e.preventDefault();
-    toggleDeepResearch(deepResearchBtnInline);
+  // Log para debugging
+  const modeNames = {
+    'normal': '💬 Normal',
+    'deep': '🔬 Deep Research',
+    'study': '📚 Modo Estudio'
+  };
+  console.log(`Modo de chat: ${modeNames[mode]}`);
+}
+
+function initDeepResearch() {
+  // Inicializar los toggles de modo de chat
+  const toggles = document.querySelectorAll('.chat-mode-toggle');
+  
+  toggles.forEach(toggle => {
+    // Establecer modo inicial
+    toggle.setAttribute('data-active-mode', 'normal');
+    
+    // Agregar eventos a cada opción
+    toggle.querySelectorAll('.chat-mode-option').forEach(option => {
+      option.addEventListener('click', (e) => {
+        e.preventDefault();
+        const mode = option.dataset.mode;
+        setChatMode(mode);
+      });
+    });
   });
 }
 
@@ -7004,7 +7079,7 @@ async function executeDeepResearch(userQuery, conversation) {
   return findings;
 }
 
-// Modificar el handleSubmit original para soportar Deep Research
+// Modificar el handleSubmit original para soportar Deep Research y Modo Estudio
 const originalHandleSubmit = handleSubmit;
 
 async function handleSubmitWithDeepResearch(event) {
@@ -7035,6 +7110,14 @@ async function handleSubmitWithDeepResearch(event) {
     }
     
     return;
+  }
+  
+  // Si el modo estudio está activo, añadir el prompt de sistema
+  if (studyMode) {
+    // Guardar temporalmente el modo estudio activo para usarlo en streamAssistantResponse
+    window._studyModeActive = true;
+  } else {
+    window._studyModeActive = false;
   }
   
   // Si no, usar el flujo normal
