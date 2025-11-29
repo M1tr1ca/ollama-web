@@ -400,8 +400,57 @@ function appendMessageElement(message) {
     content += createThinkingBlock(message.thinking, message.thinkingDuration, false);
   }
   
+  // Verificar si es un mensaje de Deep Research en progreso
+  // Puede ser: el mensaje tiene el flag Y hay una investigación en progreso
+  // O: el ID del mensaje coincide con el de la investigación activa
+  const isActiveDeepResearch = message.role === 'assistant' && 
+                                ((message.isDeepResearchInProgress && isDeepResearchInProgress()) ||
+                                 (message.id === deepResearchMessageId && isDeepResearchInProgress()));
+  
+  console.log('🔍 appendMessageElement:', { 
+    messageId: message.id, 
+    deepResearchMessageId, 
+    hasFlag: message.isDeepResearchInProgress,
+    isInProgress: isDeepResearchInProgress(),
+    isActiveDeepResearch,
+    hasProgress: !!deepResearchProgressState,
+    stepsCount: deepResearchStepsData?.length 
+  });
+  
   // Agregar el contenido del mensaje
-  if (message.content) {
+  if (isActiveDeepResearch) {
+    // Es el mensaje de Deep Research activo, crear contenedor de progreso
+    bubble.innerHTML = '';
+    const progressContainer = createDeepResearchProgressElement();
+    bubble.appendChild(progressContainer);
+    
+    // Actualizar con el estado actual
+    if (deepResearchProgressState) {
+      updateDeepResearchProgress(
+        progressContainer, 
+        deepResearchProgressState.progress, 
+        deepResearchProgressState.status, 
+        deepResearchProgressState.timeEstimate
+      );
+    }
+    
+    // Guardar referencia al nuevo contenedor
+    deepResearchCurrentContainer = progressContainer;
+    
+    // Restaurar los pasos completados si hay datos
+    if (deepResearchStepsData && deepResearchStepsData.length > 0) {
+      deepResearchStepsData.forEach(step => {
+        addResearchStep(progressContainer, step, step.isActive, step.isCompleted);
+      });
+    }
+    
+    // Restaurar hallazgos
+    if (deepResearchFindingsData && deepResearchFindingsData.length > 0) {
+      deepResearchFindingsData.forEach(finding => {
+        addFinding(progressContainer, finding);
+      });
+    }
+  } else if (message.content) {
     content += parseMarkdown(message.content);
   }
   
@@ -457,7 +506,10 @@ function appendMessageElement(message) {
   copyContainer.appendChild(timeElement)
   
   // Agregar contenido y luego el contenedor de copiar dentro del bubble
-  bubble.innerHTML = content;
+  // Solo agregar contenido HTML si NO es un Deep Research activo (ya tiene el progressContainer)
+  if (!isActiveDeepResearch) {
+    bubble.innerHTML = content;
+  }
   bubble.appendChild(copyContainer);
   
   // Renderizar matemáticas con KaTeX
@@ -594,10 +646,17 @@ function renderConversationList() {
 
 function setActiveConversation(id) {
   if (!state.conversations[id]) return;
+  
+  // NO cancelar Deep Research - permitir cambiar de chat para ver otras conversaciones
+  // Solo bloquear la escritura en otros chats (se maneja en lockInputsDuringResearch)
+  
   state.activeId = id;
   if (!attachedFiles[id]) {
     attachedFiles[id] = [];
   }
+  
+  // Mostrar/ocultar banner de investigación en progreso
+  updateResearchBanner(id);
   
   // Activar el proyecto asociado a la conversación (si tiene)
   const conversation = state.conversations[id];
@@ -5289,6 +5348,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initUserMenu();
   initProjectSystem();
   initDashboard();
+  initDeepResearch();
 });
 
 // ========================================
@@ -5928,4 +5988,1062 @@ function initProjectSystem() {
     }
   }
 }
+
+// ========================================
+// Sistema Deep Research
+// ========================================
+let deepResearchMode = false;
+const MAX_RESEARCH_ITERATIONS = 5;
+const MAX_FOLLOW_UP_QUESTIONS = 3;
+
+// Control de cancelación para Deep Research
+let deepResearchAbortController = null;
+let deepResearchActiveConversationId = null;
+let deepResearchStartTime = null;
+let deepResearchStepTimes = []; // Para estimar tiempo
+let deepResearchProgressState = null; // Estado del progreso para mostrar en UI
+let deepResearchCurrentContainer = null; // Referencia al contenedor actual
+let deepResearchMessageId = null; // ID del mensaje de respuesta
+let deepResearchStepsData = []; // Datos de los pasos para restaurar
+let deepResearchFindingsData = []; // Datos de los hallazgos para restaurar
+
+// Función para verificar si Deep Research está en progreso
+function isDeepResearchInProgress() {
+  return deepResearchAbortController !== null && deepResearchActiveConversationId !== null;
+}
+
+// Obtener el indicador de investigación para una conversación
+function getResearchIndicator(conversationId) {
+  if (deepResearchActiveConversationId === conversationId && deepResearchProgressState) {
+    return `<span class="research-indicator" title="Investigación en progreso: ${deepResearchProgressState.progress}%">🔬</span>`;
+  }
+  return '';
+}
+
+// Función para cancelar Deep Research en progreso (solo manual)
+function cancelDeepResearch() {
+  if (deepResearchAbortController) {
+    console.log('🛑 Cancelando Deep Research en progreso...');
+    deepResearchAbortController.abort();
+    deepResearchAbortController = null;
+    deepResearchActiveConversationId = null;
+    deepResearchStartTime = null;
+    deepResearchStepTimes = [];
+    
+    // Desactivar modo si estaba activo
+    if (deepResearchMode) {
+      toggleDeepResearch();
+    }
+    
+    // Restablecer estado de carga
+    state.loading = false;
+    
+    // Desbloquear inputs
+    unlockInputsDuringResearch();
+  }
+}
+
+// Bloquear inputs mientras investiga
+function lockInputsDuringResearch() {
+  const inputs = document.querySelectorAll('#prompt-input, #prompt-input-inline');
+  const sendButtons = document.querySelectorAll('.send-button');
+  
+  inputs.forEach(input => {
+    if (input) {
+      input.dataset.originalPlaceholder = input.placeholder;
+      input.placeholder = '🔬 Investigación en progreso... Solo lectura';
+      input.disabled = true;
+      input.classList.add('research-locked');
+    }
+  });
+  
+  sendButtons.forEach(btn => {
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add('research-locked');
+    }
+  });
+}
+
+// Desbloquear inputs después de investigar
+function unlockInputsDuringResearch() {
+  const inputs = document.querySelectorAll('#prompt-input, #prompt-input-inline');
+  const sendButtons = document.querySelectorAll('.send-button');
+  
+  inputs.forEach(input => {
+    if (input) {
+      input.placeholder = input.dataset.originalPlaceholder || 'Escribe un mensaje...';
+      input.disabled = false;
+      input.classList.remove('research-locked');
+    }
+  });
+  
+  sendButtons.forEach(btn => {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('research-locked');
+    }
+  });
+}
+
+// Calcular tiempo estimado restante
+function calculateEstimatedTime(currentProgress, stepsCompleted, totalSteps) {
+  if (!deepResearchStartTime || stepsCompleted === 0) {
+    return 'Calculando...';
+  }
+  
+  const elapsedMs = Date.now() - deepResearchStartTime;
+  const avgTimePerStep = elapsedMs / stepsCompleted;
+  const remainingSteps = totalSteps - stepsCompleted;
+  const estimatedRemainingMs = avgTimePerStep * remainingSteps;
+  
+  // Agregar tiempo extra para síntesis (aproximadamente 1.5x de un paso)
+  const synthesisTime = avgTimePerStep * 1.5;
+  const totalRemainingMs = estimatedRemainingMs + (currentProgress < 90 ? synthesisTime : 0);
+  
+  if (totalRemainingMs < 60000) {
+    const seconds = Math.ceil(totalRemainingMs / 1000);
+    return `~${seconds}s restantes`;
+  } else {
+    const minutes = Math.ceil(totalRemainingMs / 60000);
+    return `~${minutes} min restantes`;
+  }
+}
+
+function toggleDeepResearch(button) {
+  deepResearchMode = !deepResearchMode;
+  
+  // Actualizar ambos botones
+  const buttons = document.querySelectorAll('.deep-research-btn');
+  buttons.forEach(btn => {
+    if (deepResearchMode) {
+      btn.classList.add('active');
+      btn.title = 'Deep Research activado - Haz clic para desactivar';
+    } else {
+      btn.classList.remove('active');
+      btn.title = 'Activar Deep Research - Investigación profunda con múltiples iteraciones';
+    }
+  });
+  
+  console.log(`🔬 Deep Research: ${deepResearchMode ? 'activado' : 'desactivado'}`);
+}
+
+function initDeepResearch() {
+  const deepResearchBtn = document.getElementById('deep-research-btn');
+  const deepResearchBtnInline = document.getElementById('deep-research-btn-inline');
+  
+  deepResearchBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleDeepResearch(deepResearchBtn);
+  });
+  
+  deepResearchBtnInline?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleDeepResearch(deepResearchBtnInline);
+  });
+}
+
+// Crear elemento de progreso de Deep Research
+function createDeepResearchProgressElement() {
+  const container = document.createElement('div');
+  container.className = 'deep-research-container';
+  container.innerHTML = `
+    <div class="deep-research-header">
+      <div class="deep-research-title">
+        <svg class="deep-research-title-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+          <path d="M11 8v6M8 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M16 16l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Deep Research
+      </div>
+      <div class="deep-research-header-right">
+        <span class="deep-research-time-estimate">⏱️ Calculando...</span>
+        <span class="deep-research-status">Iniciando investigación...</span>
+      </div>
+    </div>
+    <div class="deep-research-progress">
+      <div class="deep-research-progress-bar">
+        <div class="deep-research-progress-fill" style="width: 0%"></div>
+      </div>
+      <span class="deep-research-progress-percent">0%</span>
+    </div>
+    <div class="deep-research-steps"></div>
+    <div class="deep-research-findings" style="display: none;">
+      <div class="deep-research-findings-title">
+        <span>📊</span> Hallazgos clave
+      </div>
+      <div class="deep-research-findings-list"></div>
+    </div>
+  `;
+  return container;
+}
+
+// Actualizar progreso visual
+function updateDeepResearchProgress(container, progress, status, timeEstimate = null) {
+  // Guardar estado para poder mostrar en la lista de conversaciones
+  deepResearchProgressState = { progress: Math.round(progress), status, timeEstimate };
+  
+  // Actualizar indicador en la lista de conversaciones
+  updateResearchIndicatorInList();
+  
+  // Actualizar banner si existe (estamos en otro chat)
+  updateResearchBannerProgress();
+  
+  // Usar el contenedor global si el local ya no existe en el DOM
+  const activeContainer = (container && document.body.contains(container)) 
+    ? container 
+    : deepResearchCurrentContainer;
+  
+  if (!activeContainer || !document.body.contains(activeContainer)) return;
+  
+  const progressFill = activeContainer.querySelector('.deep-research-progress-fill');
+  const statusElement = activeContainer.querySelector('.deep-research-status');
+  const percentElement = activeContainer.querySelector('.deep-research-progress-percent');
+  const timeElement = activeContainer.querySelector('.deep-research-time-estimate');
+  
+  if (progressFill) {
+    progressFill.style.width = `${progress}%`;
+  }
+  if (statusElement) {
+    statusElement.textContent = status;
+  }
+  if (percentElement) {
+    percentElement.textContent = `${Math.round(progress)}%`;
+  }
+  if (timeElement && timeEstimate) {
+    timeElement.textContent = `⏱️ ${timeEstimate}`;
+  }
+}
+
+// Actualizar solo el progreso del banner (sin recrearlo)
+function updateResearchBannerProgress() {
+  const banner = document.getElementById('research-progress-banner');
+  if (banner && deepResearchProgressState) {
+    const progressSpan = banner.querySelector('.research-banner-progress');
+    if (progressSpan) {
+      progressSpan.textContent = `${deepResearchProgressState.progress}%`;
+    }
+  }
+}
+
+// Actualizar indicador de investigación en la lista de conversaciones
+function updateResearchIndicatorInList() {
+  if (!deepResearchActiveConversationId) return;
+  
+  const conversationItem = document.querySelector(`.conversation-item[data-id="${deepResearchActiveConversationId}"]`);
+  if (!conversationItem) return;
+  
+  let indicator = conversationItem.querySelector('.research-indicator');
+  
+  if (deepResearchProgressState) {
+    if (!indicator) {
+      indicator = document.createElement('span');
+      indicator.className = 'research-indicator';
+      const titleSpan = conversationItem.querySelector('.conversation-title');
+      if (titleSpan) {
+        titleSpan.insertAdjacentElement('afterend', indicator);
+      }
+    }
+    indicator.textContent = '🔬';
+    indicator.title = `Investigando: ${deepResearchProgressState.progress}% - ${deepResearchProgressState.status}`;
+  } else if (indicator) {
+    indicator.remove();
+  }
+}
+
+// Mostrar banner cuando estás en otro chat y hay investigación en progreso
+function updateResearchBanner(currentConversationId) {
+  const existingBanner = document.getElementById('research-progress-banner');
+  
+  // Si hay una investigación en progreso en OTRO chat, mostrar banner
+  if (deepResearchActiveConversationId && 
+      deepResearchActiveConversationId !== currentConversationId && 
+      deepResearchProgressState) {
+    
+    const researchConversation = state.conversations[deepResearchActiveConversationId];
+    const title = researchConversation?.title || 'Investigación';
+    
+    if (!existingBanner) {
+      const banner = document.createElement('div');
+      banner.id = 'research-progress-banner';
+      banner.className = 'research-progress-banner';
+      banner.innerHTML = `
+        <div class="research-banner-content">
+          <span class="research-banner-icon">🔬</span>
+          <span class="research-banner-text">
+            Investigación en progreso: <strong>${escapeHtml(title.substring(0, 30))}</strong>
+          </span>
+          <span class="research-banner-progress">${deepResearchProgressState.progress}%</span>
+        </div>
+        <button class="research-banner-goto" title="Ir a la investigación">
+          Ver progreso →
+        </button>
+      `;
+      
+      banner.querySelector('.research-banner-goto').addEventListener('click', () => {
+        setActiveConversation(deepResearchActiveConversationId);
+      });
+      
+      const chatMessages = document.getElementById('chat-messages') || document.getElementById('chat-messages-inline');
+      if (chatMessages) {
+        chatMessages.parentElement.insertBefore(banner, chatMessages);
+      }
+    } else {
+      // Actualizar el banner existente
+      const progressSpan = existingBanner.querySelector('.research-banner-progress');
+      if (progressSpan && deepResearchProgressState) {
+        progressSpan.textContent = `${deepResearchProgressState.progress}%`;
+      }
+    }
+  } else if (existingBanner) {
+    // Remover banner si estamos en el chat de la investigación o no hay investigación
+    existingBanner.remove();
+  }
+}
+
+// Agregar paso de investigación
+function addResearchStep(container, step, isActive = false, isCompleted = false) {
+  // Guardar datos para restaurar después
+  const stepData = { ...step, isActive, isCompleted };
+  const existingIndex = deepResearchStepsData.findIndex(s => s.id === step.id);
+  if (existingIndex >= 0) {
+    deepResearchStepsData[existingIndex] = stepData;
+  } else {
+    deepResearchStepsData.push(stepData);
+  }
+  
+  // Usar el contenedor global si el local ya no existe en el DOM
+  const activeContainer = (container && document.body.contains(container)) 
+    ? container 
+    : deepResearchCurrentContainer;
+  
+  if (!activeContainer || !document.body.contains(activeContainer)) return;
+  const stepsContainer = activeContainer.querySelector('.deep-research-steps');
+  if (!stepsContainer) return;
+  
+  // Verificar si ya existe
+  const existingStep = stepsContainer.querySelector(`[data-step-id="${step.id}"]`);
+  if (existingStep) return existingStep;
+  
+  const stepElement = document.createElement('div');
+  stepElement.className = `deep-research-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`;
+  stepElement.dataset.stepId = step.id;
+  stepElement.innerHTML = `
+    <div class="deep-research-step-indicator">${isCompleted ? '✓' : step.number}</div>
+    <div class="deep-research-step-content">
+      <div class="deep-research-step-title">${escapeHtml(step.title)}</div>
+      <div class="deep-research-step-description">${escapeHtml(step.description || '')}</div>
+    </div>
+  `;
+  stepsContainer.appendChild(stepElement);
+  return stepElement;
+}
+
+// Actualizar estado de un paso
+function updateResearchStep(container, stepId, updates) {
+  // Actualizar datos guardados
+  const stepIndex = deepResearchStepsData.findIndex(s => s.id === stepId);
+  if (stepIndex >= 0) {
+    if (updates.isActive !== undefined) deepResearchStepsData[stepIndex].isActive = updates.isActive;
+    if (updates.isCompleted !== undefined) deepResearchStepsData[stepIndex].isCompleted = updates.isCompleted;
+    if (updates.description !== undefined) deepResearchStepsData[stepIndex].description = updates.description;
+  }
+  
+  // Usar el contenedor global si el local ya no existe en el DOM
+  const activeContainer = (container && document.body.contains(container)) 
+    ? container 
+    : deepResearchCurrentContainer;
+  
+  if (!activeContainer || !document.body.contains(activeContainer)) return;
+  const stepElement = activeContainer.querySelector(`[data-step-id="${stepId}"]`);
+  if (!stepElement) return;
+  
+  if (updates.isActive !== undefined) {
+    stepElement.classList.toggle('active', updates.isActive);
+  }
+  if (updates.isCompleted !== undefined) {
+    stepElement.classList.toggle('completed', updates.isCompleted);
+    if (updates.isCompleted) {
+      stepElement.classList.remove('active');
+      const indicator = stepElement.querySelector('.deep-research-step-indicator');
+      if (indicator) indicator.textContent = '✓';
+    }
+  }
+  if (updates.description !== undefined) {
+    const descElement = stepElement.querySelector('.deep-research-step-description');
+    if (descElement) {
+      descElement.textContent = updates.description;
+    }
+  }
+}
+
+// Agregar hallazgo
+function addFinding(container, finding) {
+  // Guardar para restaurar después
+  if (!deepResearchFindingsData.includes(finding)) {
+    deepResearchFindingsData.push(finding);
+  }
+  
+  // Usar el contenedor global si el local ya no existe en el DOM
+  const activeContainer = (container && document.body.contains(container)) 
+    ? container 
+    : deepResearchCurrentContainer;
+  
+  if (!activeContainer || !document.body.contains(activeContainer)) return;
+  const findingsContainer = activeContainer.querySelector('.deep-research-findings');
+  const findingsList = activeContainer.querySelector('.deep-research-findings-list');
+  
+  if (findingsContainer && findingsList) {
+    findingsContainer.style.display = 'block';
+    const findingElement = document.createElement('div');
+    findingElement.className = 'deep-research-finding';
+    findingElement.textContent = finding;
+    findingsList.appendChild(findingElement);
+  }
+}
+
+// Generar plan de investigación usando el modelo
+async function generateResearchPlan(userQuery, signal = null) {
+  console.log('🔬 Generando plan de investigación para:', userQuery);
+  
+  const planPrompt = `Eres un asistente de investigación experto. El usuario quiere investigar: "${userQuery}"
+
+Tu tarea es crear un plan de investigación estructurado. Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicaciones) con esta estructura exacta:
+{
+  "mainQuestion": "La pregunta principal reformulada de forma clara",
+  "subQuestions": [
+    {
+      "id": "q1",
+      "question": "Primera sub-pregunta específica",
+      "purpose": "Por qué esta pregunta es importante"
+    },
+    {
+      "id": "q2", 
+      "question": "Segunda sub-pregunta específica",
+      "purpose": "Por qué esta pregunta es importante"
+    },
+    {
+      "id": "q3",
+      "question": "Tercera sub-pregunta específica",
+      "purpose": "Por qué esta pregunta es importante"
+    }
+  ],
+  "approach": "Breve descripción del enfoque de investigación"
+}
+
+Genera exactamente 3 sub-preguntas que cubran los aspectos más importantes del tema.`;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: state.currentModel,
+        stream: false,
+        messages: [{ role: 'user', content: planPrompt }],
+        options: { temperature: 0.3 }
+      }),
+      signal
+    });
+
+    if (!response.ok) throw new Error('Error al generar plan');
+    
+    const data = await response.json();
+    const content = data.message?.content || '';
+    
+    // Extraer JSON del contenido
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const plan = JSON.parse(jsonMatch[0]);
+      console.log('📋 Plan de investigación generado:', plan);
+      return plan;
+    }
+    
+    throw new Error('No se pudo parsear el plan');
+  } catch (error) {
+    console.error('Error generando plan:', error);
+    // Plan de fallback
+    return {
+      mainQuestion: userQuery,
+      subQuestions: [
+        { id: 'q1', question: `¿Cuáles son los conceptos fundamentales de ${userQuery}?`, purpose: 'Establecer base' },
+        { id: 'q2', question: `¿Cuáles son las aplicaciones prácticas o ejemplos de ${userQuery}?`, purpose: 'Aplicación práctica' },
+        { id: 'q3', question: `¿Cuáles son los desafíos o limitaciones de ${userQuery}?`, purpose: 'Análisis crítico' }
+      ],
+      approach: 'Investigación estructurada en tres fases'
+    };
+  }
+}
+
+// Investigar una sub-pregunta
+async function investigateSubQuestion(question, previousFindings = [], signal = null) {
+  console.log('🔍 Investigando:', question);
+  
+  let contextFromFindings = '';
+  if (previousFindings.length > 0) {
+    contextFromFindings = `\n\nContexto de hallazgos previos:\n${previousFindings.map((f, i) => `${i + 1}. ${f}`).join('\n')}`;
+  }
+  
+  const investigatePrompt = `Investiga la siguiente pregunta de forma detallada y estructurada:
+
+"${question}"${contextFromFindings}
+
+Proporciona una respuesta completa y bien fundamentada. Incluye:
+1. Explicación clara del concepto
+2. Datos o ejemplos relevantes
+3. Puntos clave a recordar
+
+Responde de forma directa y útil.`;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: state.currentModel,
+        stream: false,
+        messages: [{ role: 'user', content: investigatePrompt }],
+        options: { temperature: 0.5, num_ctx: 8192 }
+      }),
+      signal
+    });
+
+    if (!response.ok) throw new Error('Error en investigación');
+    
+    const data = await response.json();
+    const content = data.message?.content || '';
+    
+    return {
+      question: question,
+      answer: content,
+      keyPoints: extractKeyPoints(content)
+    };
+  } catch (error) {
+    // Re-lanzar errores de cancelación
+    if (error.name === 'AbortError') {
+      throw error;
+    }
+    console.error('Error investigando:', error);
+    return {
+      question: question,
+      answer: 'No se pudo completar esta parte de la investigación.',
+      keyPoints: []
+    };
+  }
+}
+
+// Extraer puntos clave de una respuesta
+function extractKeyPoints(text) {
+  const points = [];
+  
+  // Buscar puntos numerados o con viñetas
+  const patterns = [
+    /(?:^|\n)\s*(?:\d+[\.\)]\s*|\-\s*|\•\s*|\*\s*)([^\n]+)/g,
+    /(?:^|\n)\s*(?:Punto clave|Key point|Importante|Nota):\s*([^\n]+)/gi
+  ];
+  
+  patterns.forEach(pattern => {
+    let match;
+    while ((match = pattern.exec(text)) !== null && points.length < 5) {
+      const point = match[1].trim();
+      if (point.length > 10 && point.length < 200 && !points.includes(point)) {
+        points.push(point);
+      }
+    }
+  });
+  
+  // Si no encontramos puntos estructurados, extraer oraciones importantes
+  if (points.length === 0) {
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 30);
+    points.push(...sentences.slice(0, 3).map(s => s.trim()));
+  }
+  
+  return points.slice(0, 5);
+}
+
+// Generar preguntas de seguimiento
+async function generateFollowUpQuestions(findings, originalQuery, signal = null) {
+  console.log('🔄 Generando preguntas de seguimiento...');
+  
+  const summaryOfFindings = findings.map(f => `- ${f.question}: ${f.keyPoints.join('; ')}`).join('\n');
+  
+  const followUpPrompt = `Basándote en la investigación realizada sobre "${originalQuery}":
+
+Hallazgos hasta ahora:
+${summaryOfFindings}
+
+¿Qué aspectos adicionales valdría la pena investigar? Responde SOLO con un JSON:
+{
+  "followUpQuestions": [
+    {"id": "f1", "question": "Pregunta de seguimiento 1"},
+    {"id": "f2", "question": "Pregunta de seguimiento 2"}
+  ],
+  "shouldContinue": true/false
+}
+
+Si ya se ha cubierto suficiente, pon shouldContinue: false.`;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: state.currentModel,
+        stream: false,
+        messages: [{ role: 'user', content: followUpPrompt }],
+        options: { temperature: 0.4 }
+      }),
+      signal
+    });
+
+    if (!response.ok) return { followUpQuestions: [], shouldContinue: false };
+    
+    const data = await response.json();
+    const content = data.message?.content || '';
+    
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    
+    return { followUpQuestions: [], shouldContinue: false };
+  } catch (error) {
+    // Re-lanzar errores de cancelación
+    if (error.name === 'AbortError') {
+      throw error;
+    }
+    console.error('Error generando follow-ups:', error);
+    return { followUpQuestions: [], shouldContinue: false };
+  }
+}
+
+// Sintetizar todos los hallazgos en un informe final
+async function synthesizeFindings(originalQuery, findings, signal = null) {
+  console.log('📝 Sintetizando informe final...');
+  
+  const findingsSummary = findings.map((f, i) => 
+    `## Investigación ${i + 1}: ${f.question}\n\n${f.answer}`
+  ).join('\n\n---\n\n');
+  
+  const synthesisPrompt = `Eres un experto sintetizando investigaciones. Se realizó una investigación profunda sobre: "${originalQuery}"
+
+Hallazgos de la investigación:
+${findingsSummary}
+
+Tu tarea es crear un INFORME FINAL COMPLETO que:
+1. Tenga una introducción clara del tema
+2. Presente los hallazgos más importantes de forma estructurada
+3. Incluya una sección de conclusiones
+4. Destaque los puntos más relevantes
+
+Usa formato Markdown con encabezados, listas y énfasis donde sea apropiado.
+El informe debe ser comprensivo pero conciso.`;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: state.currentModel,
+        stream: false,
+        messages: [{ role: 'user', content: synthesisPrompt }],
+        options: { temperature: 0.4, num_ctx: 16384 }
+      }),
+      signal
+    });
+
+    if (!response.ok) throw new Error('Error en síntesis');
+    
+    const data = await response.json();
+    return data.message?.content || 'No se pudo generar el informe final.';
+  } catch (error) {
+    // Re-lanzar errores de cancelación
+    if (error.name === 'AbortError') {
+      throw error;
+    }
+    console.error('Error sintetizando:', error);
+    
+    // Generar un informe básico con los hallazgos
+    return `# Informe de Investigación: ${originalQuery}\n\n${findings.map(f => 
+      `## ${f.question}\n\n${f.answer}`
+    ).join('\n\n---\n\n')}\n\n## Conclusión\n\nEsta investigación exploró múltiples aspectos del tema.`;
+  }
+}
+
+// Función principal de Deep Research
+async function executeDeepResearch(userQuery, conversation) {
+  console.log('🔬 Iniciando Deep Research:', userQuery);
+  
+  // Configurar control de cancelación y tiempo
+  deepResearchAbortController = new AbortController();
+  deepResearchActiveConversationId = conversation.id;
+  deepResearchStartTime = Date.now();
+  deepResearchStepTimes = [];
+  deepResearchStepsData = []; // Resetear pasos
+  deepResearchFindingsData = []; // Resetear hallazgos
+  const signal = deepResearchAbortController.signal;
+  
+  // Bloquear inputs mientras investiga
+  lockInputsDuringResearch();
+  
+  // Helper para verificar si fue cancelado
+  const checkCancelled = () => {
+    if (signal.aborted) {
+      throw new DOMException('Deep Research cancelado', 'AbortError');
+    }
+  };
+  
+  // Crear mensaje del usuario
+  const userMessage = createMessage('user', `🔬 **Deep Research**: ${userQuery}`);
+  conversation.messages.push(userMessage);
+  touchConversation(conversation.id);
+  
+  showChatState();
+  appendMessageElement(userMessage);
+  updateConversationTitleFromContent(conversation);
+  
+  // Crear mensaje del asistente con el contenedor de progreso
+  const assistantMessage = createMessage('assistant', '');
+  assistantMessage.isDeepResearchInProgress = true; // Marcar como Deep Research activo
+  conversation.messages.push(assistantMessage);
+  
+  // Guardar el ID del mensaje para poder restaurar el UI
+  deepResearchMessageId = assistantMessage.id;
+  
+  const { bubble } = appendMessageElement(assistantMessage);
+  
+  // Crear y agregar el contenedor de progreso
+  const progressContainer = createDeepResearchProgressElement();
+  bubble.innerHTML = '';
+  bubble.appendChild(progressContainer);
+  
+  // Guardar referencia al contenedor actual
+  deepResearchCurrentContainer = progressContainer;
+  
+  // Guardar referencia para actualizar desde cualquier lugar
+  const conversationId = conversation.id;
+  
+  const findings = [];
+  let iteration = 0;
+  let stepsCompleted = 0;
+  let totalExpectedSteps = 3; // Empezamos con 3 sub-preguntas + posibles follow-ups
+  
+  try {
+    checkCancelled();
+    // Fase 1: Generar plan de investigación
+    updateDeepResearchProgress(progressContainer, 5, 'Generando plan de investigación...', 'Calculando...');
+    const plan = await generateResearchPlan(userQuery, signal);
+    
+    checkCancelled(); // Verificar después del plan
+    
+    // Actualizar total de pasos esperados
+    totalExpectedSteps = plan.subQuestions.length + 2; // +2 para follow-ups y síntesis
+    
+    // Mostrar pasos del plan
+    updateDeepResearchProgress(progressContainer, 10, `Investigando: ${plan.mainQuestion}`, calculateEstimatedTime(10, 0, totalExpectedSteps));
+    
+    const totalSteps = plan.subQuestions.length;
+    
+    // Agregar pasos iniciales
+    plan.subQuestions.forEach((q, i) => {
+      addResearchStep(progressContainer, {
+        id: q.id,
+        number: i + 1,
+        title: q.question,
+        description: q.purpose
+      }, i === 0, false);
+    });
+    
+    // Fase 2: Investigar cada sub-pregunta
+    for (let i = 0; i < plan.subQuestions.length && iteration < MAX_RESEARCH_ITERATIONS; i++) {
+      checkCancelled(); // Verificar si fue cancelado
+      
+      const subQ = plan.subQuestions[i];
+      const stepStartTime = Date.now();
+      
+      updateResearchStep(progressContainer, subQ.id, { isActive: true });
+      const currentProgress = 10 + ((i + 1) / totalSteps) * 60;
+      updateDeepResearchProgress(
+        progressContainer, 
+        currentProgress,
+        `Investigando: ${subQ.question.substring(0, 50)}...`,
+        calculateEstimatedTime(currentProgress, stepsCompleted, totalExpectedSteps)
+      );
+      
+      const result = await investigateSubQuestion(
+        subQ.question, 
+        findings.map(f => f.keyPoints).flat(),
+        signal
+      );
+      
+      // Registrar tiempo del paso
+      deepResearchStepTimes.push(Date.now() - stepStartTime);
+      stepsCompleted++;
+      
+      checkCancelled(); // Verificar después de cada investigación
+      
+      findings.push(result);
+      
+      // Agregar hallazgos clave
+      result.keyPoints.slice(0, 2).forEach(point => {
+        addFinding(progressContainer, point);
+      });
+      
+      updateResearchStep(progressContainer, subQ.id, { 
+        isActive: false, 
+        isCompleted: true,
+        description: `${result.keyPoints.length} puntos clave encontrados`
+      });
+      
+      iteration++;
+      scrollChatToBottom();
+    }
+    
+    // Fase 2.5: Preguntas de seguimiento (opcional)
+    if (iteration < MAX_RESEARCH_ITERATIONS) {
+      checkCancelled();
+      updateDeepResearchProgress(progressContainer, 75, 'Evaluando si se necesita más investigación...', calculateEstimatedTime(75, stepsCompleted, totalExpectedSteps));
+      
+      const followUp = await generateFollowUpQuestions(findings, userQuery, signal);
+      
+      checkCancelled();
+      
+      if (followUp.shouldContinue && followUp.followUpQuestions.length > 0) {
+        const additionalQuestions = followUp.followUpQuestions.slice(0, MAX_FOLLOW_UP_QUESTIONS);
+        totalExpectedSteps += additionalQuestions.length; // Actualizar total
+        
+        for (let i = 0; i < additionalQuestions.length && iteration < MAX_RESEARCH_ITERATIONS; i++) {
+          checkCancelled(); // Verificar si fue cancelado
+          
+          const fq = additionalQuestions[i];
+          const stepStartTime = Date.now();
+          
+          addResearchStep(progressContainer, {
+            id: fq.id,
+            number: findings.length + 1,
+            title: fq.question,
+            description: 'Pregunta de seguimiento'
+          }, true, false);
+          
+          const currentProgress = 75 + ((i + 1) / additionalQuestions.length) * 15;
+          updateDeepResearchProgress(
+            progressContainer, 
+            currentProgress,
+            `Profundizando: ${fq.question.substring(0, 40)}...`,
+            calculateEstimatedTime(currentProgress, stepsCompleted, totalExpectedSteps)
+          );
+          
+          const result = await investigateSubQuestion(
+            fq.question,
+            findings.map(f => f.keyPoints).flat(),
+            signal
+          );
+          
+          // Registrar tiempo del paso
+          deepResearchStepTimes.push(Date.now() - stepStartTime);
+          stepsCompleted++;
+          
+          checkCancelled(); // Verificar después de cada investigación
+          
+          findings.push(result);
+          
+          result.keyPoints.slice(0, 2).forEach(point => {
+            addFinding(progressContainer, point);
+          });
+          
+          updateResearchStep(progressContainer, fq.id, { 
+            isActive: false, 
+            isCompleted: true 
+          });
+          
+          iteration++;
+          scrollChatToBottom();
+        }
+      }
+    }
+    
+    // Fase 3: Sintetizar resultados
+    checkCancelled();
+    updateDeepResearchProgress(progressContainer, 90, 'Generando informe final...', '~30s restantes');
+    
+    const finalReport = await synthesizeFindings(userQuery, findings, signal);
+    
+    checkCancelled();
+    
+    // Calcular tiempo total
+    const totalTime = Date.now() - deepResearchStartTime;
+    const totalMinutes = Math.floor(totalTime / 60000);
+    const totalSeconds = Math.floor((totalTime % 60000) / 1000);
+    const timeString = totalMinutes > 0 ? `${totalMinutes}m ${totalSeconds}s` : `${totalSeconds}s`;
+    
+    // Actualizar el mensaje con el informe final
+    updateDeepResearchProgress(progressContainer, 100, `✅ Completado en ${timeString}`, 'Listo');
+    
+    // Guardar el ID de la conversación actual para verificar después
+    const currentConversationId = conversation.id;
+    
+    // Reemplazar contenido con el informe final después de un momento
+    setTimeout(() => {
+      // Quitar el flag de investigación en progreso
+      assistantMessage.isDeepResearchInProgress = false;
+      
+      // Verificar que seguimos en la misma conversación antes de modificar el DOM
+      if (state.activeId !== currentConversationId || !document.body.contains(bubble)) {
+        // Solo guardar los datos sin modificar el DOM
+        assistantMessage.content = finalReport;
+        assistantMessage.deepResearch = {
+          query: userQuery,
+          findings: findings.length,
+          iterations: iteration
+        };
+        conversation.updatedAt = Date.now();
+        persistState();
+        return;
+      }
+      
+      assistantMessage.content = finalReport;
+      assistantMessage.deepResearch = {
+        query: userQuery,
+        findings: findings.length,
+        iterations: iteration
+      };
+      
+      bubble.innerHTML = `
+        <div class="deep-research-report">
+          <div class="deep-research-report-header">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="M11 8v6M8 11h6"/>
+              <path d="M16 16l4 4"/>
+            </svg>
+            Deep Research • ${findings.length} temas investigados
+          </div>
+        </div>
+        ${parseMarkdown(finalReport)}
+      `;
+      
+      // Agregar contenedor de copiar
+      const copyContainer = document.createElement('div');
+      copyContainer.className = 'copy-message-container';
+      
+      const copyButton = document.createElement('button');
+      copyButton.className = 'copy-message-btn';
+      copyButton.title = 'Copiar informe';
+      copyButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+      copyButton.addEventListener('click', async () => {
+        await copyToClipboard(finalReport, copyButton);
+      });
+      
+      const timeElement = document.createElement('span');
+      timeElement.className = 'message-time';
+      timeElement.textContent = formatTime(Date.now());
+      
+      copyContainer.appendChild(copyButton);
+      copyContainer.appendChild(timeElement);
+      bubble.appendChild(copyContainer);
+      
+      // Renderizar matemáticas
+      if (typeof renderMathInElement !== 'undefined') {
+        renderMathInElement(bubble, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError: false
+        });
+      }
+      
+      conversation.updatedAt = Date.now();
+      persistState();
+      renderConversationList();
+      scrollChatToBottom();
+    }, 1500);
+    
+  } catch (error) {
+    // Quitar el flag de investigación en progreso
+    assistantMessage.isDeepResearchInProgress = false;
+    
+    // Manejar cancelación de forma silenciosa
+    if (error.name === 'AbortError') {
+      console.log('🛑 Deep Research cancelado por el usuario');
+      assistantMessage.content = `⚠️ Investigación cancelada`;
+      if (bubble && document.body.contains(bubble)) {
+        bubble.innerHTML = parseMarkdown(assistantMessage.content);
+      }
+      persistState();
+    } else {
+      console.error('Error en Deep Research:', error);
+      assistantMessage.content = `⚠️ Error durante la investigación: ${error.message}`;
+      if (bubble && document.body.contains(bubble)) {
+        bubble.innerHTML = parseMarkdown(assistantMessage.content);
+      }
+      persistState();
+    }
+  } finally {
+    // Limpiar estado de cancelación y desbloquear inputs
+    deepResearchAbortController = null;
+    deepResearchActiveConversationId = null;
+    deepResearchStartTime = null;
+    deepResearchStepTimes = [];
+    deepResearchProgressState = null;
+    deepResearchMessageId = null;
+    deepResearchCurrentContainer = null;
+    deepResearchStepsData = [];
+    deepResearchFindingsData = [];
+    unlockInputsDuringResearch();
+    
+    // Limpiar indicadores visuales
+    document.querySelectorAll('.research-indicator').forEach(el => el.remove());
+    const banner = document.getElementById('research-progress-banner');
+    if (banner) banner.remove();
+  }
+  
+  // Desactivar modo Deep Research después de completar
+  if (deepResearchMode) {
+    toggleDeepResearch();
+  }
+  
+  return findings;
+}
+
+// Modificar el handleSubmit original para soportar Deep Research
+const originalHandleSubmit = handleSubmit;
+
+async function handleSubmitWithDeepResearch(event) {
+  event.preventDefault();
+  if (state.loading) return;
+
+  // Si Deep Research está activo, usar ese flujo
+  if (deepResearchMode) {
+    const isEmptyState = emptyState?.style.display !== 'none';
+    const activeInput = isEmptyState ? promptInput : promptInputInline;
+    const prompt = activeInput?.value.trim();
+    
+    if (!prompt) return;
+    
+    const conversation = state.conversations[state.activeId];
+    if (!conversation) return;
+    
+    state.loading = true;
+    activeInput.value = '';
+    autoResizeTextarea(activeInput);
+    
+    try {
+      await executeDeepResearch(prompt, conversation);
+    } catch (error) {
+      console.error('Error en Deep Research:', error);
+    } finally {
+      state.loading = false;
+    }
+    
+    return;
+  }
+  
+  // Si no, usar el flujo normal
+  return originalHandleSubmit.call(this, event);
+}
+
+// Sobrescribir handleSubmit globalmente
+handleSubmit = handleSubmitWithDeepResearch;
 
