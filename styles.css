@@ -3878,6 +3878,11 @@ input:checked + .slider:before {
   border-radius: 12px;
 }
 
+/* Ocultar el activity chart cuando estamos en investigación profunda */
+.research-active .activity-chart {
+  display: none !important;
+}
+
 .activity-bar {
   flex: 1;
   display: flex;
@@ -4295,8 +4300,14 @@ input:checked + .slider:before {
 }
 
 /* Efecto de brillo para el toggle cuando no está en modo normal */
-.chat-mode-toggle[data-active-mode="deep"],
+.chat-mode-toggle[data-active-mode="deep"] {
+  /* Deep Research: mantener aspecto neutro/transparente */
+  border-color: rgba(255,255,255,0.06);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.02);
+}
+
 .chat-mode-toggle[data-active-mode="study"] {
+  /* Study keep theme accent */
   border-color: var(--theme-primary-alpha-35);
   box-shadow: 0 0 0 1px var(--theme-primary-alpha-10);
 }
@@ -4309,10 +4320,10 @@ input:checked + .slider:before {
 
 @keyframes modePulse {
   0%, 100% {
-    filter: drop-shadow(0 0 2px var(--theme-primary-alpha-30));
+    filter: drop-shadow(0 0 2px rgba(255,255,255,0.06));
   }
   50% {
-    filter: drop-shadow(0 0 8px var(--theme-primary));
+    filter: drop-shadow(0 0 8px rgba(255,255,255,0.12));
   }
 }
 
@@ -4335,15 +4346,14 @@ input:checked + .slider:before {
 
 /* ==================== DEEP RESEARCH PROGRESS UI ==================== */
 .deep-research-container {
-  background: rgba(139, 92, 246, 0.05);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  /* Mantener un aspecto neutro/transparente, sin la temática morada */
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
 }
-
 .deep-research-header {
-  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -4364,19 +4374,28 @@ input:checked + .slider:before {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #a78bfa;
+  color: rgba(255, 255, 255, 0.9); /* neutro */
 }
 
 .deep-research-title-icon {
   width: 20px;
   height: 20px;
-  animation: spin 3s linear infinite;
+}
+
+.deep-research-title-icon .spinner-ring {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: researchRing 1.25s linear infinite;
+}
+
+@keyframes researchRing {
+  to { transform: rotate(360deg); }
 }
 
 .deep-research-time-estimate {
   font-size: 11px;
-  color: #8b5cf6;
-  background: rgba(139, 92, 246, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.03);
   padding: 4px 8px;
   border-radius: 12px;
   font-weight: 500;
@@ -4398,7 +4417,7 @@ input:checked + .slider:before {
 .deep-research-progress-bar {
   flex: 1;
   height: 4px;
-  background: rgba(139, 92, 246, 0.2);
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -4406,14 +4425,15 @@ input:checked + .slider:before {
 .deep-research-progress-percent {
   font-size: 11px;
   font-weight: 600;
-  color: #a78bfa;
+  color: rgba(255, 255, 255, 0.75);
   min-width: 35px;
   text-align: right;
 }
 
 .deep-research-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  /* Relleno neutro, semitransparente */
+  background: linear-gradient(90deg, rgba(255,255,255,0.14), rgba(255,255,255,0.08));
   border-radius: 2px;
   transition: width 0.3s ease;
   position: relative;
@@ -4457,8 +4477,8 @@ input:checked + .slider:before {
 }
 
 .deep-research-step.active {
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .deep-research-step.completed {
@@ -4475,12 +4495,15 @@ input:checked + .slider:before {
   font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;
-  background: rgba(139, 92, 246, 0.2);
-  color: #a78bfa;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .deep-research-step.active .deep-research-step-indicator {
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  background: rgba(255, 255, 255, 0.08);
   color: white;
   animation: pulse 1.5s ease-in-out infinite;
 }
@@ -4491,12 +4514,21 @@ input:checked + .slider:before {
 }
 
 .deep-research-step.completed .deep-research-step-indicator {
-  background: rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.18);
   color: #22c55e;
 }
 
-.deep-research-step.completed .deep-research-step-indicator::after {
-  content: '✓';
+/* no ::after check badge; using inline SVG for check */
+
+.deep-research-step-indicator .check-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.step-number {
+  font-size: 12px;
+  font-weight: 700;
+  color: inherit;
 }
 
 .deep-research-step-content {
@@ -4520,7 +4552,7 @@ input:checked + .slider:before {
 .deep-research-findings {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid rgba(139, 92, 246, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .deep-research-findings-title {
@@ -4533,28 +4565,76 @@ input:checked + .slider:before {
   margin-bottom: 12px;
 }
 
+.deep-research-container svg,
+.deep-research-findings-title svg,
+.deep-research-findings svg,
+.deep-research-finding svg {
+  width: 18px !important;
+  height: 18px !important;
+  max-width: 24px !important;
+}
+
+.deep-research-container svg path,
+.deep-research-container svg circle,
+.deep-research-container svg line,
+.deep-research-container svg rect {
+  stroke-width: 1.2 !important;
+}
+
+.deep-research-container .finding-item-icon,
+.deep-research-container .findings-icon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.findings-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-right: 8px;
+  color: rgba(255,255,255,0.9);
+}
+
 .deep-research-finding {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  margin-bottom: 6px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
   line-height: 1.5;
+  border: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.12s ease, transform 0.12s ease;
 }
 
 .deep-research-finding::before {
   content: '💡';
-  font-size: 14px;
+  display: none; /* no emoji */
+}
+
+.finding-item-icon {
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
+  color: rgba(255,255,255,0.75);
+}
+
+.finding-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.deep-research-finding:hover {
+  background: rgba(255,255,255,0.035);
+  transform: translateY(-2px);
 }
 
 /* Deep Research in message bubble */
 .message-bubble .deep-research-report {
-  border-top: 1px solid rgba(139, 92, 246, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   margin-top: 16px;
   padding-top: 16px;
 }
@@ -4566,7 +4646,7 @@ input:checked + .slider:before {
   margin-bottom: 12px;
   font-size: 14px;
   font-weight: 600;
-  color: #a78bfa;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .deep-research-sources {
@@ -4581,11 +4661,11 @@ input:checked + .slider:before {
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
   font-size: 11px;
-  color: rgba(139, 92, 246, 0.9);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 /* Responsive para Chat Mode Toggle */
@@ -4650,22 +4730,49 @@ input:checked + .slider:before {
   position: relative;
 }
 
-.research-locked::after {
-  content: '🔬';
+textarea.research-locked::after {
+  /* Spinner indicator for locked state - no emoji */
+  content: '';
   position: absolute;
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 16px;
-  animation: pulse 1.5s ease-in-out infinite;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.06);
+  border-top-color: rgba(255,255,255,0.6);
+  animation: researchSpin 1s linear infinite;
 }
 
 textarea.research-locked::placeholder {
-  color: rgba(139, 92, 246, 0.8) !important;
+  color: rgba(255, 255, 255, 0.35) !important;
 }
 
 button.research-locked {
-  background: rgba(139, 92, 246, 0.3) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Botón de detener investigación activo */
+button.research-active-btn {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+  transition: all 0.2s ease;
+}
+
+button.research-active-btn:hover {
+  background: rgba(239, 68, 68, 0.25) !important;
+  border-color: rgba(239, 68, 68, 0.6) !important;
+}
+
+button.research-active-btn svg {
+  color: rgba(239, 68, 68, 0.9);
+}
+
+.stop-research-spinner {
+  animation: researchSpin 1s linear infinite;
 }
 
 @keyframes pulse {
@@ -4684,6 +4791,21 @@ button.research-locked {
   cursor: help;
 }
 
+.research-indicator-icon {
+  width: 18px;
+  height: 18px;
+  color: rgba(255,255,255,0.85);
+}
+
+.research-indicator .research-indicator-spinner {
+  transform-origin: center;
+  animation: researchSpin 1s linear infinite;
+}
+
+@keyframes researchSpin {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes researchPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.7; transform: scale(1.15); }
@@ -4695,8 +4817,9 @@ button.research-locked {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.08));
-  border: 1px solid rgba(139, 92, 246, 0.25);
+  /* Neutro/transparente en lugar de la temática morada */
+  background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.06);
   border-radius: 12px;
   margin: 12px 16px;
   gap: 12px;
@@ -4721,6 +4844,18 @@ button.research-locked {
   animation: researchPulse 1.5s ease-in-out infinite;
 }
 
+.research-banner-icon svg {
+  width: 18px;
+  height: 18px;
+  color: rgba(255,255,255,0.9);
+}
+
+.research-banner-icon .spinner-ring {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: researchRing 1.25s linear infinite;
+}
+
 .research-banner-text {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.85);
@@ -4730,22 +4865,22 @@ button.research-locked {
 }
 
 .research-banner-text strong {
-  color: #a78bfa;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .research-banner-progress {
   font-size: 12px;
   font-weight: 600;
-  color: #a78bfa;
-  background: rgba(139, 92, 246, 0.2);
+  color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.04);
   padding: 3px 8px;
   border-radius: 10px;
 }
 
 .research-banner-goto {
-  background: rgba(139, 92, 246, 0.2);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  color: #a78bfa;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.9);
   padding: 6px 12px;
   border-radius: 8px;
   font-size: 12px;
@@ -4756,8 +4891,8 @@ button.research-locked {
 }
 
 .research-banner-goto:hover {
-  background: rgba(139, 92, 246, 0.35);
-  border-color: rgba(139, 92, 246, 0.5);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.12);
   transform: translateX(2px);
 }
 

@@ -462,7 +462,7 @@ function appendMessageElement(message) {
             <path d="M11 8v6M8 11h6"/>
             <path d="M16 16l4 4"/>
           </svg>
-          Deep Research • ${message.deepResearch.findings || 0} temas investigados
+          Investigación profunda • ${message.deepResearch.findings || 0} temas investigados
         </div>
       </div>
     `;
@@ -5709,14 +5709,14 @@ function renderProjectsList() {
     
     return `
       <li class="project-item ${isActive ? 'active' : ''}" data-project-id="${project.id}">
-        <div class="project-item-icon">📂</div>
+        <div class="project-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></div>
         <div class="project-item-info">
           <p class="project-item-name">${escapeHtml(project.name || 'Sin nombre')}</p>
           <p class="project-item-meta">${fileCount} archivo${fileCount !== 1 ? 's' : ''} · ${convCount} chat${convCount !== 1 ? 's' : ''}</p>
         </div>
         <div class="project-item-actions">
-          <button class="project-action-btn edit" title="Editar proyecto" data-action="edit">✎</button>
-          <button class="project-action-btn delete" title="Eliminar proyecto" data-action="delete">🗑</button>
+          <button class="project-action-btn edit" title="Editar proyecto" data-action="edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+          <button class="project-action-btn delete" title="Eliminar proyecto" data-action="delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
         </div>
       </li>
     `;
@@ -6070,7 +6070,12 @@ function isDeepResearchInProgress() {
 // Obtener el indicador de investigación para una conversación
 function getResearchIndicator(conversationId) {
   if (deepResearchActiveConversationId === conversationId && deepResearchProgressState) {
-    return `<span class="research-indicator" title="Investigación en progreso: ${deepResearchProgressState.progress}%">🔬</span>`;
+    return `<span class="research-indicator" title="Investigación en progreso: ${deepResearchProgressState.progress}%">
+      <svg class="research-indicator-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" opacity="0.12"></circle>
+        <path class="research-indicator-spinner" d="M12 6a6 6 0 0 1 0 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+      </svg>
+    </span>`;
   }
   return '';
 }
@@ -6106,7 +6111,7 @@ function lockInputsDuringResearch() {
   inputs.forEach(input => {
     if (input) {
       input.dataset.originalPlaceholder = input.placeholder;
-      input.placeholder = '🔬 Investigación en progreso... Solo lectura';
+      input.placeholder = 'Investigación en progreso... Solo lectura';
       input.disabled = true;
       input.classList.add('research-locked');
     }
@@ -6114,10 +6119,33 @@ function lockInputsDuringResearch() {
   
   sendButtons.forEach(btn => {
     if (btn) {
-      btn.disabled = true;
-      btn.classList.add('research-locked');
+      // Guardar contenido original y convertir en botón de detener
+      btn.dataset.originalContent = btn.innerHTML;
+      btn.innerHTML = '<svg class="stop-research-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-dasharray="31.4" stroke-dashoffset="10"></circle></svg>';
+      btn.disabled = false;
+      btn.classList.add('research-active-btn');
+      btn.classList.remove('research-locked');
+      btn.title = 'Detener investigación';
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        cancelDeepResearch();
+      };
     }
   });
+
+  // Ocultar temporalmente el activity chart y ranking si están visibles (para evitar superposición visual)
+  const activityChart = document.getElementById('activity-chart');
+  const modelsRanking = document.getElementById('models-ranking');
+  [activityChart, modelsRanking].forEach(el => {
+    if (el) {
+      // Guardar display original
+      el.dataset.__origDisplay = el.style.display || '';
+      el.style.display = 'none';
+    }
+  });
+  // Marca global de estado 'research-active' para ocultar automáticamente elementos si hay CSS que lo soporta
+  document.body.classList.add('research-active');
 }
 
 // Desbloquear inputs después de investigar
@@ -6135,10 +6163,27 @@ function unlockInputsDuringResearch() {
   
   sendButtons.forEach(btn => {
     if (btn) {
+      // Restaurar contenido original del botón
+      btn.innerHTML = btn.dataset.originalContent || '↑';
       btn.disabled = false;
       btn.classList.remove('research-locked');
+      btn.classList.remove('research-active-btn');
+      btn.title = 'Enviar';
+      btn.onclick = null;
     }
   });
+
+  // Restaurar visibilidad del activity chart y ranking
+  const activityChart = document.getElementById('activity-chart');
+  const modelsRanking = document.getElementById('models-ranking');
+  [activityChart, modelsRanking].forEach(el => {
+    if (el) {
+      el.style.display = el.dataset.__origDisplay || '';
+      delete el.dataset.__origDisplay;
+    }
+  });
+  // Restaurar clase global
+  document.body.classList.remove('research-active');
 }
 
 function toggleDeepResearch(button) {
@@ -6218,12 +6263,14 @@ function createDeepResearchProgressElement() {
   container.innerHTML = `
     <div class="deep-research-header">
       <div class="deep-research-title">
-        <svg class="deep-research-title-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
-          <path d="M11 8v6M8 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M16 16l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <svg class="deep-research-title-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Spinner ring -->
+          <circle class="spinner-ring" cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="34 100" stroke-linejoin="round" opacity="0.12"></circle>
+          <!-- Magnifier icon (static) -->
+          <circle cx="11" cy="11" r="5" stroke="currentColor" stroke-width="1.6"></circle>
+          <path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
         </svg>
-        Deep Research
+        Investigación profunda
       </div>
       <div class="deep-research-header-right">
         <span class="deep-research-status">Iniciando investigación...</span>
@@ -6236,9 +6283,17 @@ function createDeepResearchProgressElement() {
       <span class="deep-research-progress-percent">0%</span>
     </div>
     <div class="deep-research-steps"></div>
-    <div class="deep-research-findings" style="display: none;">
+      <div class="deep-research-findings" style="display: none;">
       <div class="deep-research-findings-title">
-        <span>📊</span> Hallazgos clave
+        <svg class="findings-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="5" cy="7" r="1.5" fill="currentColor" />
+          <path d="M9 7h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+          <path d="M9 12h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="5" cy="17" r="1.5" fill="currentColor" />
+          <path d="M9 17h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        Hallazgos clave
       </div>
       <div class="deep-research-findings-list"></div>
     </div>
@@ -6308,7 +6363,7 @@ function updateResearchIndicatorInList() {
         titleSpan.insertAdjacentElement('afterend', indicator);
       }
     }
-    indicator.textContent = '🔬';
+    indicator.innerHTML = getResearchIndicator(deepResearchActiveConversationId);
     indicator.title = `Investigando: ${deepResearchProgressState.progress}% - ${deepResearchProgressState.status}`;
   } else if (indicator) {
     indicator.remove();
@@ -6333,7 +6388,11 @@ function updateResearchBanner(currentConversationId) {
       banner.className = 'research-progress-banner';
       banner.innerHTML = `
         <div class="research-banner-content">
-          <span class="research-banner-icon">🔬</span>
+          <svg class="research-banner-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle class="spinner-ring" cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.5" opacity="0.12"></circle>
+            <circle cx="11" cy="11" r="5" stroke="currentColor" stroke-width="1.5" />
+            <path d="M15 15l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
           <span class="research-banner-text">
             Investigación en progreso: <strong>${escapeHtml(title.substring(0, 30))}</strong>
           </span>
@@ -6398,7 +6457,7 @@ function addResearchStep(container, step, isActive = false, isCompleted = false)
   stepElement.className = `deep-research-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`;
   stepElement.dataset.stepId = step.id;
   stepElement.innerHTML = `
-    <div class="deep-research-step-indicator">${isCompleted ? '✓' : step.number}</div>
+    <div class="deep-research-step-indicator">${isCompleted ? '<svg class="check-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : `<span class=\"step-number\">${step.number}</span>`}</div>
     <div class="deep-research-step-content">
       <div class="deep-research-step-title">${escapeHtml(step.title)}</div>
       <div class="deep-research-step-description">${escapeHtml(step.description || '')}</div>
@@ -6436,7 +6495,9 @@ function updateResearchStep(container, stepId, updates) {
     if (updates.isCompleted) {
       stepElement.classList.remove('active');
       const indicator = stepElement.querySelector('.deep-research-step-indicator');
-      if (indicator) indicator.textContent = '✓';
+      if (indicator) {
+        indicator.innerHTML = '<svg class="check-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
     }
   }
   if (updates.description !== undefined) {
@@ -6468,7 +6529,10 @@ function addFinding(container, finding) {
     findingsContainer.style.display = 'block';
     const findingElement = document.createElement('div');
     findingElement.className = 'deep-research-finding';
-    findingElement.textContent = finding;
+    findingElement.innerHTML = `
+      <svg class="finding-item-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" stroke="currentColor" stroke-width="1.2"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="finding-text">${escapeHtml(finding)}</div>
+    `;
     findingsList.appendChild(findingElement);
   }
 }
@@ -6765,7 +6829,7 @@ async function executeDeepResearch(userQuery, conversation) {
   };
   
   // Crear mensaje del usuario
-  const userMessage = createMessage('user', `🔬 **Deep Research**: ${userQuery}`);
+  const userMessage = createMessage('user', `Investigación profunda: ${userQuery}`);
   conversation.messages.push(userMessage);
   touchConversation(conversation.id);
   
@@ -6988,7 +7052,7 @@ async function executeDeepResearch(userQuery, conversation) {
               <path d="M11 8v6M8 11h6"/>
               <path d="M16 16l4 4"/>
             </svg>
-            Deep Research • ${findings.length} temas investigados
+            Investigación profunda • ${findings.length} temas investigados
           </div>
         </div>
         ${parseMarkdown(finalReport)}
