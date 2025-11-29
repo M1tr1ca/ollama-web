@@ -401,21 +401,24 @@ function appendMessageElement(message) {
   }
   
   // Verificar si es un mensaje de Deep Research en progreso
-  // Puede ser: el mensaje tiene el flag Y hay una investigación en progreso
-  // O: el ID del mensaje coincide con el de la investigación activa
-  const isActiveDeepResearch = message.role === 'assistant' && 
-                                ((message.isDeepResearchInProgress && isDeepResearchInProgress()) ||
-                                 (message.id === deepResearchMessageId && isDeepResearchInProgress()));
+  // SOLO mostrar la UI de progreso si hay una investigación activa Y este es el mensaje correcto
+  const isResearchActive = isDeepResearchInProgress();
+  const isCorrectMessage = message.id === deepResearchMessageId;
+  const isCorrectConversation = state.activeId === deepResearchActiveConversationId;
+  const hasNoFinalContent = !message.content || message.content === '';
   
-  console.log('🔍 appendMessageElement:', { 
-    messageId: message.id, 
-    deepResearchMessageId, 
-    hasFlag: message.isDeepResearchInProgress,
-    isInProgress: isDeepResearchInProgress(),
-    isActiveDeepResearch,
-    hasProgress: !!deepResearchProgressState,
-    stepsCount: deepResearchStepsData?.length 
-  });
+  const isActiveDeepResearch = message.role === 'assistant' && 
+                                message.isDeepResearchInProgress === true &&
+                                hasNoFinalContent &&
+                                isResearchActive &&
+                                isCorrectMessage &&
+                                isCorrectConversation;
+  
+  // Si el mensaje tiene el flag pero ya tiene contenido, limpiar el flag (investigación terminada)
+  if (message.isDeepResearchInProgress && message.content && message.deepResearch) {
+    message.isDeepResearchInProgress = false;
+    persistState();
+  }
   
   // Agregar el contenido del mensaje
   if (isActiveDeepResearch) {
@@ -429,8 +432,7 @@ function appendMessageElement(message) {
       updateDeepResearchProgress(
         progressContainer, 
         deepResearchProgressState.progress, 
-        deepResearchProgressState.status, 
-        deepResearchProgressState.timeEstimate
+        deepResearchProgressState.status
       );
     }
     
@@ -439,7 +441,7 @@ function appendMessageElement(message) {
     
     // Restaurar los pasos completados si hay datos
     if (deepResearchStepsData && deepResearchStepsData.length > 0) {
-      deepResearchStepsData.forEach(step => {
+      deepResearchStepsData.forEach((step) => {
         addResearchStep(progressContainer, step, step.isActive, step.isCompleted);
       });
     }
@@ -450,6 +452,21 @@ function appendMessageElement(message) {
         addFinding(progressContainer, finding);
       });
     }
+  } else if (message.role === 'assistant' && message.deepResearch && message.content) {
+    // Es un mensaje de Deep Research completado - mostrar con encabezado especial
+    content += `
+      <div class="deep-research-report">
+        <div class="deep-research-report-header">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7"/>
+            <path d="M11 8v6M8 11h6"/>
+            <path d="M16 16l4 4"/>
+          </svg>
+          Deep Research • ${message.deepResearch.findings || 0} temas investigados
+        </div>
+      </div>
+    `;
+    content += parseMarkdown(message.content);
   } else if (message.content) {
     content += parseMarkdown(message.content);
   }
@@ -6086,30 +6103,6 @@ function unlockInputsDuringResearch() {
   });
 }
 
-// Calcular tiempo estimado restante
-function calculateEstimatedTime(currentProgress, stepsCompleted, totalSteps) {
-  if (!deepResearchStartTime || stepsCompleted === 0) {
-    return 'Calculando...';
-  }
-  
-  const elapsedMs = Date.now() - deepResearchStartTime;
-  const avgTimePerStep = elapsedMs / stepsCompleted;
-  const remainingSteps = totalSteps - stepsCompleted;
-  const estimatedRemainingMs = avgTimePerStep * remainingSteps;
-  
-  // Agregar tiempo extra para síntesis (aproximadamente 1.5x de un paso)
-  const synthesisTime = avgTimePerStep * 1.5;
-  const totalRemainingMs = estimatedRemainingMs + (currentProgress < 90 ? synthesisTime : 0);
-  
-  if (totalRemainingMs < 60000) {
-    const seconds = Math.ceil(totalRemainingMs / 1000);
-    return `~${seconds}s restantes`;
-  } else {
-    const minutes = Math.ceil(totalRemainingMs / 60000);
-    return `~${minutes} min restantes`;
-  }
-}
-
 function toggleDeepResearch(button) {
   deepResearchMode = !deepResearchMode;
   
@@ -6158,7 +6151,6 @@ function createDeepResearchProgressElement() {
         Deep Research
       </div>
       <div class="deep-research-header-right">
-        <span class="deep-research-time-estimate">⏱️ Calculando...</span>
         <span class="deep-research-status">Iniciando investigación...</span>
       </div>
     </div>
@@ -6180,9 +6172,9 @@ function createDeepResearchProgressElement() {
 }
 
 // Actualizar progreso visual
-function updateDeepResearchProgress(container, progress, status, timeEstimate = null) {
+function updateDeepResearchProgress(container, progress, status) {
   // Guardar estado para poder mostrar en la lista de conversaciones
-  deepResearchProgressState = { progress: Math.round(progress), status, timeEstimate };
+  deepResearchProgressState = { progress: Math.round(progress), status };
   
   // Actualizar indicador en la lista de conversaciones
   updateResearchIndicatorInList();
@@ -6190,17 +6182,16 @@ function updateDeepResearchProgress(container, progress, status, timeEstimate = 
   // Actualizar banner si existe (estamos en otro chat)
   updateResearchBannerProgress();
   
-  // Usar el contenedor global si el local ya no existe en el DOM
-  const activeContainer = (container && document.body.contains(container)) 
-    ? container 
-    : deepResearchCurrentContainer;
+  // Usar el contenedor pasado o el global como fallback
+  let activeContainer = container || deepResearchCurrentContainer;
+  if (!activeContainer) return;
   
-  if (!activeContainer || !document.body.contains(activeContainer)) return;
+  // Si usamos el global, verificar que esté en el DOM
+  if (activeContainer === deepResearchCurrentContainer && !document.body.contains(activeContainer)) return;
   
   const progressFill = activeContainer.querySelector('.deep-research-progress-fill');
   const statusElement = activeContainer.querySelector('.deep-research-status');
   const percentElement = activeContainer.querySelector('.deep-research-progress-percent');
-  const timeElement = activeContainer.querySelector('.deep-research-time-estimate');
   
   if (progressFill) {
     progressFill.style.width = `${progress}%`;
@@ -6210,9 +6201,6 @@ function updateDeepResearchProgress(container, progress, status, timeEstimate = 
   }
   if (percentElement) {
     percentElement.textContent = `${Math.round(progress)}%`;
-  }
-  if (timeElement && timeEstimate) {
-    timeElement.textContent = `⏱️ ${timeEstimate}`;
   }
 }
 
@@ -6313,12 +6301,17 @@ function addResearchStep(container, step, isActive = false, isCompleted = false)
     deepResearchStepsData.push(stepData);
   }
   
-  // Usar el contenedor global si el local ya no existe en el DOM
-  const activeContainer = (container && document.body.contains(container)) 
-    ? container 
-    : deepResearchCurrentContainer;
+  // Usar el contenedor pasado directamente si existe, o el global como fallback
+  // Usar el contenedor pasado directamente o el global como fallback
+  let activeContainer = container || deepResearchCurrentContainer;
   
-  if (!activeContainer || !document.body.contains(activeContainer)) return;
+  // Si no hay contenedor disponible, salir
+  if (!activeContainer) return;
+  
+  // Solo verificar si está en el DOM cuando usamos el contenedor global (no se pasó container)
+  // Si se pasó un container directamente, confiamos en él aunque no esté en el DOM aún
+  if (!container && !document.body.contains(activeContainer)) return;
+  
   const stepsContainer = activeContainer.querySelector('.deep-research-steps');
   if (!stepsContainer) return;
   
@@ -6350,12 +6343,13 @@ function updateResearchStep(container, stepId, updates) {
     if (updates.description !== undefined) deepResearchStepsData[stepIndex].description = updates.description;
   }
   
-  // Usar el contenedor global si el local ya no existe en el DOM
-  const activeContainer = (container && document.body.contains(container)) 
-    ? container 
-    : deepResearchCurrentContainer;
+  // Usar el contenedor pasado directamente si existe, o el global como fallback
+  let activeContainer = container || deepResearchCurrentContainer;
+  if (!activeContainer) return;
   
-  if (!activeContainer || !document.body.contains(activeContainer)) return;
+  // Solo verificar si está en el DOM cuando usamos el contenedor global
+  if (!container && !document.body.contains(activeContainer)) return;
+  
   const stepElement = activeContainer.querySelector(`[data-step-id="${stepId}"]`);
   if (!stepElement) return;
   
@@ -6385,12 +6379,13 @@ function addFinding(container, finding) {
     deepResearchFindingsData.push(finding);
   }
   
-  // Usar el contenedor global si el local ya no existe en el DOM
-  const activeContainer = (container && document.body.contains(container)) 
-    ? container 
-    : deepResearchCurrentContainer;
+  // Usar el contenedor pasado directamente si existe, o el global como fallback
+  let activeContainer = container || deepResearchCurrentContainer;
+  if (!activeContainer) return;
   
-  if (!activeContainer || !document.body.contains(activeContainer)) return;
+  // Solo verificar si está en el DOM cuando usamos el contenedor global
+  if (!container && !document.body.contains(activeContainer)) return;
+  
   const findingsContainer = activeContainer.querySelector('.deep-research-findings');
   const findingsList = activeContainer.querySelector('.deep-research-findings-list');
   
@@ -6732,7 +6727,7 @@ async function executeDeepResearch(userQuery, conversation) {
   try {
     checkCancelled();
     // Fase 1: Generar plan de investigación
-    updateDeepResearchProgress(progressContainer, 5, 'Generando plan de investigación...', 'Calculando...');
+    updateDeepResearchProgress(progressContainer, 5, 'Generando plan de investigación...');
     const plan = await generateResearchPlan(userQuery, signal);
     
     checkCancelled(); // Verificar después del plan
@@ -6741,7 +6736,7 @@ async function executeDeepResearch(userQuery, conversation) {
     totalExpectedSteps = plan.subQuestions.length + 2; // +2 para follow-ups y síntesis
     
     // Mostrar pasos del plan
-    updateDeepResearchProgress(progressContainer, 10, `Investigando: ${plan.mainQuestion}`, calculateEstimatedTime(10, 0, totalExpectedSteps));
+    updateDeepResearchProgress(progressContainer, 10, `Investigando: ${plan.mainQuestion}`);
     
     const totalSteps = plan.subQuestions.length;
     
@@ -6767,8 +6762,7 @@ async function executeDeepResearch(userQuery, conversation) {
       updateDeepResearchProgress(
         progressContainer, 
         currentProgress,
-        `Investigando: ${subQ.question.substring(0, 50)}...`,
-        calculateEstimatedTime(currentProgress, stepsCompleted, totalExpectedSteps)
+        `Investigando: ${subQ.question.substring(0, 50)}...`
       );
       
       const result = await investigateSubQuestion(
@@ -6803,7 +6797,7 @@ async function executeDeepResearch(userQuery, conversation) {
     // Fase 2.5: Preguntas de seguimiento (opcional)
     if (iteration < MAX_RESEARCH_ITERATIONS) {
       checkCancelled();
-      updateDeepResearchProgress(progressContainer, 75, 'Evaluando si se necesita más investigación...', calculateEstimatedTime(75, stepsCompleted, totalExpectedSteps));
+      updateDeepResearchProgress(progressContainer, 75, 'Evaluando si se necesita más investigación...');
       
       const followUp = await generateFollowUpQuestions(findings, userQuery, signal);
       
@@ -6830,8 +6824,7 @@ async function executeDeepResearch(userQuery, conversation) {
           updateDeepResearchProgress(
             progressContainer, 
             currentProgress,
-            `Profundizando: ${fq.question.substring(0, 40)}...`,
-            calculateEstimatedTime(currentProgress, stepsCompleted, totalExpectedSteps)
+            `Profundizando: ${fq.question.substring(0, 40)}...`
           );
           
           const result = await investigateSubQuestion(
@@ -6865,7 +6858,7 @@ async function executeDeepResearch(userQuery, conversation) {
     
     // Fase 3: Sintetizar resultados
     checkCancelled();
-    updateDeepResearchProgress(progressContainer, 90, 'Generando informe final...', '~30s restantes');
+    updateDeepResearchProgress(progressContainer, 90, 'Generando informe final...');
     
     const finalReport = await synthesizeFindings(userQuery, findings, signal);
     
@@ -6878,37 +6871,40 @@ async function executeDeepResearch(userQuery, conversation) {
     const timeString = totalMinutes > 0 ? `${totalMinutes}m ${totalSeconds}s` : `${totalSeconds}s`;
     
     // Actualizar el mensaje con el informe final
-    updateDeepResearchProgress(progressContainer, 100, `✅ Completado en ${timeString}`, 'Listo');
+    updateDeepResearchProgress(progressContainer, 100, `✅ Completado en ${timeString}`);
     
     // Guardar el ID de la conversación actual para verificar después
     const currentConversationId = conversation.id;
     
-    // Reemplazar contenido con el informe final después de un momento
-    setTimeout(() => {
-      // Quitar el flag de investigación en progreso
-      assistantMessage.isDeepResearchInProgress = false;
-      
-      // Verificar que seguimos en la misma conversación antes de modificar el DOM
-      if (state.activeId !== currentConversationId || !document.body.contains(bubble)) {
-        // Solo guardar los datos sin modificar el DOM
-        assistantMessage.content = finalReport;
-        assistantMessage.deepResearch = {
-          query: userQuery,
-          findings: findings.length,
-          iterations: iteration
-        };
-        conversation.updatedAt = Date.now();
-        persistState();
+    // IMPORTANTE: Guardar los datos del mensaje INMEDIATAMENTE (antes de limpiar variables globales)
+    // Quitar el flag de investigación en progreso
+    assistantMessage.isDeepResearchInProgress = false;
+    assistantMessage.content = finalReport;
+    assistantMessage.deepResearch = {
+      query: userQuery,
+      findings: findings.length,
+      iterations: iteration
+    };
+    conversation.updatedAt = Date.now();
+    persistState();
+    
+    // Función para renderizar el informe final en el bubble
+    const renderFinalReport = () => {
+      // Si el usuario cambió de chat, re-renderizar se hará cuando vuelva (por appendMessageElement)
+      if (state.activeId !== currentConversationId) {
+        console.log('🔬 Deep Research completado en otro chat, el informe se mostrará al volver');
+        renderConversationList();
         return;
       }
       
-      assistantMessage.content = finalReport;
-      assistantMessage.deepResearch = {
-        query: userQuery,
-        findings: findings.length,
-        iterations: iteration
-      };
+      // Si el bubble ya no existe en el DOM, re-renderizar la conversación completa
+      if (!bubble || !document.body.contains(bubble)) {
+        console.log('🔬 Re-renderizando conversación con informe completado');
+        renderActiveConversation();
+        return;
+      }
       
+      // El usuario sigue en el chat y el bubble existe, actualizar directamente
       bubble.innerHTML = `
         <div class="deep-research-report">
           <div class="deep-research-report-header">
@@ -6954,11 +6950,12 @@ async function executeDeepResearch(userQuery, conversation) {
         });
       }
       
-      conversation.updatedAt = Date.now();
-      persistState();
       renderConversationList();
       scrollChatToBottom();
-    }, 1500);
+    };
+    
+    // Mostrar el informe después de un breve momento para que el usuario vea "Completado"
+    setTimeout(renderFinalReport, 1500);
     
   } catch (error) {
     // Quitar el flag de investigación en progreso
