@@ -568,17 +568,23 @@ function renderActiveConversation() {
 function showEmptyState() {
   if (emptyState) emptyState.style.display = 'flex';
   if (chatState) chatState.style.display = 'none';
-  // Mostrar botón incógnito del empty-state y ocultar el del chat
+  // Mostrar botones del empty-state y ocultar los del chat
   if (incognitoButtonEmpty) incognitoButtonEmpty.style.display = 'flex';
   if (incognitoButton) incognitoButton.style.display = 'none';
+  // Mostrar botón overlay del empty-state
+  const screenOverlayToggleEmpty = document.getElementById('screen-overlay-toggle-empty');
+  if (screenOverlayToggleEmpty) screenOverlayToggleEmpty.style.display = 'flex';
 }
 
 function showChatState() {
   if (emptyState) emptyState.style.display = 'none';
   if (chatState) chatState.style.display = 'flex';
-  // Ocultar botón incógnito del empty-state y mostrar el del chat
+  // Ocultar botones del empty-state y mostrar los del chat
   if (incognitoButtonEmpty) incognitoButtonEmpty.style.display = 'none';
   if (incognitoButton) incognitoButton.style.display = 'flex';
+  // Ocultar botón overlay del empty-state (ya hay uno en el chat header)
+  const screenOverlayToggleEmpty = document.getElementById('screen-overlay-toggle-empty');
+  if (screenOverlayToggleEmpty) screenOverlayToggleEmpty.style.display = 'none';
 }
 
 function renderConversationList() {

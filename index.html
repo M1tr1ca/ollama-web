@@ -693,7 +693,11 @@
           <div class="main-composer">
             <div id="file-drop-area" class="file-drop-area">
               <div class="file-drop-content">
-                <span class="file-drop-icon">📎</span>
+                <span class="file-drop-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                  </svg>
+                </span>
                 <span class="file-drop-text">Arrastra archivos aquí o haz clic para seleccionar</span>
                 <input type="file" id="file-input" multiple accept=".txt,.md,.json,.csv,.py,.js,.html,.css,.xml,.pdf,.jpg,.jpeg,.png,.gif,.webp" style="display: none;">
               </div>
@@ -726,9 +730,13 @@
                       </button>
                       <div class="chat-mode-slider"></div>
                     </div>
-                    <button type="button" class="input-icon-button" id="attach-file-btn" title="Adjuntar archivo">📎</button>
                   </div>
                   <div class="input-controls-right">
+                    <button type="button" class="input-icon-button attach-btn-minimal" id="attach-file-btn" title="Adjuntar archivo">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                    </button>
                     <div class="model-select-wrapper">
                       <select id="model-select" name="model" class="model-select"></select>
                     </div>
@@ -766,7 +774,11 @@
                 </svg>
               </button>
               <button id="attachments-badge" class="attachments-badge" type="button" title="Ver archivos adjuntos" style="display: none;">
-                <span class="attachments-icon">📎</span>
+                <span class="attachments-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                  </svg>
+                </span>
                 <span id="attachments-count" class="attachments-count">0</span>
               </button>
               <button id="rename-conversation" class="icon-button" type="button" title="Renombrar conversación">✎</button>
@@ -797,7 +809,11 @@
           <footer class="composer">
             <div id="file-drop-area-inline" class="file-drop-area">
               <div class="file-drop-content">
-                <span class="file-drop-icon">📎</span>
+                <span class="file-drop-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                  </svg>
+                </span>
                 <span class="file-drop-text">Arrastra archivos aquí o haz clic para seleccionar</span>
                 <input type="file" id="file-input-inline" multiple accept=".txt,.md,.json,.csv,.py,.js,.html,.css,.xml,.pdf,.jpg,.jpeg,.png,.gif,.webp" style="display: none;">
               </div>
@@ -830,9 +846,13 @@
                       </button>
                       <div class="chat-mode-slider"></div>
                     </div>
-                    <button type="button" class="input-icon-button" id="attach-file-btn-inline" title="Adjuntar archivo">📎</button>
                   </div>
                   <div class="input-controls-right">
+                    <button type="button" class="input-icon-button attach-btn-minimal" id="attach-file-btn-inline" title="Adjuntar archivo">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                    </button>
                     <div class="model-select-wrapper">
                       <select id="model-select-inline" name="model" class="model-select"></select>
                     </div>
