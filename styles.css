@@ -1353,7 +1353,7 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
 .input-wrapper {
   position: relative;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: none;
   border-radius: 26px;
   padding: 6px 20px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
@@ -1395,7 +1395,6 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   align-items: center;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .input-controls-left {
@@ -1844,8 +1843,11 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   overflow: hidden;
   position: relative;
   z-index: 10;
-  background: rgba(43, 43, 43, 0.3);
-  backdrop-filter: blur(10px);
+  background: rgba(43, 43, 43, 0.15);
+  backdrop-filter: blur(20px);
+  border-radius: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .chat-header {
@@ -1853,10 +1855,9 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   justify-content: space-between;
   align-items: center;
   padding: 12px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(43, 43, 43, 0.2);
-  backdrop-filter: blur(10px);
+  background: transparent;
   position: relative;
+  border: none;
 }
 
 .chat-header-left {
@@ -2091,7 +2092,7 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   padding: 24px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-  background: rgba(43, 43, 43, 0.2);
+  background: transparent;
 }
 
 .chat-area::-webkit-scrollbar {
@@ -2775,9 +2776,8 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
 
 .composer {
   padding: 16px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(43, 43, 43, 0.85);
-  backdrop-filter: blur(10px);
+  background: transparent;
+  border: none;
 }
 
 .composer .input-wrapper {
