@@ -653,6 +653,13 @@
       <div class="main-column">
         <div id="background-image" class="background-image"></div>
         <div id="empty-state-header" class="empty-state-header">
+          <button id="screen-overlay-toggle-empty" class="screen-overlay-button icon-button" title="Modo Overlay - Chat sobre otras apps">
+            <svg class="screen-overlay-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="12" y="11" width="10" height="8" rx="1" stroke="currentColor" stroke-width="1.5" fill="rgba(255,255,255,0.1)"/>
+              <circle cx="17" cy="15" r="1.5" fill="currentColor"/>
+            </svg>
+          </button>
           <button id="incognito-toggle-empty" class="incognito-button icon-button" title="Activar modo incógnito">
             <svg class="incognito-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <!-- Sombrero -->
@@ -751,6 +758,13 @@
               <h2 id="conversation-title">Nueva conversación</h2>
             </div>
             <div class="chat-actions">
+              <button id="screen-overlay-toggle" class="screen-overlay-button icon-button" title="Modo Overlay - Chat sobre otras apps">
+                <svg class="screen-overlay-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                  <rect x="12" y="11" width="10" height="8" rx="1" stroke="currentColor" stroke-width="1.5" fill="rgba(255,255,255,0.1)"/>
+                  <circle cx="17" cy="15" r="1.5" fill="currentColor"/>
+                </svg>
+              </button>
               <button id="attachments-badge" class="attachments-badge" type="button" title="Ver archivos adjuntos" style="display: none;">
                 <span class="attachments-icon">📎</span>
                 <span id="attachments-count" class="attachments-count">0</span>
@@ -831,6 +845,90 @@
         </div>
       </div>
     </div>
+    
+    <!-- Screen Overlay Mode - Chat flotante sobre otras apps -->
+    <div id="screen-overlay-container" class="screen-overlay-container" style="display: none;">
+      <div class="screen-overlay-panel">
+        <div class="screen-overlay-header">
+          <div class="screen-overlay-title">
+            <svg class="screen-overlay-icon-small" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/>
+            </svg>
+            <span>Chat con Captura</span>
+          </div>
+          <div class="screen-overlay-actions">
+            <button id="screen-overlay-capture" class="screen-overlay-btn capture-btn" title="Capturar pantalla (Ctrl+Shift+S)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+            <button id="screen-overlay-popout" class="screen-overlay-btn popout-btn" title="Abrir en ventana flotante (siempre visible)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="7" width="15" height="12" rx="2"/>
+                <path d="M17 2h5v5"/>
+                <path d="M14 10L22 2"/>
+              </svg>
+            </button>
+            <button id="screen-overlay-minimize" class="screen-overlay-btn" title="Minimizar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <button id="screen-overlay-close" class="screen-overlay-btn close-btn" title="Cerrar modo overlay">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        
+        <div class="screen-overlay-preview" id="screen-overlay-preview" style="display: none;">
+          <div class="preview-label">Captura actual:</div>
+          <img id="screen-overlay-preview-img" src="" alt="Captura de pantalla"/>
+          <button id="screen-overlay-clear-capture" class="clear-capture-btn" title="Eliminar captura">×</button>
+        </div>
+        
+        <div class="screen-overlay-messages" id="screen-overlay-messages">
+          <div class="screen-overlay-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <circle cx="12" cy="10" r="3"/>
+              <path d="M8 21l4-4 4 4"/>
+            </svg>
+            <p>Captura tu pantalla y pregunta sobre lo que ves</p>
+            <span class="hint">Presiona el botón de cámara o Ctrl+Shift+S para capturar</span>
+          </div>
+        </div>
+        
+        <div class="screen-overlay-input-container">
+          <div class="screen-overlay-input-wrapper">
+            <textarea id="screen-overlay-input" placeholder="Pregunta sobre lo que ves..." rows="1"></textarea>
+            <button id="screen-overlay-send" class="screen-overlay-send-btn" title="Enviar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="19" x2="12" y2="5"/>
+                <polyline points="5 12 12 5 19 12"/>
+              </svg>
+            </button>
+          </div>
+          <div class="screen-overlay-model-select">
+            <select id="screen-overlay-model-select"></select>
+          </div>
+        </div>
+      </div>
+      
+      <div class="screen-overlay-minimized" id="screen-overlay-minimized" style="display: none;">
+        <button id="screen-overlay-restore" class="screen-overlay-restore-btn" title="Restaurar chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    
     <script type="module" src="/app.js"></script>
   </body>
 </html>

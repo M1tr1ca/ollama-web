@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat con Captura - Ollama Web</title>
+  <link rel="icon" type="image/png" href="/assets/Fondo.png" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --theme-primary: #60a5fa;
+      --theme-primary-dark: #3b82f6;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: rgba(20, 20, 20, 0.98);
+      color: #f5f5f5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header */
+    .popup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      -webkit-app-region: drag;
+      user-select: none;
+    }
+
+    .popup-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .popup-title svg {
+      width: 18px;
+      height: 18px;
+      color: #60a5fa;
+    }
+
+    .popup-status {
+      font-size: 10px;
+      padding: 2px 8px;
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+
+    .popup-status.disconnected {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+
+    .popup-actions {
+      display: flex;
+      gap: 6px;
+      -webkit-app-region: no-drag;
+    }
+
+    .popup-btn {
+      width: 26px;
+      height: 26px;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .popup-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .popup-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.95);
+    }
+
+    .popup-btn.capture-btn {
+      background: rgba(96, 165, 250, 0.15);
+      color: #60a5fa;
+    }
+
+    .popup-btn.capture-btn:hover {
+      background: rgba(96, 165, 250, 0.25);
+      transform: scale(1.05);
+    }
+
+    .popup-btn.capture-btn.capturing {
+      animation: pulse-capture 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse-capture {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(96, 165, 250, 0); }
+    }
+
+    /* Preview */
+    .popup-preview {
+      padding: 8px 12px;
+      background: rgba(96, 165, 250, 0.08);
+      border-bottom: 1px solid rgba(96, 165, 250, 0.15);
+      position: relative;
+      display: none;
+    }
+
+    .popup-preview.visible {
+      display: block;
+    }
+
+    .popup-preview .preview-label {
+      font-size: 10px;
+      color: rgba(96, 165, 250, 0.9);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .popup-preview img {
+      width: 100%;
+      max-height: 80px;
+      object-fit: contain;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .popup-preview .clear-btn {
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      width: 18px;
+      height: 18px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.8);
+      color: white;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .popup-preview .clear-btn:hover {
+      background: #ef4444;
+    }
+
+    /* Messages */
+    .popup-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    }
+
+    .popup-messages::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .popup-messages::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+
+    .popup-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: rgba(255, 255, 255, 0.5);
+      text-align: center;
+      padding: 20px;
+    }
+
+    .popup-empty svg {
+      margin-bottom: 10px;
+      color: rgba(96, 165, 250, 0.5);
+    }
+
+    .popup-empty p {
+      font-size: 12px;
+      margin: 0;
+    }
+
+    .popup-empty .hint {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.4);
+      margin-top: 6px;
+    }
+
+    /* Message */
+    .popup-message {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .popup-message.user {
+      align-items: flex-end;
+    }
+
+    .popup-message.assistant {
+      align-items: flex-start;
+    }
+
+    .popup-message-content {
+      max-width: 95%;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.5;
+      word-wrap: break-word;
+    }
+
+    .popup-message.user .popup-message-content {
+      background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      color: white;
+      border-bottom-right-radius: 3px;
+    }
+
+    .popup-message.assistant .popup-message-content {
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.9);
+      border-bottom-left-radius: 3px;
+    }
+
+    .popup-message-image {
+      max-width: 100%;
+      max-height: 60px;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .popup-message-time {
+      font-size: 9px;
+      color: rgba(255, 255, 255, 0.4);
+      padding: 0 4px;
+    }
+
+    /* Loading */
+    .popup-loading {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      border-bottom-left-radius: 3px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 11px;
+    }
+
+    .popup-loading-dots {
+      display: flex;
+      gap: 3px;
+    }
+
+    .popup-loading-dots span {
+      width: 5px;
+      height: 5px;
+      background: #60a5fa;
+      border-radius: 50%;
+      animation: loading-pulse 1.4s infinite ease-in-out;
+    }
+
+    .popup-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .popup-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes loading-pulse {
+      0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+      30% { opacity: 1; transform: scale(1.1); }
+    }
+
+    /* Input */
+    .popup-input-container {
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .popup-input-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 6px 10px;
+      transition: all 0.2s ease;
+    }
+
+    .popup-input-wrapper:focus-within {
+      border-color: rgba(96, 165, 250, 0.4);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    #popup-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      line-height: 1.4;
+      resize: none;
+      outline: none;
+      min-height: 20px;
+      max-height: 80px;
+      font-family: inherit;
+    }
+
+    #popup-input::placeholder {
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .popup-send-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .popup-send-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .popup-send-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 10px rgba(96, 165, 250, 0.3);
+    }
+
+    .popup-send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .popup-model-select {
+      margin-top: 6px;
+    }
+
+    .popup-model-select select {
+      width: 100%;
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 11px;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10"><path fill="rgba(255,255,255,0.7)" d="M5 7L1 3h8z"/></svg>');
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+    }
+
+    /* Flash effect */
+    .capture-flash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: white;
+      z-index: 9999;
+      animation: flash 0.3s ease-out forwards;
+      pointer-events: none;
+    }
+
+    @keyframes flash {
+      0% { opacity: 0.7; }
+      100% { opacity: 0; }
+    }
+
+    /* Markdown content */
+    .popup-message-content code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 11px;
+    }
+
+    .popup-message-content pre {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 8px;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin: 6px 0;
+    }
+
+    .popup-message-content pre code {
+      background: none;
+      padding: 0;
+    }
+
+    .popup-message-content strong {
+      font-weight: 600;
+    }
+
+    .popup-message-content ul, .popup-message-content ol {
+      margin: 4px 0;
+      padding-left: 16px;
+    }
+
+    .popup-message-content p {
+      margin: 4px 0;
+    }
+
+    /* Always on top indicator */
+    .always-on-top-indicator {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: rgba(96, 165, 250, 0.8);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .always-on-top-indicator::before {
+      content: '📌';
+      font-size: 10px;
+    }
+
+    /* Indicador de modo captura */
+    .capture-mode-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      animation: fade-in 0.2s ease-out;
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .capture-mode-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 24px 32px;
+      background: rgba(30, 30, 30, 0.95);
+      border: 1px solid rgba(96, 165, 250, 0.3);
+      border-radius: 16px;
+      box-shadow: 0 0 40px rgba(96, 165, 250, 0.2);
+    }
+
+    .capture-mode-box svg {
+      color: #60a5fa;
+      animation: pulse-icon 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-icon {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.7; }
+    }
+
+    .capture-mode-box span {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 14px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="popup-header">
+    <div class="popup-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+      <span>Chat con Captura</span>
+      <span class="popup-status" id="popup-status">Conectado</span>
+    </div>
+    <div class="popup-actions">
+      <button class="popup-btn capture-btn" id="capture-btn" title="Capturar pantalla (Ctrl+Shift+S)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+      <button class="popup-btn" id="clear-chat-btn" title="Limpiar chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="popup-preview" id="preview">
+    <div class="preview-label">Captura actual:</div>
+    <img id="preview-img" src="" alt="Captura"/>
+    <button class="clear-btn" id="clear-preview-btn" title="Eliminar captura">×</button>
+  </div>
+
+  <div class="popup-messages" id="messages">
+    <div class="popup-empty" id="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <circle cx="12" cy="10" r="3"/>
+        <path d="M8 21l4-4 4 4"/>
+      </svg>
+      <p>Captura tu pantalla y pregunta sobre lo que ves</p>
+      <span class="hint">Esta ventana se mantiene visible sobre otras apps</span>
+    </div>
+  </div>
+
+  <div class="popup-input-container">
+    <div class="popup-input-wrapper">
+      <textarea id="popup-input" placeholder="Pregunta sobre lo que ves..." rows="1"></textarea>
+      <button class="popup-send-btn" id="send-btn" title="Enviar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="19" x2="12" y2="5"/>
+          <polyline points="5 12 12 5 19 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="popup-model-select">
+      <select id="model-select"></select>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:11434';
+    
+    // Estado
+    let currentCapture = null;
+    let messages = [];
+    let currentModel = null;
+    let isLoading = false;
+    let parentWindow = null;
+
+    // Elementos
+    const messagesContainer = document.getElementById('messages');
+    const emptyState = document.getElementById('empty-state');
+    const inputEl = document.getElementById('popup-input');
+    const sendBtn = document.getElementById('send-btn');
+    const captureBtn = document.getElementById('capture-btn');
+    const previewEl = document.getElementById('preview');
+    const previewImg = document.getElementById('preview-img');
+    const clearPreviewBtn = document.getElementById('clear-preview-btn');
+    const clearChatBtn = document.getElementById('clear-chat-btn');
+    const modelSelect = document.getElementById('model-select');
+    const statusEl = document.getElementById('popup-status');
+
+    // Inicializar
+    async function init() {
+      // Obtener referencia a la ventana padre
+      parentWindow = window.opener;
+      
+      // Cargar modelos
+      await loadModels();
+      
+      // Event listeners
+      captureBtn.addEventListener('click', captureScreen);
+      sendBtn.addEventListener('click', sendMessage);
+      clearPreviewBtn.addEventListener('click', clearCapture);
+      clearChatBtn.addEventListener('click', clearChat);
+      
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+      
+      inputEl.addEventListener('input', autoResize);
+      
+      modelSelect.addEventListener('change', (e) => {
+        currentModel = e.target.value;
+        // Sincronizar con la ventana padre si está disponible
+        if (parentWindow && !parentWindow.closed) {
+          try {
+            parentWindow.postMessage({ type: 'modelChange', model: currentModel }, '*');
+          } catch (e) {}
+        }
+      });
+      
+      // Escuchar mensajes de la ventana padre
+      window.addEventListener('message', handleParentMessage);
+      
+      // Atajos de teclado
+      document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.shiftKey && e.key === 'S') {
+          e.preventDefault();
+          captureScreen();
+        }
+      });
+      
+      // Verificar conexión periódicamente
+      setInterval(checkConnection, 5000);
+      checkConnection();
+      
+      // Enfocar input
+      inputEl.focus();
+    }
+
+    // Cargar modelos desde Ollama
+    async function loadModels() {
+      try {
+        const response = await fetch(`${API_BASE}/api/tags`);
+        if (!response.ok) throw new Error('Error al cargar modelos');
+        
+        const data = await response.json();
+        const models = data?.models ?? [];
+        
+        modelSelect.innerHTML = '';
+        models.forEach(model => {
+          const option = document.createElement('option');
+          option.value = model.name;
+          option.textContent = formatModelName(model.name);
+          modelSelect.appendChild(option);
+        });
+        
+        // Intentar obtener el modelo actual de la ventana padre
+        if (parentWindow && !parentWindow.closed) {
+          try {
+            parentWindow.postMessage({ type: 'getModel' }, '*');
+          } catch (e) {}
+        }
+        
+        // Si no hay modelo seleccionado, usar el primero
+        if (models.length > 0) {
+          currentModel = models[0].name;
+          modelSelect.value = currentModel;
+        }
+        
+        updateStatus(true);
+      } catch (error) {
+        console.error('Error loading models:', error);
+        modelSelect.innerHTML = '<option>Error al cargar</option>';
+        updateStatus(false);
+      }
+    }
+
+    function formatModelName(name) {
+      if (name.includes(':')) {
+        const parts = name.split(':');
+        const baseName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+        const tag = parts[1].toUpperCase().split('-')[0];
+        return `${baseName} ${tag}`;
+      }
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+
+    // Manejar mensajes de la ventana padre
+    function handleParentMessage(event) {
+      const data = event.data;
+      
+      if (data.type === 'setModel' && data.model) {
+        currentModel = data.model;
+        if (modelSelect.querySelector(`option[value="${data.model}"]`)) {
+          modelSelect.value = data.model;
+        }
+      }
+    }
+
+    // Capturar pantalla - INSTANTÁNEA sin grabar
+    async function captureScreen() {
+      try {
+        captureBtn.classList.add('capturing');
+        
+        // Ocultar completamente la ventana popup durante la captura
+        document.body.style.opacity = '0';
+        
+        // Pequeña espera para asegurar que esté oculta
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Mostrar indicador de modo captura
+        const indicator = document.createElement('div');
+        indicator.className = 'capture-mode-overlay';
+        indicator.innerHTML = `
+          <div class="capture-mode-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="40" height="40">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <span>Selecciona qué capturar</span>
+          </div>
+        `;
+        document.body.appendChild(indicator);
+        document.body.style.opacity = '1';
+        
+        try {
+          const stream = await navigator.mediaDevices.getDisplayMedia({
+            video: { 
+              cursor: 'always',
+              displaySurface: 'monitor'
+            },
+            audio: false,
+            preferCurrentTab: false,
+            selfBrowserSurface: 'exclude'
+          });
+          
+          // Quitar indicador
+          indicator.remove();
+          
+          // Capturar frame INSTANTÁNEAMENTE
+          const track = stream.getVideoTracks()[0];
+          const imageCapture = new ImageCapture(track);
+          const bitmap = await imageCapture.grabFrame();
+          
+          // DETENER INMEDIATAMENTE
+          stream.getTracks().forEach(track => track.stop());
+          
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(bitmap, 0, 0);
+          
+          currentCapture = canvas.toDataURL('image/png');
+          
+          // Mostrar preview
+          previewImg.src = currentCapture;
+          previewEl.classList.add('visible');
+          
+          // Flash
+          showFlash();
+          
+          inputEl.focus();
+          
+        } catch (innerError) {
+          indicator.remove();
+          throw innerError;
+        }
+        
+      } catch (error) {
+        console.error('Error capturando:', error);
+        document.body.style.opacity = '1';
+      } finally {
+        captureBtn.classList.remove('capturing');
+        document.body.style.opacity = '1';
+      }
+    }
+
+    // Mostrar flash
+    function showFlash() {
+      const flash = document.createElement('div');
+      flash.className = 'capture-flash';
+      document.body.appendChild(flash);
+      setTimeout(() => flash.remove(), 300);
+    }
+
+    // Limpiar captura
+    function clearCapture() {
+      currentCapture = null;
+      previewEl.classList.remove('visible');
+      previewImg.src = '';
+    }
+
+    // Limpiar chat
+    function clearChat() {
+      messages = [];
+      renderMessages();
+    }
+
+    // Enviar mensaje
+    async function sendMessage() {
+      const prompt = inputEl.value.trim();
+      if (!prompt && !currentCapture) return;
+      if (isLoading) return;
+      
+      // Añadir mensaje del usuario
+      const userMessage = {
+        role: 'user',
+        content: prompt || 'Describe lo que ves en esta imagen',
+        image: currentCapture,
+        timestamp: Date.now()
+      };
+      messages.push(userMessage);
+      
+      // Limpiar
+      inputEl.value = '';
+      autoResize();
+      const capturedImage = currentCapture;
+      clearCapture();
+      
+      renderMessages();
+      scrollToBottom();
+      
+      // Mostrar loading
+      showLoading();
+      isLoading = true;
+      sendBtn.disabled = true;
+      
+      try {
+        const apiMessages = [
+          {
+            role: 'system',
+            content: 'Eres un asistente visual experto. El usuario te enviará capturas de pantalla y preguntas. Responde de manera concisa pero completa.'
+          }
+        ];
+        
+        messages.forEach(msg => {
+          const apiMsg = { role: msg.role, content: msg.content };
+          if (msg.image && msg.role === 'user') {
+            const base64Part = msg.image.split(',')[1];
+            if (base64Part) apiMsg.images = [base64Part];
+          }
+          apiMessages.push(apiMsg);
+        });
+        
+        const response = await fetch(`${API_BASE}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: currentModel,
+            stream: true,
+            messages: apiMessages,
+            options: { num_ctx: 4096 }
+          })
+        });
+        
+        if (!response.ok) throw new Error(response.statusText);
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let assistantContent = '';
+        
+        const assistantMessage = {
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now()
+        };
+        messages.push(assistantMessage);
+        
+        hideLoading();
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line);
+              if (parsed.message?.content) {
+                assistantContent += parsed.message.content;
+                assistantMessage.content = assistantContent;
+                renderMessages();
+                scrollToBottom();
+              }
+            } catch (e) {}
+          }
+        }
+        
+      } catch (error) {
+        console.error('Error:', error);
+        hideLoading();
+        messages.push({
+          role: 'assistant',
+          content: `⚠️ Error: ${error.message}`,
+          timestamp: Date.now()
+        });
+        renderMessages();
+      } finally {
+        isLoading = false;
+        sendBtn.disabled = false;
+        inputEl.focus();
+      }
+    }
+
+    // Renderizar mensajes
+    function renderMessages() {
+      if (messages.length === 0) {
+        emptyState.style.display = 'flex';
+        return;
+      }
+      
+      emptyState.style.display = 'none';
+      
+      let html = '';
+      messages.forEach(msg => {
+        const time = formatTime(msg.timestamp);
+        const isUser = msg.role === 'user';
+        
+        html += `<div class="popup-message ${msg.role}">`;
+        
+        if (isUser && msg.image) {
+          html += `<img class="popup-message-image" src="${msg.image}" alt="Captura"/>`;
+        }
+        
+        const content = isUser ? escapeHtml(msg.content) : parseMarkdown(msg.content);
+        html += `<div class="popup-message-content">${content}</div>`;
+        html += `<span class="popup-message-time">${time}</span>`;
+        html += '</div>';
+      });
+      
+      // Mantener el empty state oculto
+      messagesContainer.innerHTML = html + '<div id="empty-state" class="popup-empty" style="display: none;"></div>';
+      
+      // Renderizar matemáticas si está disponible
+      if (typeof renderMathInElement !== 'undefined') {
+        renderMathInElement(messagesContainer, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+
+    function showLoading() {
+      const loading = document.createElement('div');
+      loading.className = 'popup-loading';
+      loading.id = 'loading';
+      loading.innerHTML = `
+        <span>Analizando...</span>
+        <div class="popup-loading-dots">
+          <span></span><span></span><span></span>
+        </div>
+      `;
+      messagesContainer.appendChild(loading);
+      scrollToBottom();
+    }
+
+    function hideLoading() {
+      const loading = document.getElementById('loading');
+      if (loading) loading.remove();
+    }
+
+    function scrollToBottom() {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function autoResize() {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 80) + 'px';
+    }
+
+    function formatTime(timestamp) {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function parseMarkdown(text) {
+      if (!text) return '';
+      if (typeof marked !== 'undefined') {
+        return marked.parse(text);
+      }
+      return text.replace(/\n/g, '<br>');
+    }
+
+    function checkConnection() {
+      fetch(`${API_BASE}/api/tags`)
+        .then(r => updateStatus(r.ok))
+        .catch(() => updateStatus(false));
+    }
+
+    function updateStatus(connected) {
+      if (connected) {
+        statusEl.textContent = 'Conectado';
+        statusEl.classList.remove('disconnected');
+      } else {
+        statusEl.textContent = 'Desconectado';
+        statusEl.classList.add('disconnected');
+      }
+    }
+
+    // Iniciar
+    init();
+  </script>
+</body>
+</html>

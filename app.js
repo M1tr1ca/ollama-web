@@ -5404,6 +5404,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initProjectSystem();
   initDashboard();
   initDeepResearch();
+  initScreenOverlay();
 });
 
 // ========================================
@@ -7662,4 +7663,741 @@ async function handleSubmitWithDeepResearch(event) {
 
 // Sobrescribir handleSubmit globalmente
 handleSubmit = handleSubmitWithDeepResearch;
+
+// ========================================
+// Screen Overlay Mode - Chat con Captura de Pantalla
+// ========================================
+
+let screenOverlayActive = false;
+let screenOverlayStream = null;
+let screenOverlayCapture = null; // Base64 de la captura actual
+let screenOverlayMessages = [];
+let screenOverlayDragging = false;
+let screenOverlayDragOffset = { x: 0, y: 0 };
+
+// Elementos del overlay
+const screenOverlayContainer = document.getElementById('screen-overlay-container');
+const screenOverlayPanel = document.querySelector('.screen-overlay-panel');
+const screenOverlayMessagesContainer = document.getElementById('screen-overlay-messages');
+const screenOverlayInput = document.getElementById('screen-overlay-input');
+const screenOverlaySendBtn = document.getElementById('screen-overlay-send');
+const screenOverlayModelSelect = document.getElementById('screen-overlay-model-select');
+const screenOverlayPreview = document.getElementById('screen-overlay-preview');
+const screenOverlayPreviewImg = document.getElementById('screen-overlay-preview-img');
+const screenOverlayMinimized = document.getElementById('screen-overlay-minimized');
+
+// Botones
+const screenOverlayToggle = document.getElementById('screen-overlay-toggle');
+const screenOverlayToggleEmpty = document.getElementById('screen-overlay-toggle-empty');
+const screenOverlayCaptureBtn = document.getElementById('screen-overlay-capture');
+const screenOverlayMinimizeBtn = document.getElementById('screen-overlay-minimize');
+const screenOverlayCloseBtn = document.getElementById('screen-overlay-close');
+const screenOverlayRestoreBtn = document.getElementById('screen-overlay-restore');
+const screenOverlayClearCaptureBtn = document.getElementById('screen-overlay-clear-capture');
+const screenOverlayPopoutBtn = document.getElementById('screen-overlay-popout');
+
+// Variable para la ventana popup
+let screenOverlayPopupWindow = null;
+
+// Inicializar Screen Overlay
+function initScreenOverlay() {
+  // Toggle buttons
+  screenOverlayToggle?.addEventListener('click', toggleScreenOverlay);
+  screenOverlayToggleEmpty?.addEventListener('click', toggleScreenOverlay);
+  
+  // Panel buttons
+  screenOverlayCaptureBtn?.addEventListener('click', captureScreen);
+  screenOverlayMinimizeBtn?.addEventListener('click', minimizeScreenOverlay);
+  screenOverlayCloseBtn?.addEventListener('click', closeScreenOverlay);
+  screenOverlayRestoreBtn?.addEventListener('click', restoreScreenOverlay);
+  screenOverlayClearCaptureBtn?.addEventListener('click', clearScreenCapture);
+  screenOverlayPopoutBtn?.addEventListener('click', popoutScreenOverlay);
+  
+  // Send button
+  screenOverlaySendBtn?.addEventListener('click', sendScreenOverlayMessage);
+  
+  // Input handling
+  screenOverlayInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendScreenOverlayMessage();
+    }
+  });
+  
+  screenOverlayInput?.addEventListener('input', () => {
+    autoResizeOverlayTextarea();
+  });
+  
+  // Dragging functionality
+  const header = document.querySelector('.screen-overlay-header');
+  if (header && screenOverlayPanel) {
+    header.addEventListener('mousedown', startDragging);
+    document.addEventListener('mousemove', handleDragging);
+    document.addEventListener('mouseup', stopDragging);
+  }
+  
+  // Keyboard shortcut for capture
+  document.addEventListener('keydown', (e) => {
+    // Ctrl+Shift+S para capturar cuando el overlay está activo
+    if (e.ctrlKey && e.shiftKey && e.key === 'S' && screenOverlayActive) {
+      e.preventDefault();
+      captureScreen();
+    }
+    // Escape para cerrar el overlay
+    if (e.key === 'Escape' && screenOverlayActive) {
+      closeScreenOverlay();
+    }
+  });
+  
+  // Sync models
+  syncOverlayModels();
+}
+
+// Sincronizar modelos con el selector principal
+function syncOverlayModels() {
+  if (!screenOverlayModelSelect || !modelSelect) return;
+  
+  // Copiar opciones del selector principal
+  screenOverlayModelSelect.innerHTML = modelSelect.innerHTML;
+  screenOverlayModelSelect.value = modelSelect.value;
+  
+  // Mantener sincronizado
+  screenOverlayModelSelect.addEventListener('change', (e) => {
+    state.currentModel = e.target.value;
+    modelSelect.value = e.target.value;
+    if (modelSelectInline) modelSelectInline.value = e.target.value;
+    persistState();
+  });
+}
+
+// Toggle Screen Overlay Mode
+function toggleScreenOverlay() {
+  if (screenOverlayActive) {
+    closeScreenOverlay();
+  } else {
+    openScreenOverlay();
+  }
+}
+
+// Abrir Screen Overlay
+async function openScreenOverlay() {
+  screenOverlayActive = true;
+  
+  // Sincronizar modelos antes de mostrar
+  syncOverlayModels();
+  
+  // Mostrar el overlay
+  if (screenOverlayContainer) {
+    screenOverlayContainer.style.display = 'block';
+  }
+  if (screenOverlayPanel) {
+    screenOverlayPanel.style.display = 'flex';
+  }
+  if (screenOverlayMinimized) {
+    screenOverlayMinimized.style.display = 'none';
+  }
+  
+  // Actualizar botones
+  [screenOverlayToggle, screenOverlayToggleEmpty].forEach(btn => {
+    if (btn) btn.classList.add('active');
+  });
+  
+  // Limpiar mensajes anteriores
+  screenOverlayMessages = [];
+  renderOverlayMessages();
+  
+  // Enfocar input
+  setTimeout(() => {
+    screenOverlayInput?.focus();
+  }, 100);
+  
+  // Mostrar notificación de instrucciones
+  showScreenCaptureNotification('Modo Overlay activado - Captura tu pantalla para empezar');
+}
+
+// Cerrar Screen Overlay
+function closeScreenOverlay() {
+  screenOverlayActive = false;
+  
+  // Detener cualquier stream de pantalla
+  if (screenOverlayStream) {
+    screenOverlayStream.getTracks().forEach(track => track.stop());
+    screenOverlayStream = null;
+  }
+  
+  // Ocultar overlay
+  if (screenOverlayContainer) {
+    screenOverlayContainer.style.display = 'none';
+  }
+  
+  // Limpiar captura
+  clearScreenCapture();
+  
+  // Actualizar botones
+  [screenOverlayToggle, screenOverlayToggleEmpty].forEach(btn => {
+    if (btn) btn.classList.remove('active');
+  });
+}
+
+// Abrir el overlay en una ventana popup independiente
+function popoutScreenOverlay() {
+  // Si ya hay una ventana popup abierta, darle foco
+  if (screenOverlayPopupWindow && !screenOverlayPopupWindow.closed) {
+    screenOverlayPopupWindow.focus();
+    return;
+  }
+  
+  // Calcular tamaño y posición de la ventana
+  const width = 400;
+  const height = 550;
+  const left = window.screen.width - width - 50;
+  const top = 100;
+  
+  // Características de la ventana
+  const features = [
+    `width=${width}`,
+    `height=${height}`,
+    `left=${left}`,
+    `top=${top}`,
+    'resizable=yes',
+    'scrollbars=no',
+    'status=no',
+    'menubar=no',
+    'toolbar=no',
+    'location=no'
+  ].join(',');
+  
+  // Abrir la ventana popup
+  screenOverlayPopupWindow = window.open('overlay-popup.html', 'OllamaOverlay', features);
+  
+  if (screenOverlayPopupWindow) {
+    // Cerrar el overlay dentro de la app principal
+    closeScreenOverlay();
+    
+    // Escuchar mensajes de la ventana popup
+    window.addEventListener('message', handlePopupMessage);
+    
+    // Enviar el modelo actual cuando la ventana esté lista
+    screenOverlayPopupWindow.addEventListener('load', () => {
+      if (state.currentModel) {
+        screenOverlayPopupWindow.postMessage({ type: 'setModel', model: state.currentModel }, '*');
+      }
+    });
+    
+    // Monitorear si la ventana se cierra
+    const checkPopup = setInterval(() => {
+      if (screenOverlayPopupWindow && screenOverlayPopupWindow.closed) {
+        clearInterval(checkPopup);
+        screenOverlayPopupWindow = null;
+        window.removeEventListener('message', handlePopupMessage);
+      }
+    }, 500);
+    
+    // Notificación
+    showScreenCaptureNotification('Chat abierto en ventana flotante - Siempre visible');
+  } else {
+    // Si no se pudo abrir (popup bloqueado), mostrar error
+    showScreenCaptureNotification('⚠️ Permite ventanas emergentes para esta función');
+  }
+}
+
+// Manejar mensajes del popup
+function handlePopupMessage(event) {
+  const data = event.data;
+  
+  if (data.type === 'getModel') {
+    // El popup solicita el modelo actual
+    if (screenOverlayPopupWindow && !screenOverlayPopupWindow.closed && state.currentModel) {
+      screenOverlayPopupWindow.postMessage({ type: 'setModel', model: state.currentModel }, '*');
+    }
+  } else if (data.type === 'modelChange') {
+    // El popup cambió el modelo, sincronizar
+    if (data.model) {
+      state.currentModel = data.model;
+      if (modelSelect) modelSelect.value = data.model;
+      if (modelSelectInline) modelSelectInline.value = data.model;
+      if (screenOverlayModelSelect) screenOverlayModelSelect.value = data.model;
+      persistState();
+    }
+  }
+}
+
+// Minimizar overlay
+function minimizeScreenOverlay() {
+  if (screenOverlayPanel) {
+    screenOverlayPanel.style.display = 'none';
+  }
+  if (screenOverlayMinimized) {
+    screenOverlayMinimized.style.display = 'block';
+  }
+}
+
+// Restaurar overlay
+function restoreScreenOverlay() {
+  if (screenOverlayPanel) {
+    screenOverlayPanel.style.display = 'flex';
+  }
+  if (screenOverlayMinimized) {
+    screenOverlayMinimized.style.display = 'none';
+  }
+  
+  // Enfocar input
+  setTimeout(() => {
+    screenOverlayInput?.focus();
+  }, 100);
+}
+
+// Capturar pantalla
+async function captureScreen() {
+  try {
+    // Añadir clase de animación al botón
+    if (screenOverlayCaptureBtn) {
+      screenOverlayCaptureBtn.classList.add('capturing');
+    }
+    
+    // OCULTAR COMPLETAMENTE el panel antes de capturar
+    const panelOriginalDisplay = screenOverlayPanel?.style.display;
+    const containerOriginalDisplay = screenOverlayContainer?.style.display;
+    
+    if (screenOverlayPanel) {
+      screenOverlayPanel.style.display = 'none';
+    }
+    
+    // Pequeña espera para asegurar que el panel esté oculto
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Crear un indicador visual de que estamos en modo captura
+    const captureIndicator = document.createElement('div');
+    captureIndicator.className = 'capture-mode-indicator';
+    captureIndicator.innerHTML = `
+      <div class="capture-mode-content">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <span>Selecciona qué capturar</span>
+      </div>
+    `;
+    document.body.appendChild(captureIndicator);
+    
+    try {
+      // Solicitar captura de pantalla - el usuario selecciona qué capturar
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          cursor: 'always',
+          displaySurface: 'monitor' // Preferir pantalla completa
+        },
+        audio: false,
+        preferCurrentTab: false,
+        selfBrowserSurface: 'exclude', // Excluir la pestaña actual si es posible
+        systemAudio: 'exclude'
+      });
+      
+      // Quitar indicador
+      captureIndicator.remove();
+      
+      // Capturar un frame INSTANTÁNEAMENTE
+      const track = stream.getVideoTracks()[0];
+      const imageCapture = new ImageCapture(track);
+      const bitmap = await imageCapture.grabFrame();
+      
+      // DETENER INMEDIATAMENTE - no seguir grabando
+      stream.getTracks().forEach(track => track.stop());
+      
+      // Convertir a canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(bitmap, 0, 0);
+      
+      // Convertir a base64
+      screenOverlayCapture = canvas.toDataURL('image/png');
+      
+      // Restaurar panel
+      if (screenOverlayPanel) {
+        screenOverlayPanel.style.display = 'flex';
+      }
+      
+      // Mostrar preview
+      if (screenOverlayPreview && screenOverlayPreviewImg) {
+        screenOverlayPreviewImg.src = screenOverlayCapture;
+        screenOverlayPreview.style.display = 'block';
+      }
+      
+      // Efecto flash
+      showCaptureFlash();
+      
+      // Notificación
+      showScreenCaptureNotification('📸 ¡Captura lista! Escribe tu pregunta');
+      
+      // Enfocar input
+      screenOverlayInput?.focus();
+      
+    } catch (innerError) {
+      // El usuario canceló o hubo error - quitar indicador y restaurar
+      captureIndicator.remove();
+      throw innerError;
+    }
+    
+  } catch (error) {
+    console.error('Error al capturar pantalla:', error);
+    
+    // Restaurar panel
+    if (screenOverlayPanel) {
+      screenOverlayPanel.style.display = 'flex';
+    }
+    
+    if (error.name !== 'NotAllowedError') {
+      showScreenCaptureNotification('Error al capturar - Inténtalo de nuevo');
+    }
+  } finally {
+    // Quitar animación del botón
+    if (screenOverlayCaptureBtn) {
+      screenOverlayCaptureBtn.classList.remove('capturing');
+    }
+  }
+}
+
+// Limpiar captura
+function clearScreenCapture() {
+  screenOverlayCapture = null;
+  if (screenOverlayPreview) {
+    screenOverlayPreview.style.display = 'none';
+  }
+  if (screenOverlayPreviewImg) {
+    screenOverlayPreviewImg.src = '';
+  }
+}
+
+// Mostrar flash de captura
+function showCaptureFlash() {
+  const flash = document.createElement('div');
+  flash.className = 'screen-capture-flash';
+  document.body.appendChild(flash);
+  
+  setTimeout(() => {
+    flash.remove();
+  }, 300);
+}
+
+// Mostrar notificación
+function showScreenCaptureNotification(message) {
+  // Remover notificación existente
+  const existing = document.querySelector('.screen-capture-notification');
+  if (existing) existing.remove();
+  
+  const notification = document.createElement('div');
+  notification.className = 'screen-capture-notification';
+  notification.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+    <span>${escapeHtml(message)}</span>
+  `;
+  
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateX(-50%) translateY(20px)';
+    setTimeout(() => notification.remove(), 300);
+  }, 2500);
+}
+
+// Enviar mensaje en el overlay
+async function sendScreenOverlayMessage() {
+  const prompt = screenOverlayInput?.value.trim();
+  if (!prompt && !screenOverlayCapture) return;
+  
+  // Verificar que hay un modelo seleccionado
+  if (!state.currentModel) {
+    showScreenCaptureNotification('Selecciona un modelo primero');
+    return;
+  }
+  
+  // Añadir mensaje del usuario
+  const userMessage = {
+    role: 'user',
+    content: prompt || 'Describe lo que ves en esta imagen',
+    image: screenOverlayCapture,
+    timestamp: Date.now()
+  };
+  screenOverlayMessages.push(userMessage);
+  
+  // Limpiar input
+  if (screenOverlayInput) {
+    screenOverlayInput.value = '';
+    autoResizeOverlayTextarea();
+  }
+  
+  // Guardar la captura y limpiarla de la preview
+  const capturedImage = screenOverlayCapture;
+  clearScreenCapture();
+  
+  // Renderizar mensajes
+  renderOverlayMessages();
+  scrollOverlayToBottom();
+  
+  // Mostrar loading
+  showOverlayLoading();
+  
+  // Deshabilitar envío mientras procesa
+  if (screenOverlaySendBtn) screenOverlaySendBtn.disabled = true;
+  
+  try {
+    // Preparar mensajes para la API
+    const apiMessages = [];
+    
+    // Añadir contexto del sistema
+    apiMessages.push({
+      role: 'system',
+      content: 'Eres un asistente visual experto. El usuario te enviará capturas de pantalla y preguntas sobre lo que ve. Responde de manera concisa pero completa, describiendo y analizando lo que se muestra en las imágenes.'
+    });
+    
+    // Construir historial de mensajes
+    screenOverlayMessages.forEach(msg => {
+      const apiMsg = {
+        role: msg.role,
+        content: msg.content
+      };
+      
+      // Si hay imagen, añadirla
+      if (msg.image && msg.role === 'user') {
+        // Extraer solo la parte base64
+        const base64Part = msg.image.split(',')[1];
+        if (base64Part) {
+          apiMsg.images = [base64Part];
+        }
+      }
+      
+      apiMessages.push(apiMsg);
+    });
+    
+    // Hacer la petición
+    const response = await fetch(`${API_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: state.currentModel,
+        stream: true,
+        messages: apiMessages,
+        options: {
+          num_ctx: 4096
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
+    
+    // Procesar stream
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let assistantContent = '';
+    
+    // Añadir mensaje del asistente vacío
+    const assistantMessage = {
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now()
+    };
+    screenOverlayMessages.push(assistantMessage);
+    
+    // Ocultar loading
+    hideOverlayLoading();
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        
+        try {
+          const parsed = JSON.parse(line);
+          
+          if (parsed.message?.content) {
+            assistantContent += parsed.message.content;
+            assistantMessage.content = assistantContent;
+            renderOverlayMessages();
+            scrollOverlayToBottom();
+          }
+          
+          if (parsed.done) {
+            break;
+          }
+        } catch (e) {
+          console.warn('Error parsing stream chunk', e);
+        }
+      }
+    }
+    
+    // Actualizar estadísticas
+    trackModelUsage(state.currentModel);
+    trackDailyMessage();
+    
+  } catch (error) {
+    console.error('Error en overlay chat:', error);
+    
+    // Añadir mensaje de error
+    screenOverlayMessages.push({
+      role: 'assistant',
+      content: `⚠️ Error: ${error.message}`,
+      timestamp: Date.now()
+    });
+    
+    hideOverlayLoading();
+    renderOverlayMessages();
+  } finally {
+    if (screenOverlaySendBtn) screenOverlaySendBtn.disabled = false;
+    screenOverlayInput?.focus();
+  }
+}
+
+// Renderizar mensajes del overlay
+function renderOverlayMessages() {
+  if (!screenOverlayMessagesContainer) return;
+  
+  if (screenOverlayMessages.length === 0) {
+    screenOverlayMessagesContainer.innerHTML = `
+      <div class="screen-overlay-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+          <rect x="2" y="3" width="20" height="14" rx="2"/>
+          <circle cx="12" cy="10" r="3"/>
+          <path d="M8 21l4-4 4 4"/>
+        </svg>
+        <p>Captura tu pantalla y pregunta sobre lo que ves</p>
+        <span class="hint">Presiona el botón de cámara o Ctrl+Shift+S para capturar</span>
+      </div>
+    `;
+    return;
+  }
+  
+  let html = '';
+  
+  screenOverlayMessages.forEach(msg => {
+    const time = formatTime(msg.timestamp);
+    const isUser = msg.role === 'user';
+    
+    html += `<div class="screen-overlay-message ${msg.role}">`;
+    
+    // Si es mensaje del usuario con imagen
+    if (isUser && msg.image) {
+      html += `<img class="screen-overlay-message-image" src="${msg.image}" alt="Captura"/>`;
+    }
+    
+    // Contenido del mensaje
+    const content = isUser ? escapeHtml(msg.content) : parseMarkdown(msg.content);
+    html += `<div class="screen-overlay-message-content">${content}</div>`;
+    
+    // Hora
+    html += `<span class="screen-overlay-message-time">${time}</span>`;
+    
+    html += '</div>';
+  });
+  
+  screenOverlayMessagesContainer.innerHTML = html;
+  
+  // Renderizar matemáticas
+  if (typeof renderMathInElement !== 'undefined') {
+    renderMathInElement(screenOverlayMessagesContainer, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false}
+      ],
+      throwOnError: false
+    });
+  }
+}
+
+// Mostrar loading en el overlay
+function showOverlayLoading() {
+  const loading = document.createElement('div');
+  loading.className = 'screen-overlay-loading';
+  loading.id = 'screen-overlay-loading';
+  loading.innerHTML = `
+    <span>Analizando...</span>
+    <div class="screen-overlay-loading-dots">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  `;
+  screenOverlayMessagesContainer?.appendChild(loading);
+  scrollOverlayToBottom();
+}
+
+// Ocultar loading
+function hideOverlayLoading() {
+  const loading = document.getElementById('screen-overlay-loading');
+  if (loading) loading.remove();
+}
+
+// Scroll al final
+function scrollOverlayToBottom() {
+  if (screenOverlayMessagesContainer) {
+    screenOverlayMessagesContainer.scrollTop = screenOverlayMessagesContainer.scrollHeight;
+  }
+}
+
+// Auto resize textarea
+function autoResizeOverlayTextarea() {
+  if (!screenOverlayInput) return;
+  screenOverlayInput.style.height = 'auto';
+  screenOverlayInput.style.height = Math.min(screenOverlayInput.scrollHeight, 120) + 'px';
+}
+
+// Dragging del panel
+function startDragging(e) {
+  if (e.target.closest('.screen-overlay-btn')) return;
+  
+  screenOverlayDragging = true;
+  const rect = screenOverlayPanel.getBoundingClientRect();
+  screenOverlayDragOffset = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+  
+  screenOverlayPanel.style.cursor = 'grabbing';
+  e.preventDefault();
+}
+
+function handleDragging(e) {
+  if (!screenOverlayDragging || !screenOverlayPanel) return;
+  
+  const x = e.clientX - screenOverlayDragOffset.x;
+  const y = e.clientY - screenOverlayDragOffset.y;
+  
+  // Limitar a la ventana
+  const maxX = window.innerWidth - screenOverlayPanel.offsetWidth;
+  const maxY = window.innerHeight - screenOverlayPanel.offsetHeight;
+  
+  screenOverlayPanel.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+  screenOverlayPanel.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+  screenOverlayPanel.style.right = 'auto';
+  screenOverlayPanel.style.bottom = 'auto';
+}
+
+function stopDragging() {
+  screenOverlayDragging = false;
+  if (screenOverlayPanel) {
+    screenOverlayPanel.style.cursor = '';
+  }
+}
+
+// También inicializar después de cargar modelos
+const originalLoadModels = loadModels;
+loadModels = async function() {
+  await originalLoadModels.call(this);
+  syncOverlayModels();
+};
+
 
