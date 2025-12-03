@@ -4907,3 +4907,354 @@ button.research-active-btn svg {
     text-align: center;
   }
 }
+
+/* ========================================
+   Sistema de Información de Contexto para Proyectos
+   ======================================== */
+
+.context-info-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.context-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.context-model-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.context-model-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.context-model-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.context-model-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.context-model-capacity {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.context-refresh-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.context-refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.context-refresh-btn.loading svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Barra de uso de contexto */
+.context-usage-bar-container {
+  margin-bottom: 16px;
+}
+
+.context-usage-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.context-usage-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease, background 0.3s ease;
+  background: linear-gradient(90deg, #22c55e, #4ade80);
+  width: 0%;
+}
+
+.context-usage-fill.warning {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.context-usage-fill.danger {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.context-usage-fill.critical {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+  animation: pulse-danger 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-danger {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.context-usage-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.context-usage-percent {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Desglose de tokens */
+.context-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.context-breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.breakdown-icon {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+}
+
+.breakdown-label {
+  color: rgba(255, 255, 255, 0.6);
+  flex: 1;
+}
+
+.breakdown-value {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Advertencia de contexto */
+.context-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.warning-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.warning-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.warning-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ef4444;
+}
+
+.warning-message {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
+/* Sugerencia de modelo */
+.context-suggestion {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 8px;
+}
+
+.suggestion-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.suggestion-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.suggestion-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.suggested-models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.suggested-model-btn {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #4ade80;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.suggested-model-btn:hover {
+  background: rgba(34, 197, 94, 0.25);
+  border-color: rgba(34, 197, 94, 0.5);
+}
+
+.suggested-model-btn .model-ctx {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+}
+
+.section-label-icon {
+  margin-right: 6px;
+}
+
+/* Animación de carga para la info de contexto */
+.context-info-card.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.context-info-card.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes context-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Indicador compacto de contexto en el badge del proyecto */
+.project-context-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.context-mini-bar {
+  width: 40px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.context-mini-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s ease;
+  background: #4ade80;
+  width: 0%;
+}
+
+.context-mini-fill.warning {
+  background: #fbbf24;
+}
+
+.context-mini-fill.danger {
+  background: #f87171;
+}
+
+.context-mini-fill.critical {
+  background: #ef4444;
+  animation: pulse-mini 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-mini {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.context-mini-text {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* Colores del texto según el nivel de uso */
+.context-mini-text.warning {
+  color: #fbbf24;
+}
+
+.context-mini-text.danger {
+  color: #f87171;
+}
+
+.context-mini-text.critical {
+  color: #ef4444;
+}

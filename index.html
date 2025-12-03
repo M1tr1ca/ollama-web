@@ -478,6 +478,79 @@
                   <div id="project-files-list" class="project-files-list"></div>
                 </div>
               </div>
+              
+              <!-- Sección de información de contexto del modelo -->
+              <div class="personalization-section" id="project-context-info-section">
+                <label class="section-label">
+                  <span class="section-label-icon">📊</span>
+                  Uso de contexto del modelo
+                </label>
+                <div class="context-info-card" id="project-context-info">
+                  <div class="context-info-header">
+                    <div class="context-model-info">
+                      <span class="context-model-icon">🤖</span>
+                      <div class="context-model-details">
+                        <span class="context-model-name" id="context-model-name">Selecciona un modelo</span>
+                        <span class="context-model-capacity" id="context-model-capacity">-- tokens disponibles</span>
+                      </div>
+                    </div>
+                    <button type="button" class="context-refresh-btn" id="context-refresh-btn" title="Actualizar información">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 4v6h6M23 20v-6h-6"/>
+                        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  <!-- Barra de progreso de uso de contexto -->
+                  <div class="context-usage-bar-container">
+                    <div class="context-usage-bar" id="context-usage-bar">
+                      <div class="context-usage-fill" id="context-usage-fill"></div>
+                    </div>
+                    <div class="context-usage-labels">
+                      <span class="context-usage-used" id="context-usage-used">0 tokens usados</span>
+                      <span class="context-usage-percent" id="context-usage-percent">0%</span>
+                    </div>
+                  </div>
+                  
+                  <!-- Desglose de tokens -->
+                  <div class="context-breakdown" id="context-breakdown">
+                    <div class="context-breakdown-item">
+                      <span class="breakdown-icon">📝</span>
+                      <span class="breakdown-label">Instrucciones:</span>
+                      <span class="breakdown-value" id="breakdown-instructions">0 tokens</span>
+                    </div>
+                    <div class="context-breakdown-item">
+                      <span class="breakdown-icon">📄</span>
+                      <span class="breakdown-label">Documentos:</span>
+                      <span class="breakdown-value" id="breakdown-documents">0 tokens</span>
+                    </div>
+                    <div class="context-breakdown-item">
+                      <span class="breakdown-icon">💬</span>
+                      <span class="breakdown-label">Reserva para chat:</span>
+                      <span class="breakdown-value" id="breakdown-chat">~2000 tokens</span>
+                    </div>
+                  </div>
+                  
+                  <!-- Advertencia si se excede el límite -->
+                  <div class="context-warning" id="context-warning" style="display: none;">
+                    <span class="warning-icon">⚠️</span>
+                    <div class="warning-content">
+                      <span class="warning-title" id="warning-title">Contexto excedido</span>
+                      <span class="warning-message" id="warning-message">El contenido supera la capacidad del modelo. Considera usar un modelo con más contexto o reducir los archivos.</span>
+                    </div>
+                  </div>
+                  
+                  <!-- Sugerencia de modelo alternativo -->
+                  <div class="context-suggestion" id="context-suggestion" style="display: none;">
+                    <span class="suggestion-icon">💡</span>
+                    <div class="suggestion-content">
+                      <span class="suggestion-text" id="suggestion-text">Modelos compatibles con tu contenido:</span>
+                      <div class="suggested-models" id="suggested-models"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="modal-footer">
               <button class="modal-button secondary" id="cancel-project">Cancelar</button>
@@ -597,6 +670,12 @@
           <div id="project-badge-empty" class="project-badge project-badge-floating" style="display: none;">
             <span class="project-badge-icon">📂</span>
             <span id="project-badge-name-empty" class="project-badge-name"></span>
+            <span class="project-context-indicator" id="project-context-indicator-empty" title="Uso de contexto">
+              <span class="context-mini-bar">
+                <span class="context-mini-fill" id="context-mini-fill-empty"></span>
+              </span>
+              <span class="context-mini-text" id="context-mini-text-empty">0%</span>
+            </span>
           </div>
           
           <div class="greeting">
@@ -662,6 +741,12 @@
               <div id="project-badge" class="project-badge" style="display: none;">
                 <span class="project-badge-icon">📂</span>
                 <span id="project-badge-name" class="project-badge-name"></span>
+                <span class="project-context-indicator" id="project-context-indicator" title="Uso de contexto">
+                  <span class="context-mini-bar">
+                    <span class="context-mini-fill" id="context-mini-fill"></span>
+                  </span>
+                  <span class="context-mini-text" id="context-mini-text">0%</span>
+                </span>
               </div>
               <h2 id="conversation-title">Nueva conversación</h2>
             </div>

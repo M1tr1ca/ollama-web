@@ -5676,10 +5676,73 @@ function updateProjectBadge() {
       badgeNameEmpty.textContent = project.name;
       badgeEmpty.style.display = 'flex';
     }
+    
+    // Actualizar indicadores compactos de contexto
+    updateCompactContextIndicators(project);
   } else {
     // Ocultar ambos badges
     if (badge) badge.style.display = 'none';
     if (badgeEmpty) badgeEmpty.style.display = 'none';
+  }
+}
+
+// Actualizar los indicadores compactos de contexto en los badges
+async function updateCompactContextIndicators(project) {
+  if (!project) return;
+  
+  try {
+    // Obtener info del modelo actual
+    const currentModel = state.currentModel;
+    if (!currentModel) return;
+    
+    const modelInfo = await getModelContextInfo(currentModel);
+    const contextLength = modelInfo?.contextLength || MODEL_CONTEXT_DEFAULTS?.default || 4096;
+    
+    // Calcular tokens del proyecto
+    const tokenUsage = calculateProjectTokens(project.instructions || '', project.files || []);
+    const chatReserve = 2000;
+    const totalWithReserve = tokenUsage.total + chatReserve;
+    const usagePercent = Math.min(100, Math.round((totalWithReserve / contextLength) * 100));
+    
+    // Actualizar ambos indicadores (chat header y empty state)
+    const indicators = [
+      {
+        fill: document.getElementById('context-mini-fill'),
+        text: document.getElementById('context-mini-text')
+      },
+      {
+        fill: document.getElementById('context-mini-fill-empty'),
+        text: document.getElementById('context-mini-text-empty')
+      }
+    ];
+    
+    indicators.forEach(({ fill, text }) => {
+      if (fill) {
+        fill.style.width = `${usagePercent}%`;
+        fill.classList.remove('warning', 'danger', 'critical');
+        if (usagePercent >= 100) {
+          fill.classList.add('critical');
+        } else if (usagePercent >= 85) {
+          fill.classList.add('danger');
+        } else if (usagePercent >= 70) {
+          fill.classList.add('warning');
+        }
+      }
+      
+      if (text) {
+        text.textContent = `${usagePercent}%`;
+        text.classList.remove('warning', 'danger', 'critical');
+        if (usagePercent >= 100) {
+          text.classList.add('critical');
+        } else if (usagePercent >= 85) {
+          text.classList.add('danger');
+        } else if (usagePercent >= 70) {
+          text.classList.add('warning');
+        }
+      }
+    });
+  } catch (error) {
+    console.warn('Error al actualizar indicadores de contexto:', error);
   }
 }
 
@@ -5779,6 +5842,10 @@ function renderProjectFiles() {
       const fileId = btn.dataset.fileId;
       projectsState.tempProjectFiles = projectsState.tempProjectFiles.filter(f => f.id !== fileId);
       renderProjectFiles();
+      // Actualizar info de contexto después de eliminar
+      if (typeof updateProjectContextInfo === 'function') {
+        updateProjectContextInfo();
+      }
     });
   });
 }
@@ -5812,7 +5879,13 @@ function openProjectModal(projectId = null) {
   
   renderProjectFiles();
   modal.style.display = 'flex';
-  setTimeout(() => nameInput.focus(), 100);
+  setTimeout(() => {
+    nameInput.focus();
+    // Actualizar info de contexto cuando se abre el modal
+    if (typeof updateProjectContextInfo === 'function') {
+      updateProjectContextInfo();
+    }
+  }, 100);
 }
 
 function closeProjectModal() {
@@ -5932,6 +6005,11 @@ async function handleProjectFiles(files) {
   }
   
   renderProjectFiles();
+  
+  // Actualizar info de contexto después de añadir archivos
+  if (typeof updateProjectContextInfo === 'function') {
+    updateProjectContextInfo();
+  }
 }
 
 function initProjectSystem() {
@@ -6042,6 +6120,400 @@ function initProjectSystem() {
       chatState.classList.add('in-project');
     }
   }
+  
+  // Inicializar sistema de información de contexto
+  initProjectContextInfo();
+}
+
+// ========================================
+// Sistema de Información de Contexto del Modelo
+// ========================================
+
+// Cache de información de modelos
+const modelContextCache = {};
+const MODEL_CONTEXT_DEFAULTS = {
+  // Contextos conocidos por defecto (en tokens)
+  'llama2': 4096,
+  'llama3': 8192,
+  'llama3.1': 131072,
+  'llama3.2': 131072,
+  'mistral': 32768,
+  'mixtral': 32768,
+  'codellama': 16384,
+  'deepseek-coder': 16384,
+  'deepseek-r1': 65536,
+  'qwen': 32768,
+  'qwen2': 131072,
+  'qwen2.5': 131072,
+  'phi': 2048,
+  'phi3': 131072,
+  'gemma': 8192,
+  'gemma2': 8192,
+  'llava': 4096,
+  'default': 4096
+};
+
+// Estimar tokens de un texto (aproximación: ~4 caracteres por token para español/inglés)
+function estimateTokens(text) {
+  if (!text) return 0;
+  // Estimación más precisa: ~3.5 caracteres por token en español
+  return Math.ceil(text.length / 3.5);
+}
+
+// Formatear número de tokens para mostrar
+function formatTokens(tokens) {
+  if (tokens >= 1000000) {
+    return (tokens / 1000000).toFixed(1) + 'M';
+  }
+  if (tokens >= 1000) {
+    return (tokens / 1000).toFixed(1) + 'K';
+  }
+  return tokens.toString();
+}
+
+// Obtener información de contexto de un modelo usando la API de Ollama
+async function getModelContextInfo(modelName) {
+  if (!modelName) return null;
+  
+  // Revisar cache primero
+  if (modelContextCache[modelName]) {
+    return modelContextCache[modelName];
+  }
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: modelName })
+    });
+    
+    if (!response.ok) {
+      throw new Error('No se pudo obtener información del modelo');
+    }
+    
+    const data = await response.json();
+    
+    // Extraer num_ctx de los parámetros del modelo
+    let contextLength = MODEL_CONTEXT_DEFAULTS.default;
+    
+    // Buscar en los parámetros del modelfile
+    if (data.parameters) {
+      const ctxMatch = data.parameters.match(/num_ctx\s+(\d+)/i);
+      if (ctxMatch) {
+        contextLength = parseInt(ctxMatch[1]);
+      }
+    }
+    
+    // Si no se encontró, usar valores por defecto basados en el nombre del modelo
+    if (contextLength === MODEL_CONTEXT_DEFAULTS.default) {
+      const baseName = modelName.split(':')[0].toLowerCase();
+      for (const [key, value] of Object.entries(MODEL_CONTEXT_DEFAULTS)) {
+        if (baseName.includes(key)) {
+          contextLength = value;
+          break;
+        }
+      }
+    }
+    
+    // Extraer información adicional del modelo
+    const info = {
+      name: modelName,
+      contextLength: contextLength,
+      family: data.details?.family || 'unknown',
+      parameterSize: data.details?.parameter_size || 'unknown',
+      quantization: data.details?.quantization_level || 'unknown',
+      template: data.template || '',
+      modelfile: data.modelfile || ''
+    };
+    
+    // Guardar en cache
+    modelContextCache[modelName] = info;
+    
+    return info;
+  } catch (error) {
+    console.warn('Error al obtener información del modelo:', error);
+    
+    // Devolver información por defecto
+    const baseName = modelName.split(':')[0].toLowerCase();
+    let defaultContext = MODEL_CONTEXT_DEFAULTS.default;
+    
+    for (const [key, value] of Object.entries(MODEL_CONTEXT_DEFAULTS)) {
+      if (baseName.includes(key)) {
+        defaultContext = value;
+        break;
+      }
+    }
+    
+    return {
+      name: modelName,
+      contextLength: defaultContext,
+      family: 'unknown',
+      parameterSize: 'unknown',
+      quantization: 'unknown',
+      template: '',
+      modelfile: ''
+    };
+  }
+}
+
+// Calcular tokens usados por el proyecto
+function calculateProjectTokens(instructionsText, files) {
+  let instructionsTokens = 0;
+  let documentsTokens = 0;
+  
+  // Tokens de instrucciones
+  if (instructionsText) {
+    // Incluir el formato del contexto
+    const formattedInstructions = `══════════════════════════════════════════════════════════════\n📋 INSTRUCCIONES DEL PROYECTO: "Proyecto"\n══════════════════════════════════════════════════════════════\n\n${instructionsText}\n\n`;
+    instructionsTokens = estimateTokens(formattedInstructions);
+  }
+  
+  // Tokens de documentos (solo archivos de texto, no imágenes)
+  const textFiles = (files || []).filter(f => !f.isImage);
+  if (textFiles.length > 0) {
+    let documentContext = '=== DOCUMENTOS DEL PROYECTO (DEBES LEER Y USAR ESTE CONTENIDO) ===\n\n';
+    
+    textFiles.forEach((file, index) => {
+      documentContext += `══════════════════════════════════════════════════════════════\n`;
+      documentContext += `📄 DOCUMENTO ${index + 1}: ${file.name}\n`;
+      documentContext += `══════════════════════════════════════════════════════════════\n\n`;
+      documentContext += `${file.content || ''}\n\n`;
+    });
+    
+    documentContext += '=== FIN DE DOCUMENTOS DEL PROYECTO ===\n\n';
+    documentContext += 'IMPORTANTE: Debes seguir las instrucciones del proyecto y USAR el contenido de los documentos proporcionados para responder las preguntas del usuario. Si el usuario pregunta sobre los documentos, resume o explica lo que contienen.\n';
+    
+    documentsTokens = estimateTokens(documentContext);
+  }
+  
+  return {
+    instructions: instructionsTokens,
+    documents: documentsTokens,
+    total: instructionsTokens + documentsTokens
+  };
+}
+
+// Obtener todos los modelos disponibles con su información de contexto
+async function getAllModelsWithContext() {
+  try {
+    const response = await fetch(`${API_BASE}/api/tags`);
+    if (!response.ok) throw new Error('Error al cargar modelos');
+    
+    const data = await response.json();
+    const models = data?.models ?? [];
+    
+    // Obtener información de contexto para cada modelo
+    const modelsWithContext = await Promise.all(
+      models.map(async (model) => {
+        const contextInfo = await getModelContextInfo(model.name);
+        return {
+          name: model.name,
+          displayName: formatModelName(model.name),
+          contextLength: contextInfo?.contextLength || MODEL_CONTEXT_DEFAULTS.default,
+          size: model.size
+        };
+      })
+    );
+    
+    // Ordenar por contexto de mayor a menor
+    modelsWithContext.sort((a, b) => b.contextLength - a.contextLength);
+    
+    return modelsWithContext;
+  } catch (error) {
+    console.warn('Error al obtener modelos:', error);
+    return [];
+  }
+}
+
+// Formatear nombre del modelo para mostrar
+function formatModelName(modelName) {
+  if (!modelName) return 'Desconocido';
+  
+  if (modelName.includes(':')) {
+    const parts = modelName.split(':');
+    const baseName = parts[0];
+    const tag = parts[1] || '';
+    
+    const formattedBase = baseName.charAt(0).toUpperCase() + baseName.slice(1);
+    
+    if (tag.includes('-')) {
+      const tagParts = tag.split('-');
+      const size = tagParts[0];
+      return `${formattedBase} ${size.toUpperCase()}`;
+    }
+    
+    return `${formattedBase} ${tag.toUpperCase()}`;
+  }
+  
+  return modelName.charAt(0).toUpperCase() + modelName.slice(1);
+}
+
+// Actualizar la UI de información de contexto
+async function updateProjectContextInfo() {
+  const modelNameEl = document.getElementById('context-model-name');
+  const modelCapacityEl = document.getElementById('context-model-capacity');
+  const usageBarFillEl = document.getElementById('context-usage-fill');
+  const usageUsedEl = document.getElementById('context-usage-used');
+  const usagePercentEl = document.getElementById('context-usage-percent');
+  const breakdownInstructionsEl = document.getElementById('breakdown-instructions');
+  const breakdownDocumentsEl = document.getElementById('breakdown-documents');
+  const breakdownChatEl = document.getElementById('breakdown-chat');
+  const warningEl = document.getElementById('context-warning');
+  const warningTitleEl = document.getElementById('warning-title');
+  const warningMessageEl = document.getElementById('warning-message');
+  const suggestionEl = document.getElementById('context-suggestion');
+  const suggestedModelsEl = document.getElementById('suggested-models');
+  const refreshBtn = document.getElementById('context-refresh-btn');
+  const contextInfoCard = document.getElementById('project-context-info');
+  
+  if (!modelNameEl || !contextInfoCard) return;
+  
+  // Añadir clase de loading
+  refreshBtn?.classList.add('loading');
+  contextInfoCard.classList.add('loading');
+  
+  try {
+    // Obtener modelo actual
+    const currentModel = state.currentModel;
+    if (!currentModel) {
+      modelNameEl.textContent = 'No hay modelo seleccionado';
+      modelCapacityEl.textContent = 'Selecciona un modelo';
+      return;
+    }
+    
+    // Obtener información del modelo
+    const modelInfo = await getModelContextInfo(currentModel);
+    const contextLength = modelInfo?.contextLength || MODEL_CONTEXT_DEFAULTS.default;
+    
+    // Actualizar nombre y capacidad del modelo
+    modelNameEl.textContent = formatModelName(currentModel);
+    modelCapacityEl.textContent = `${formatTokens(contextLength)} tokens de contexto`;
+    
+    // Obtener contenido actual del proyecto
+    const instructionsInput = document.getElementById('project-instructions-input');
+    const instructions = instructionsInput?.value || '';
+    const files = projectsState.tempProjectFiles || [];
+    
+    // Calcular tokens
+    const tokenUsage = calculateProjectTokens(instructions, files);
+    const chatReserve = 2000; // Reservar tokens para la conversación
+    const totalUsed = tokenUsage.total;
+    const totalWithReserve = totalUsed + chatReserve;
+    const usagePercent = Math.min(100, Math.round((totalWithReserve / contextLength) * 100));
+    
+    // Actualizar barra de uso
+    usageBarFillEl.style.width = `${usagePercent}%`;
+    usageUsedEl.textContent = `${formatTokens(totalUsed)} tokens usados`;
+    usagePercentEl.textContent = `${usagePercent}%`;
+    
+    // Cambiar color según el uso
+    usageBarFillEl.classList.remove('warning', 'danger', 'critical');
+    if (usagePercent >= 100) {
+      usageBarFillEl.classList.add('critical');
+    } else if (usagePercent >= 85) {
+      usageBarFillEl.classList.add('danger');
+    } else if (usagePercent >= 70) {
+      usageBarFillEl.classList.add('warning');
+    }
+    
+    // Actualizar desglose
+    breakdownInstructionsEl.textContent = `${formatTokens(tokenUsage.instructions)} tokens`;
+    breakdownDocumentsEl.textContent = `${formatTokens(tokenUsage.documents)} tokens`;
+    breakdownChatEl.textContent = `~${formatTokens(chatReserve)} tokens`;
+    
+    // Mostrar/ocultar advertencia
+    if (totalWithReserve > contextLength) {
+      warningEl.style.display = 'flex';
+      const excesoTokens = totalWithReserve - contextLength;
+      warningTitleEl.textContent = '⚠️ Contexto excedido';
+      warningMessageEl.textContent = `El contenido supera la capacidad del modelo por ${formatTokens(excesoTokens)} tokens. El modelo podría perder información o dar respuestas incompletas. Considera reducir el contenido o usar un modelo con más contexto.`;
+      
+      // Buscar modelos alternativos
+      const allModels = await getAllModelsWithContext();
+      const compatibleModels = allModels.filter(m => m.contextLength >= totalWithReserve && m.name !== currentModel);
+      
+      if (compatibleModels.length > 0) {
+        suggestionEl.style.display = 'flex';
+        suggestedModelsEl.innerHTML = compatibleModels.slice(0, 3).map(m => `
+          <button class="suggested-model-btn" data-model="${escapeHtml(m.name)}">
+            ${escapeHtml(m.displayName)}
+            <span class="model-ctx">${formatTokens(m.contextLength)}</span>
+          </button>
+        `).join('');
+        
+        // Añadir event listeners para cambiar de modelo
+        suggestedModelsEl.querySelectorAll('.suggested-model-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const newModel = btn.dataset.model;
+            if (newModel) {
+              switchToModel(newModel);
+            }
+          });
+        });
+      } else {
+        suggestionEl.style.display = 'none';
+      }
+    } else if (usagePercent >= 85) {
+      warningEl.style.display = 'flex';
+      warningTitleEl.textContent = '⚠️ Uso elevado de contexto';
+      warningMessageEl.textContent = `Estás usando el ${usagePercent}% del contexto disponible. Podrías tener poco espacio para conversaciones largas.`;
+      suggestionEl.style.display = 'none';
+    } else {
+      warningEl.style.display = 'none';
+      suggestionEl.style.display = 'none';
+    }
+    
+  } catch (error) {
+    console.error('Error al actualizar info de contexto:', error);
+  } finally {
+    refreshBtn?.classList.remove('loading');
+    contextInfoCard.classList.remove('loading');
+  }
+}
+
+// Cambiar al modelo sugerido
+async function switchToModel(modelName) {
+  state.currentModel = modelName;
+  
+  // Actualizar selectores de modelo
+  const selects = [modelSelect, modelSelectInline].filter(Boolean);
+  selects.forEach(select => {
+    if (select) {
+      select.value = modelName;
+    }
+  });
+  
+  persistState();
+  
+  // Actualizar info de contexto
+  await updateProjectContextInfo();
+}
+
+// Inicializar sistema de información de contexto
+function initProjectContextInfo() {
+  // Botón de actualizar
+  const refreshBtn = document.getElementById('context-refresh-btn');
+  refreshBtn?.addEventListener('click', () => {
+    updateProjectContextInfo();
+  });
+  
+  // Escuchar cambios en las instrucciones
+  const instructionsInput = document.getElementById('project-instructions-input');
+  let debounceTimer = null;
+  
+  instructionsInput?.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      updateProjectContextInfo();
+    }, 500);
+  });
+  
+  // Escuchar cambios en el modelo
+  [modelSelect, modelSelectInline].filter(Boolean).forEach(select => {
+    select?.addEventListener('change', () => {
+      updateProjectContextInfo();
+    });
+  });
 }
 
 // ========================================
