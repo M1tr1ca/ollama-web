@@ -162,16 +162,16 @@ class TranslationManager {
     }
 
     async init() {
-        // Load saved language from localStorage if available
+        // Cargar idioma guardado en localStorage si está disponible
         const savedLang = localStorage.getItem('ollama-web-lang');
         if (savedLang) {
             this.currentLang = savedLang;
         }
 
-        // Load default language (es)
+        // Cargar idioma por defecto (es)
         await this.loadLanguage('es');
 
-        // If current language is different, load it too
+        // Si el idioma actual es diferente, cargarlo también
         if (this.currentLang !== 'es') {
             await this.loadLanguage(this.currentLang);
         }
@@ -189,8 +189,8 @@ class TranslationManager {
             this.translations[lang] = data;
             this.loadedLanguages.add(lang);
         } catch (error) {
-            console.error('Error loading translation:', error);
-            // Fallback to Spanish if loading fails
+            console.error('Error al cargar la traducción:', error);
+            // Si el idioma no es español, cargar español como respaldo
             if (lang !== 'es') {
                 this.currentLang = 'es';
                 await this.loadLanguage('es');
@@ -216,7 +216,7 @@ class TranslationManager {
 
         let text = langData[key] || key;
 
-        // Replace parameters
+        // Reemplazar parámetros
         Object.keys(params).forEach(param => {
             text = text.replace(`{${param}}`, params[param]);
         });
@@ -229,25 +229,26 @@ class TranslationManager {
             const key = element.getAttribute('data-i18n');
             const translated = this.translate(key);
 
-            // Handle different element types
+            // Manejar diferentes tipos de elementos
             if (element.tagName === 'INPUT' && element.getAttribute('placeholder')) {
                 element.placeholder = translated;
             } else if (element.tagName === 'TEXTAREA' && element.getAttribute('placeholder')) {
                 element.placeholder = translated;
             } else if (element.title && element.getAttribute('data-i18n-title')) {
-                // If specifically targeting title
+                // Si específicamente se está apuntando al título
                 element.title = translated;
             } else {
                 // Preservar iconos/estructura en elementos complejos
                 const target = element.getAttribute('data-i18n-target');
                 if (target === 'title') {
                     element.title = translated;
+                    // Si específicamente se está apuntando al placeholder
                 } else if (target === 'placeholder') {
                     element.placeholder = translated;
                 } else {
                     const icon = element.querySelector('svg, .icon, .menu-icon');
                     if (icon && element.childNodes.length > 1) {
-                        // It has an icon.
+                        // Si tiene un icono
                         const textSpan = element.querySelector('span:not(.icon):not(.menu-icon)');
                         if (textSpan) {
                             textSpan.textContent = translated;
@@ -261,7 +262,7 @@ class TranslationManager {
             }
         });
 
-        // Update HTML lang attribute
+        // Actualizar atributo lang del HTML
         document.documentElement.lang = this.currentLang;
     }
 
@@ -274,5 +275,5 @@ class TranslationManager {
     }
 }
 
-// Export instance
+// Exportar instancia
 window.translationManager = new TranslationManager();
