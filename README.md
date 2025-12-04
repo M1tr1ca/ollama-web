@@ -26,6 +26,7 @@ Ollama Web Chat provides a beautiful, user-friendly interface to chat with your 
 - **Persistent Storage**: All conversations are automatically saved to browser localStorage
 - **Rich Formatting**: Full markdown support including headers, lists, code blocks, and links
 - **Mathematical Expressions**: Render LaTeX formulas inline or as display blocks using KaTeX
+- **Multi-language Support**: Switch interface langua instantly
 - **Model Selection**: Easily switch between different Ollama models via a dropdown menu
 
 ### User Interface
@@ -66,7 +67,8 @@ Navigate to `http://localhost:5173`
 ## Usage
 
 1. **Select a model** from the dropdown menu
-2. **Type your message** in the input field
+2. **Select language** via the globe icon in the header (English/Spanish)
+3. **Type your message** in the input field
 3. **Press Enter** or click the send button (↑) to send
 4. **Manage conversations** using the sidebar:
    - Click "+ New Conversation" to start a new chat
@@ -125,6 +127,8 @@ ollama-web/
 ├── index.html          # Main HTML structure
 ├── styles.css          # Styles and animations
 ├── app.js             # Application logic
+├── js/                # Modules (TranslationManager)
+├── translations/      # Language files (en.json, es.json)
 ├── package.json       # Dependencies and scripts
 ├── assets/            # Images and static assets
 ├── README.md          # This file
