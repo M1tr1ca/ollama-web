@@ -33,7 +33,7 @@ const state = {
   loading: false,
 };
 
-// Attachments per conversation
+//Archivos adjuntos por conversación
 const attachedFiles = {};
 
 let currentStreamReader = null;
