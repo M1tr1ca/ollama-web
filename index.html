@@ -192,6 +192,43 @@
                   </button>
                 </div>
               </div>
+              
+              <div class="personalization-section">
+                <label class="section-label">
+                  Modos de chat visibles
+                  <span class="section-hint">Elige qué modos mostrar en la barra de entrada</span>
+                </label>
+                <div class="chat-modes-chips" id="chat-modes-selector">
+                  <label class="chat-mode-chip" data-mode="normal">
+                    <input type="checkbox" id="mode-normal-visible" data-mode="normal" checked>
+                    <span class="chip-content">
+                      <span class="chip-icon">💬</span>
+                      <span class="chip-text">Normal</span>
+                    </span>
+                  </label>
+                  <label class="chat-mode-chip" data-mode="web">
+                    <input type="checkbox" id="mode-web-visible" data-mode="web" checked>
+                    <span class="chip-content">
+                      <span class="chip-icon">🌐</span>
+                      <span class="chip-text">Web</span>
+                    </span>
+                  </label>
+                  <label class="chat-mode-chip" data-mode="deep">
+                    <input type="checkbox" id="mode-deep-visible" data-mode="deep" checked>
+                    <span class="chip-content">
+                      <span class="chip-icon">🧠</span>
+                      <span class="chip-text">Think</span>
+                    </span>
+                  </label>
+                  <label class="chat-mode-chip" data-mode="study">
+                    <input type="checkbox" id="mode-study-visible" data-mode="study" checked>
+                    <span class="chip-content">
+                      <span class="chip-icon">📚</span>
+                      <span class="chip-text">Estudio</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
             </div>
             <div class="modal-footer">
               <button class="modal-button secondary" id="cancel-ai-personalization">Cancelar</button>
@@ -715,11 +752,17 @@
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                       </button>
+                      <button type="button" class="chat-mode-option" data-mode="web" title="Modo Web - Búsqueda en internet">
+                        <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </button>
                       <button type="button" class="chat-mode-option" data-mode="deep" title="Deep Research - Investigación profunda">
                         <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
-                          <path d="M11 8v6M8 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                          <path d="M16 16l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                          <circle cx="10" cy="10" r="6" stroke="currentColor" stroke-width="2"/>
+                          <path d="M14.5 14.5L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                          <path d="M8 10h4M10 8v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                         </svg>
                       </button>
                       <button type="button" class="chat-mode-option" data-mode="study" title="Modo Estudio - Aprendizaje guiado">
@@ -831,11 +874,17 @@
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                       </button>
+                      <button type="button" class="chat-mode-option" data-mode="web" title="Modo Web - Búsqueda en internet">
+                        <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </button>
                       <button type="button" class="chat-mode-option" data-mode="deep" title="Deep Research - Investigación profunda">
                         <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
-                          <path d="M11 8v6M8 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                          <path d="M16 16l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                          <circle cx="10" cy="10" r="6" stroke="currentColor" stroke-width="2"/>
+                          <path d="M14.5 14.5L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                          <path d="M8 10h4M10 8v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                         </svg>
                       </button>
                       <button type="button" class="chat-mode-option" data-mode="study" title="Modo Estudio - Aprendizaje guiado">
