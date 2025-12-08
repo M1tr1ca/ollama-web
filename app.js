@@ -468,20 +468,28 @@ function appendMessageElement(message) {
       });
     }
   } else if (message.role === 'assistant' && message.deepResearch && message.content) {
-    // Es un mensaje de Deep Research completado - mostrar con encabezado especial
+    // Es un mensaje de Deep Think completado - mostrar con encabezado especial
     content += `
       <div class="deep-research-report">
         <div class="deep-research-report-header">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="7"/>
-            <path d="M11 8v6M8 11h6"/>
-            <path d="M16 16l4 4"/>
+            <path d="M12 2C7.58 2 4 5.58 4 10c0 2.5 1.2 4.7 3 6.2V19c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-2.8c1.8-1.5 3-3.7 3-6.2 0-4.42-3.58-8-8-8z" fill="none"/>
+            <path d="M9 13v2M12 11v4M15 13v2" stroke-linecap="round"/>
           </svg>
-          Investigación profunda • ${message.deepResearch.findings || 0} temas investigados
+          Pensamiento profundo • ${message.deepResearch.findings || 0} temas analizados
         </div>
       </div>
     `;
     content += parseMarkdown(message.content);
+  } else if (message.role === 'assistant' && message.webSearchData && message.content) {
+    // Es un mensaje de búsqueda web completado - reconstruir la UI
+    const webData = message.webSearchData;
+    content += createWebSearchUIForRestore(webData);
+    content += '<div style="height: 1px; background: rgba(255,255,255,0.1); margin: 16px 0;"></div>';
+    content += '<div class="web-search-response">';
+    content += createWebThinkingBlock(message.content.substring(0, 100), false);
+    content += '<div class="web-response-content">' + parseMarkdown(message.content) + '</div>';
+    content += '</div>';
   } else if (message.content) {
     content += parseMarkdown(message.content);
   }
@@ -503,6 +511,9 @@ function appendMessageElement(message) {
   });
 
   // Crear botón de regenerar respuesta (solo para mensajes del asistente)
+  let webSourcesBtn = null;
+  let webSourcesPopup = null;
+  
   if (message.role === 'assistant') {
     const regenerateButton = document.createElement('button');
     regenerateButton.className = 'regenerate-message-btn';
@@ -513,6 +524,59 @@ function appendMessageElement(message) {
       await regenerateResponse(message.id);
     });
     copyContainer.appendChild(regenerateButton);
+    
+    // Preparar botón de fuentes web si el mensaje tiene webSearchData (se añade después del copiar)
+    if (message.webSearchData && message.webSearchData.results && message.webSearchData.results.length > 0) {
+      webSourcesBtn = document.createElement('button');
+      webSourcesBtn.className = 'web-sources-btn';
+      webSourcesBtn.title = 'Ver fuentes consultadas';
+      webSourcesBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <span>${message.webSearchData.results.length}</span>
+      `;
+      
+      // Crear popup de fuentes
+      webSourcesPopup = document.createElement('div');
+      webSourcesPopup.className = 'web-sources-popup';
+      webSourcesPopup.style.display = 'none';
+      
+      let popupContent = '<div class="web-sources-popup-header"><span>Fuentes consultadas</span></div>';
+      popupContent += '<div class="web-sources-popup-list">';
+      
+      message.webSearchData.results.forEach(result => {
+        let domain = '';
+        let faviconUrl = '';
+        try {
+          const urlObj = new URL(result.link);
+          domain = urlObj.hostname.replace('www.', '');
+          faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        } catch (e) {
+          domain = 'web';
+        }
+        
+        popupContent += `
+          <a href="${result.link}" target="_blank" rel="noopener noreferrer" class="web-sources-popup-item">
+            <img src="${faviconUrl}" alt="" class="web-sources-popup-favicon" onerror="this.style.display='none'">
+            <div class="web-sources-popup-info">
+              <div class="web-sources-popup-title">${escapeHtml(result.title)}</div>
+              <div class="web-sources-popup-url">${domain}</div>
+            </div>
+          </a>
+        `;
+      });
+      
+      popupContent += '</div>';
+      webSourcesPopup.innerHTML = popupContent;
+      
+      webSourcesBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isVisible = webSourcesPopup.style.display === 'block';
+        webSourcesPopup.style.display = isVisible ? 'none' : 'block';
+      });
+    }
   }
 
   // Crear botón de editar (solo para mensajes del usuario)
@@ -537,6 +601,18 @@ function appendMessageElement(message) {
   copyContainer.appendChild(copyButton);
   copyContainer.appendChild(timeElement)
 
+  
+  // Orden correcto: regenerar (ya añadido) → copiar → fuentes → hora
+  copyContainer.appendChild(copyButton);
+  
+  // Añadir botón de fuentes web después del copiar (si existe)
+  if (webSourcesBtn) {
+    copyContainer.appendChild(webSourcesBtn);
+    copyContainer.appendChild(webSourcesPopup);
+  }
+  
+  copyContainer.appendChild(timeElement);
+  
   // Agregar contenido y luego el contenedor de copiar dentro del bubble
   // Solo agregar contenido HTML si NO es un Deep Research activo (ya tiene el progressContainer)
   if (!isActiveDeepResearch) {
@@ -2251,6 +2327,23 @@ MODO ESTUDIO ACTIVADO - Eres un tutor educativo experto. Tu rol es:
 Responde de manera paciente, alentadora y didáctica. Tu objetivo es que el estudiante realmente ENTIENDA el tema, no solo memorice información.
 ` : '';
 
+    // Instrucciones y contexto para modo búsqueda web
+    const webSearchInstructions = window._webSearchModeActive && window._webSearchContext ? `
+🌐 MODO BÚSQUEDA WEB ACTIVADO
+
+He realizado una búsqueda en internet sobre la consulta del usuario. Aquí están los resultados que encontré:
+
+${window._webSearchContext}
+
+INSTRUCCIONES:
+1. Usa esta información de internet para responder la pregunta del usuario de manera completa y precisa.
+2. Sintetiza la información de múltiples fuentes cuando sea relevante.
+3. Si citas información específica, menciona de qué fuente proviene.
+4. Si la información parece desactualizada o contradictoria, indícalo.
+5. Complementa con tu conocimiento cuando sea apropiado.
+6. Al final, puedes sugerir búsquedas adicionales si el usuario quiere profundizar.
+` : '';
+    
     // Determinar las instrucciones finales
     let instructions = '';
     const hasDocuments = textFiles.length > 0 || shouldIncludeProjectContext;
@@ -2263,10 +2356,21 @@ Responde de manera paciente, alentadora y didáctica. Tu objetivo es que el estu
     }
 
     // Combinar todas las instrucciones
-    if (systemContent || styleInstructions || instructions || studyModeInstructions) {
+    if (systemContent || styleInstructions || instructions || studyModeInstructions || webSearchInstructions) {
       let finalContent = systemContent;
 
       // Añadir instrucciones del modo estudio primero (alta prioridad)
+      
+      // Añadir contexto de búsqueda web primero (máxima prioridad)
+      if (webSearchInstructions) {
+        if (finalContent) {
+          finalContent += '\n\n';
+        }
+        finalContent += webSearchInstructions;
+        console.log('🌐 Modo Web activado - Añadiendo resultados de búsqueda');
+      }
+      
+      // Añadir instrucciones del modo estudio (alta prioridad)
       if (studyModeInstructions) {
         if (finalContent) {
           finalContent += '\n\n';
@@ -3667,6 +3771,90 @@ function getStyleInstructions(style) {
 }
 
 // ========================================
+// Sistema de Modos de Chat Visibles
+// ========================================
+const VISIBLE_CHAT_MODES_KEY = 'ollama-web-visible-chat-modes';
+const DEFAULT_VISIBLE_MODES = ['normal', 'web', 'deep', 'study'];
+
+function getVisibleChatModes() {
+  if (!hasLocalStorage) return DEFAULT_VISIBLE_MODES;
+  try {
+    const stored = window.localStorage.getItem(VISIBLE_CHAT_MODES_KEY);
+    if (stored) {
+      const modes = JSON.parse(stored);
+      // Asegurar que al menos un modo esté visible
+      return modes.length > 0 ? modes : DEFAULT_VISIBLE_MODES;
+    }
+    return DEFAULT_VISIBLE_MODES;
+  } catch (error) {
+    console.warn('No se pudo obtener los modos de chat visibles', error);
+    return DEFAULT_VISIBLE_MODES;
+  }
+}
+
+function saveVisibleChatModes(modes) {
+  if (!hasLocalStorage) return;
+  try {
+    // Asegurar que al menos un modo esté visible
+    const modesToSave = modes.length > 0 ? modes : DEFAULT_VISIBLE_MODES;
+    window.localStorage.setItem(VISIBLE_CHAT_MODES_KEY, JSON.stringify(modesToSave));
+    // Actualizar la UI después de guardar
+    updateChatModeTogglesVisibility();
+  } catch (error) {
+    console.warn('No se pudo guardar los modos de chat visibles', error);
+  }
+}
+
+function updateChatModeTogglesVisibility() {
+  const visibleModes = getVisibleChatModes();
+  const toggles = document.querySelectorAll('.chat-mode-toggle');
+  
+  toggles.forEach(toggle => {
+    const options = toggle.querySelectorAll('.chat-mode-option');
+    let visibleCount = 0;
+    let firstVisibleMode = null;
+    const visibleModesList = [];
+    
+    options.forEach(option => {
+      const mode = option.dataset.mode;
+      const isVisible = visibleModes.includes(mode);
+      option.style.display = isVisible ? '' : 'none';
+      if (isVisible) {
+        visibleCount++;
+        visibleModesList.push(mode);
+        if (!firstVisibleMode) firstVisibleMode = mode;
+      }
+    });
+    
+    // Si solo hay un modo visible, ocultar todo el toggle
+    toggle.style.display = visibleCount > 1 ? '' : 'none';
+    
+    // Si el modo activo actual no está visible, cambiar al primer modo visible
+    const currentMode = toggle.getAttribute('data-active-mode');
+    if (!visibleModes.includes(currentMode) && firstVisibleMode) {
+      setChatMode(firstVisibleMode);
+    }
+    
+    // Actualizar la posición del slider basada en modos visibles
+    updateSliderPosition(toggle, visibleModesList);
+  });
+}
+
+function updateSliderPosition(toggle, visibleModesList) {
+  const slider = toggle.querySelector('.chat-mode-slider');
+  if (!slider) return;
+  
+  const currentMode = toggle.getAttribute('data-active-mode');
+  const index = visibleModesList.indexOf(currentMode);
+  
+  if (index !== -1) {
+    // Calcular la posición: 3px inicial + (34px * índice)
+    const translateX = 34 * index;
+    slider.style.transform = `translateX(${translateX}px)`;
+  }
+}
+
+// ========================================
 // Sistema de Memoria
 // ========================================
 const MEMORY_STORAGE_KEY = 'ollama-web-memories';
@@ -4265,6 +4453,14 @@ function initUserMenu() {
           }
         });
 
+        
+        // Cargar modos de chat visibles
+        const visibleModes = getVisibleChatModes();
+        const modeCheckboxes = aiPersonalizationModal.querySelectorAll('#chat-modes-selector input[type="checkbox"]');
+        modeCheckboxes.forEach(checkbox => {
+          checkbox.checked = visibleModes.includes(checkbox.dataset.mode);
+        });
+        
         setTimeout(() => aiPersonalInfoInput.focus(), 100);
         if (settingsMenu) {
           settingsMenu.style.display = 'none';
@@ -4532,6 +4728,19 @@ function initUserMenu() {
         saveAIResponseStyle(selectedStyle);
       }
 
+      
+      // Guardar modos de chat visibles
+      const modeCheckboxes = aiPersonalizationModal?.querySelectorAll('#chat-modes-selector input[type="checkbox"]');
+      if (modeCheckboxes) {
+        const selectedModes = [];
+        modeCheckboxes.forEach(checkbox => {
+          if (checkbox.checked) {
+            selectedModes.push(checkbox.dataset.mode);
+          }
+        });
+        saveVisibleChatModes(selectedModes);
+      }
+      
       closeAIPersonalizationModalFunc();
     });
 
@@ -5860,12 +6069,13 @@ function renderProjectsList() {
     const fileCount = (project.files || []).length;
     const convCount = (project.conversationIds || []).length;
 
+    
     return `
       <li class="project-item ${isActive ? 'active' : ''}" data-project-id="${project.id}">
         <div class="project-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></div>
         <div class="project-item-info">
           <p class="project-item-name">${escapeHtml(project.name || 'Sin nombre')}</p>
-          <p class="project-item-meta">${fileCount} archivo${fileCount !== 1 ? 's' : ''} · ${convCount} chat${convCount !== 1 ? 's' : ''}</p>
+          <p class="project-item-meta">${fileCount} archivo${fileCount !== 1 ? 's' : ''}</p>
         </div>
         <div class="project-item-actions">
           <button class="project-action-btn edit" title="Editar proyecto" data-action="edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
@@ -6774,10 +6984,400 @@ function toggleDeepResearch(button) {
   });
 
   console.log(`🔬 Deep Research: ${deepResearchMode ? 'activado' : 'desactivado'}`);
+  
+  console.log(`🧠 Deep Think: ${deepResearchMode ? 'activado' : 'desactivado'}`);
 }
 
 // Variable para modo estudio
 let studyMode = false;
+
+// Variable para modo web (búsqueda en internet)
+let webSearchMode = false;
+const SERPER_API_KEY = '7ea5d17c7248272c4a1d3d0790ae7388e72f295c';
+
+// Crear HTML estático de búsqueda web para restaurar desde el estado guardado
+function createWebSearchUIForRestore(webData) {
+  if (!webData || !webData.results) return '';
+  
+  const sourcesHtml = webData.results.map((result, index) => {
+    let domain = '';
+    let faviconUrl = '';
+    try {
+      const urlObj = new URL(result.link);
+      domain = urlObj.hostname;
+      faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    } catch (e) {
+      domain = 'web';
+    }
+    
+    return `
+      <a class="web-search-source-item" href="${result.link}" target="_blank" rel="noopener noreferrer" style="animation: none; opacity: 1; transform: none;">
+        <img class="web-search-source-icon" src="${faviconUrl}" alt="${domain}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="web-search-source-icon-fallback" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </div>
+        <div class="web-search-source-content">
+          <div class="web-search-source-title">${escapeHtml(result.title)}</div>
+          <div class="web-search-source-snippet">${escapeHtml(result.snippet || '')}</div>
+          <div class="web-search-source-url">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            ${domain}
+          </div>
+        </div>
+      </a>
+    `;
+  }).join('');
+  
+  const finalSourcesHtml = webData.results.map(result => {
+    let domain = '';
+    try {
+      domain = new URL(result.link).hostname.replace('www.', '');
+    } catch (e) {
+      domain = 'web';
+    }
+    return `
+      <a href="${result.link}" target="_blank" rel="noopener noreferrer" class="web-search-final-source" title="${escapeHtml(result.title)}">
+        <img class="web-search-final-source-favicon" src="https://www.google.com/s2/favicons?domain=${domain}&sz=32" alt="" onerror="this.style.display='none'">
+        <span class="web-search-final-source-name">${domain}</span>
+      </a>
+    `;
+  }).join('');
+  
+  return `
+    <div class="web-search-container minimized">
+      <div class="web-search-header" style="cursor: pointer;" onclick="this.parentElement.classList.toggle('minimized');">
+        <div class="web-search-title">
+          <svg class="web-search-icon done" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Búsqueda web
+        </div>
+        <div class="web-search-header-right">
+          <div class="web-search-status">
+            <span class="web-search-status-dot done"></span>
+            <span class="web-search-status-text">Completado</span>
+          </div>
+          <button class="web-search-toggle-btn" title="Expandir" onclick="event.stopPropagation(); this.closest('.web-search-container').classList.toggle('minimized'); this.title = this.closest('.web-search-container').classList.contains('minimized') ? 'Expandir' : 'Minimizar';">
+            <svg class="web-search-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="18 15 12 9 6 15"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="web-search-content">
+        <div class="web-search-query">${escapeHtml(webData.query)}</div>
+        <div class="web-search-progress">
+          <div class="web-search-progress-text">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <span class="web-search-progress-label">Fuentes encontradas</span>
+          </div>
+        </div>
+        <div class="web-search-sources-label">Fuentes consultadas</div>
+        <div class="web-search-sources">${sourcesHtml}</div>
+        <div class="web-search-final-sources">
+          <div class="web-search-final-sources-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            ${webData.results.length} fuentes consultadas
+          </div>
+          <div class="web-search-final-sources-list">${finalSourcesHtml}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Crear elemento de UI para búsqueda web
+function createWebSearchUI(query) {
+  const container = document.createElement('div');
+  container.className = 'web-search-container';
+  container.innerHTML = `
+    <div class="web-search-header">
+      <div class="web-search-title">
+        <svg class="web-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        Buscando en la web
+      </div>
+      <div class="web-search-header-right">
+        <div class="web-search-status">
+          <span class="web-search-status-dot"></span>
+          <span class="web-search-status-text">Trabajando...</span>
+        </div>
+        <button class="web-search-toggle-btn" title="Minimizar" style="display: none;">
+          <svg class="web-search-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="18 15 12 9 6 15"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="web-search-content">
+      <div class="web-search-query">${escapeHtml(query)}</div>
+      <div class="web-search-progress">
+        <div class="web-search-progress-text">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <span class="web-search-progress-label">Buscando resultados relevantes...</span>
+        </div>
+      </div>
+      <div class="web-search-sources-label">Revisando fuentes</div>
+      <div class="web-search-sources">
+        ${createSkeletonSources(3)}
+      </div>
+    </div>
+  `;
+  return container;
+}
+
+// Crear fuentes skeleton (placeholders)
+function createSkeletonSources(count) {
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    html += `
+      <div class="web-search-source-skeleton">
+        <div class="skeleton-icon"></div>
+        <div class="skeleton-content">
+          <div class="skeleton-title"></div>
+          <div class="skeleton-text"></div>
+        </div>
+      </div>
+    `;
+  }
+  return html;
+}
+
+// Actualizar UI con resultados de búsqueda
+function updateWebSearchUI(container, searchData, query) {
+  if (!container || !searchData) return;
+  
+  // Actualizar estado a completado
+  const statusDot = container.querySelector('.web-search-status-dot');
+  const statusText = container.querySelector('.web-search-status-text');
+  const searchIcon = container.querySelector('.web-search-icon');
+  const progressLabel = container.querySelector('.web-search-progress-label');
+  const toggleBtn = container.querySelector('.web-search-toggle-btn');
+  const content = container.querySelector('.web-search-content');
+  
+  if (statusDot) statusDot.classList.add('done');
+  if (statusText) statusText.textContent = 'Completado';
+  if (searchIcon) searchIcon.classList.add('done');
+  if (progressLabel) progressLabel.textContent = 'Fuentes encontradas';
+  
+  // Mostrar botón de minimizar
+  if (toggleBtn) {
+    toggleBtn.style.display = 'flex';
+    toggleBtn.onclick = (e) => {
+      e.stopPropagation();
+      container.classList.toggle('minimized');
+      toggleBtn.title = container.classList.contains('minimized') ? 'Expandir' : 'Minimizar';
+    };
+  }
+  
+  // Permitir hacer clic en el header para expandir/minimizar
+  const header = container.querySelector('.web-search-header');
+  if (header) {
+    header.style.cursor = 'pointer';
+    header.onclick = () => {
+      if (toggleBtn && toggleBtn.style.display !== 'none') {
+        container.classList.toggle('minimized');
+        toggleBtn.title = container.classList.contains('minimized') ? 'Expandir' : 'Minimizar';
+      }
+    };
+  }
+  
+  // Actualizar fuentes
+  const sourcesContainer = container.querySelector('.web-search-sources');
+  if (sourcesContainer && searchData.organic) {
+    sourcesContainer.innerHTML = '';
+    
+    searchData.organic.slice(0, 5).forEach((result, index) => {
+      const sourceItem = document.createElement('a');
+      sourceItem.className = 'web-search-source-item';
+      sourceItem.href = result.link;
+      sourceItem.target = '_blank';
+      sourceItem.rel = 'noopener noreferrer';
+      sourceItem.style.animationDelay = `${index * 0.1}s`;
+      
+      // Extraer dominio para el favicon
+      let domain = '';
+      let faviconUrl = '';
+      try {
+        const urlObj = new URL(result.link);
+        domain = urlObj.hostname;
+        // Usar el servicio de Google para obtener favicons
+        faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+      } catch (e) {
+        domain = 'web';
+        faviconUrl = '';
+      }
+      
+      sourceItem.innerHTML = `
+        <img class="web-search-source-icon" src="${faviconUrl}" alt="${domain}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="web-search-source-icon-fallback" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </div>
+        <div class="web-search-source-content">
+          <div class="web-search-source-title">${escapeHtml(result.title)}</div>
+          <div class="web-search-source-snippet">${escapeHtml(result.snippet || '')}</div>
+          <div class="web-search-source-url">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            ${domain}
+          </div>
+        </div>
+      `;
+      
+      sourcesContainer.appendChild(sourceItem);
+    });
+  }
+  
+  // Añadir sección de fuentes finales
+  addFinalSources(container, searchData);
+}
+
+// Añadir las fuentes usadas al final
+function addFinalSources(container, searchData) {
+  if (!container || !searchData || !searchData.organic) return;
+  
+  const finalSourcesDiv = document.createElement('div');
+  finalSourcesDiv.className = 'web-search-final-sources';
+  
+  const sourcesCount = Math.min(searchData.organic.length, 5);
+  
+  finalSourcesDiv.innerHTML = `
+    <div class="web-search-final-sources-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      ${sourcesCount} fuentes consultadas
+    </div>
+    <div class="web-search-final-sources-list">
+      ${searchData.organic.slice(0, 5).map(result => {
+        let domain = '';
+        try {
+          domain = new URL(result.link).hostname.replace('www.', '');
+        } catch (e) {
+          domain = 'web';
+        }
+        return `
+          <a href="${result.link}" target="_blank" rel="noopener noreferrer" class="web-search-final-source" title="${escapeHtml(result.title)}">
+            <img class="web-search-final-source-favicon" src="https://www.google.com/s2/favicons?domain=${domain}&sz=32" alt="" onerror="this.style.display='none'">
+            <span class="web-search-final-source-name">${domain}</span>
+          </a>
+        `;
+      }).join('')}
+    </div>
+  `;
+  
+  // Añadir al contenedor de contenido si existe, sino al container principal
+  const contentContainer = container.querySelector('.web-search-content');
+  if (contentContainer) {
+    contentContainer.appendChild(finalSourcesDiv);
+  } else {
+    container.appendChild(finalSourcesDiv);
+  }
+}
+
+// Función para buscar en la web con Serper API
+async function searchWeb(query) {
+  try {
+    const response = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": SERPER_API_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        q: query,
+        gl: "es",
+        hl: "es",
+        num: 5
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error en búsqueda: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error buscando en la web:', error);
+    return null;
+  }
+}
+
+// Formatear resultados de búsqueda para el contexto del modelo
+function formatSearchResults(searchData) {
+  if (!searchData) return '';
+  
+  let context = '📊 **Resultados de búsqueda web:**\n\n';
+  
+  // Answer box si existe
+  if (searchData.answerBox) {
+    context += `📌 **Respuesta destacada:**\n`;
+    if (searchData.answerBox.title) context += `**${searchData.answerBox.title}**\n`;
+    if (searchData.answerBox.answer) context += `${searchData.answerBox.answer}\n`;
+    if (searchData.answerBox.snippet) context += `${searchData.answerBox.snippet}\n`;
+    context += '\n';
+  }
+  
+  // Knowledge graph si existe
+  if (searchData.knowledgeGraph) {
+    const kg = searchData.knowledgeGraph;
+    context += `📚 **Información:**\n`;
+    if (kg.title) context += `**${kg.title}**`;
+    if (kg.type) context += ` (${kg.type})`;
+    context += '\n';
+    if (kg.description) context += `${kg.description}\n`;
+    context += '\n';
+  }
+  
+  // Resultados orgánicos
+  if (searchData.organic && searchData.organic.length > 0) {
+    context += `🔍 **Resultados principales:**\n\n`;
+    searchData.organic.slice(0, 5).forEach((result, i) => {
+      context += `${i + 1}. **${result.title}**\n`;
+      context += `   ${result.snippet}\n`;
+      context += `   🔗 ${result.link}\n\n`;
+    });
+  }
+  
+  // People also ask
+  if (searchData.peopleAlsoAsk && searchData.peopleAlsoAsk.length > 0) {
+    context += `❓ **Preguntas relacionadas:**\n`;
+    searchData.peopleAlsoAsk.slice(0, 3).forEach(q => {
+      context += `- ${q.question}\n`;
+      if (q.snippet) context += `  ${q.snippet}\n`;
+    });
+    context += '\n';
+  }
+  
+  return context;
+}
 
 // Función para cambiar el modo de chat
 function setChatMode(mode) {
@@ -6785,20 +7385,34 @@ function setChatMode(mode) {
   deepResearchMode = mode === 'deep';
   studyMode = mode === 'study';
 
+  webSearchMode = mode === 'web';
+  
   // Actualizar todos los toggles
   const toggles = document.querySelectorAll('.chat-mode-toggle');
+  const visibleModes = getVisibleChatModes();
+  
   toggles.forEach(toggle => {
     toggle.setAttribute('data-active-mode', mode);
     toggle.querySelectorAll('.chat-mode-option').forEach(opt => {
       opt.classList.toggle('active', opt.dataset.mode === mode);
     });
+    
+    // Calcular posición del slider basado en modos visibles
+    const visibleModesList = [];
+    toggle.querySelectorAll('.chat-mode-option').forEach(opt => {
+      if (visibleModes.includes(opt.dataset.mode)) {
+        visibleModesList.push(opt.dataset.mode);
+      }
+    });
+    updateSliderPosition(toggle, visibleModesList);
   });
 
   // Log para debugging
   const modeNames = {
     'normal': '💬 Normal',
-    'deep': '🔬 Deep Research',
-    'study': '📚 Modo Estudio'
+    'deep': '🧠 Deep Think',
+    'study': '📚 Modo Estudio',
+    'web': '🌐 Búsqueda Web'
   };
   console.log(`Modo de chat: ${modeNames[mode]}`);
 }
@@ -6820,9 +7434,12 @@ function initDeepResearch() {
       });
     });
   });
+  
+  // Aplicar visibilidad de modos según preferencias guardadas
+  updateChatModeTogglesVisibility();
 }
 
-// Crear elemento de progreso de Deep Research
+// Crear elemento de progreso de Deep Think
 function createDeepResearchProgressElement() {
   const container = document.createElement('div');
   container.className = 'deep-research-container';
@@ -6830,16 +7447,13 @@ function createDeepResearchProgressElement() {
     <div class="deep-research-header">
       <div class="deep-research-title">
         <svg class="deep-research-title-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <!-- Spinner ring -->
-          <circle class="spinner-ring" cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="34 100" stroke-linejoin="round" opacity="0.12"></circle>
-          <!-- Magnifier icon (static) -->
-          <circle cx="11" cy="11" r="5" stroke="currentColor" stroke-width="1.6"></circle>
-          <path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path class="spinner-ring" d="M12 2C7.58 2 4 5.58 4 10c0 2.5 1.2 4.7 3 6.2V19c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-2.8c1.8-1.5 3-3.7 3-6.2 0-4.42-3.58-8-8-8z" stroke="currentColor" stroke-width="1.6" fill="none"/>
+          <path d="M9 13v2M12 11v4M15 13v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
         </svg>
-        Investigación profunda
+        Pensamiento profundo
       </div>
       <div class="deep-research-header-right">
-        <span class="deep-research-status">Iniciando investigación...</span>
+        <span class="deep-research-status">Iniciando análisis...</span>
       </div>
     </div>
     <div class="deep-research-progress">
@@ -7371,10 +7985,12 @@ El informe debe ser comprensivo pero conciso.`;
   }
 }
 
-// Función principal de Deep Research
+// Función principal de Deep Think
 async function executeDeepResearch(userQuery, conversation) {
   console.log('🔬 Iniciando Deep Research:', userQuery);
 
+  console.log('🧠 Iniciando Deep Think:', userQuery);
+  
   // Configurar control de cancelación y tiempo
   deepResearchAbortController = new AbortController();
   deepResearchActiveConversationId = conversation.id;
@@ -7709,7 +8325,7 @@ async function executeDeepResearch(userQuery, conversation) {
   return findings;
 }
 
-// Modificar el handleSubmit original para soportar Deep Research y Modo Estudio
+// Modificar el handleSubmit original para soportar Deep Research, Modo Estudio y Modo Web
 const originalHandleSubmit = handleSubmit;
 
 async function handleSubmitWithDeepResearch(event) {
@@ -7742,9 +8358,136 @@ async function handleSubmitWithDeepResearch(event) {
     return;
   }
 
+  
+  // Si el modo web está activo, buscar en internet primero con UI visual
+  if (webSearchMode) {
+    const isEmptyState = emptyState?.style.display !== 'none';
+    const activeInput = isEmptyState ? promptInput : promptInputInline;
+    const prompt = activeInput?.value.trim();
+    
+    if (!prompt) return;
+    
+    const conversation = state.conversations[state.activeId];
+    if (!conversation) return;
+    
+    // Limpiar input
+    activeInput.value = '';
+    autoResizeTextarea(activeInput);
+    
+    // Mostrar el chat si estamos en empty state
+    if (isEmptyState) {
+      showChatState();
+    }
+    
+    // Crear mensaje del usuario
+    const userMessage = createMessage('user', prompt);
+    conversation.messages.push(userMessage);
+    touchConversation(conversation.id);
+    appendMessageElement(userMessage);
+    updateConversationTitleFromContent(conversation);
+    conversation.updatedAt = Date.now();
+    persistState();
+    renderConversationList();
+    
+    // Crear UI de búsqueda web
+    const webSearchUI = createWebSearchUI(prompt);
+    
+    // Crear mensaje del asistente con la UI de búsqueda
+    const assistantMessage = createMessage('assistant', '');
+    conversation.messages.push(assistantMessage);
+    const { bubble } = appendMessageElement(assistantMessage);
+    
+    // Insertar la UI de búsqueda en el bubble
+    bubble.innerHTML = '';
+    bubble.appendChild(webSearchUI);
+    
+    // Scroll hacia abajo
+    const chatArea = document.querySelector('.chat-area');
+    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+    
+    console.log('🌐 Buscando en la web:', prompt);
+    
+    try {
+      // Realizar la búsqueda
+      const searchResults = await searchWeb(prompt);
+      
+      if (searchResults) {
+        // Actualizar la UI con los resultados
+        updateWebSearchUI(webSearchUI, searchResults, prompt);
+        
+        const formattedResults = formatSearchResults(searchResults);
+        window._webSearchContext = formattedResults;
+        window._webSearchQuery = prompt;
+        window._webSearchResults = searchResults;
+        console.log('🌐 Resultados encontrados:', searchResults);
+        
+        // Pequeña pausa para que se vea la animación
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Ahora generar la respuesta del modelo
+        // Añadir un separador visual
+        const separator = document.createElement('div');
+        separator.style.cssText = 'height: 1px; background: rgba(255,255,255,0.1); margin: 16px 0;';
+        bubble.appendChild(separator);
+        
+        // Crear contenedor para la respuesta
+        const responseContainer = document.createElement('div');
+        responseContainer.className = 'web-search-response';
+        bubble.appendChild(responseContainer);
+        
+        // Guardar referencia para la respuesta streaming
+        window._webSearchResponseContainer = responseContainer;
+        window._webSearchModeActive = true;
+        
+        // Construir mensajes para el modelo
+        const payloadMessages = buildWebSearchPayload(conversation, prompt, formattedResults);
+        
+        state.loading = true;
+        
+        try {
+          // Pasar los resultados de búsqueda para el botón de fuentes
+          await streamAssistantResponseInContainer(conversation, payloadMessages, responseContainer, assistantMessage, searchResults);
+        } catch (error) {
+          console.error('Error generando respuesta:', error);
+          responseContainer.innerHTML = `<p style="color: #ef4444;">⚠️ Error al generar respuesta: ${error.message}</p>`;
+        } finally {
+          state.loading = false;
+          window._webSearchModeActive = false;
+          window._webSearchContext = null;
+          window._webSearchResponseContainer = null;
+        }
+        
+      } else {
+        // Error en la búsqueda
+        webSearchUI.innerHTML = `
+          <div style="color: #ef4444; padding: 12px;">
+            ⚠️ No se pudieron obtener resultados de búsqueda. Intenta de nuevo.
+          </div>
+        `;
+        window._webSearchContext = null;
+        window._webSearchQuery = null;
+      }
+    } catch (error) {
+      console.error('Error en búsqueda web:', error);
+      webSearchUI.innerHTML = `
+        <div style="color: #ef4444; padding: 12px;">
+          ⚠️ Error en la búsqueda: ${error.message}
+        </div>
+      `;
+      window._webSearchContext = null;
+      window._webSearchQuery = null;
+    }
+    
+    persistState();
+    return;
+  }
+  
+  // Reset web search state
+  window._webSearchModeActive = false;
+  window._webSearchContext = null;
+  
   // Si el modo estudio está activo, añadir el prompt de sistema
   if (studyMode) {
-    // Guardar temporalmente el modo estudio activo para usarlo en streamAssistantResponse
     window._studyModeActive = true;
   } else {
     window._studyModeActive = false;
@@ -7752,6 +8495,304 @@ async function handleSubmitWithDeepResearch(event) {
 
   // Si no, usar el flujo normal
   return originalHandleSubmit.call(this, event);
+}
+
+// Construir payload para búsqueda web
+function buildWebSearchPayload(conversation, prompt, webContext) {
+  const payloadMessages = [];
+  
+  // Mensaje de sistema con contexto web
+  const systemMessage = `🌐 MODO BÚSQUEDA WEB ACTIVADO
+
+He realizado una búsqueda en internet sobre la consulta del usuario. Aquí están los resultados que encontré:
+
+${webContext}
+
+INSTRUCCIONES:
+1. Usa esta información de internet para responder la pregunta del usuario de manera completa y precisa.
+2. Sintetiza la información de múltiples fuentes cuando sea relevante.
+3. Si citas información específica, menciona de qué fuente proviene.
+4. Si la información parece desactualizada o contradictoria, indícalo.
+5. Complementa con tu conocimiento cuando sea apropiado.
+6. Responde en español de forma clara y útil.`;
+
+  payloadMessages.push({
+    role: 'system',
+    content: systemMessage
+  });
+  
+  // Añadir historial de conversación (últimos mensajes relevantes)
+  const recentMessages = conversation.messages.slice(-6, -1); // Excluir el último que es el actual
+  recentMessages.forEach(msg => {
+    if (msg.role === 'user' || msg.role === 'assistant') {
+      payloadMessages.push({
+        role: msg.role,
+        content: msg.content || ''
+      });
+    }
+  });
+  
+  // Añadir el mensaje actual del usuario
+  payloadMessages.push({
+    role: 'user',
+    content: prompt
+  });
+  
+  return payloadMessages;
+}
+
+// Crear bloque de razonamiento para modo web (streaming en vivo)
+function createWebThinkingBlock(thinking, isLoading = true) {
+  if (isLoading) {
+    return `
+      <div class="web-thinking-block expanded">
+        <div class="web-thinking-block-header">
+          <svg class="web-thinking-block-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          <span class="web-thinking-block-title">Analizando fuentes<span class="web-thinking-dots"><span>.</span><span>.</span><span>.</span></span></span>
+        </div>
+        <div class="web-thinking-block-content">
+          <div class="web-thinking-block-text">${escapeHtml(thinking || '')}<span class="web-thinking-cursor">▊</span></div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Bloque colapsado después de terminar
+  return `
+    <div class="web-thinking-block collapsed" onclick="this.classList.toggle('expanded'); this.classList.toggle('collapsed');">
+      <div class="web-thinking-block-header">
+        <svg class="web-thinking-block-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <span class="web-thinking-block-title">Análisis web completado</span>
+        <span class="web-thinking-block-chevron">▼</span>
+      </div>
+      <div class="web-thinking-block-content">
+        <div class="web-thinking-block-text">${escapeHtml(thinking || '')}</div>
+      </div>
+    </div>
+  `;
+}
+
+// Stream respuesta en un contenedor específico
+async function streamAssistantResponseInContainer(conversation, payloadMessages, container, assistantMessage, searchResults = null) {
+  if (!state.currentModel) {
+    throw new Error('Selecciona un modelo antes de enviar un mensaje.');
+  }
+
+  // Mostrar bloque de razonamiento inicial
+  container.innerHTML = createWebThinkingBlock('', true);
+  
+  const body = {
+    model: state.currentModel,
+    stream: true,
+    messages: payloadMessages,
+    options: {
+      num_ctx: 8192
+    }
+  };
+
+  console.log('🌐 Enviando solicitud al modelo:', state.currentModel);
+
+  const response = await fetch(`${API_BASE}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Error del servidor:', response.status, errorText);
+    throw new Error(`Error del servidor: ${response.statusText}`);
+  }
+
+  const reader = response.body.getReader();
+  currentStreamReader = reader;
+  updateSendButtonToStop();
+
+  let fullContent = '';
+  const decoder = new TextDecoder();
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (wasCancelled) {
+        wasCancelled = false;
+        break;
+      }
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n').filter(line => line.trim());
+
+      for (const line of lines) {
+        try {
+          const json = JSON.parse(line);
+          if (json.message?.content) {
+            fullContent += json.message.content;
+            
+            // Actualizar el bloque de razonamiento en vivo
+            const thinkingTextEl = container.querySelector('.web-thinking-block-text');
+            if (thinkingTextEl) {
+              thinkingTextEl.innerHTML = escapeHtml(fullContent) + '<span class="web-thinking-cursor">▊</span>';
+              
+              // Auto-scroll dentro del bloque de pensamiento
+              const contentEl = container.querySelector('.web-thinking-block-content');
+              if (contentEl) {
+                contentEl.scrollTop = contentEl.scrollHeight;
+              }
+            }
+            
+            // Scroll del chat
+            const chatArea = document.querySelector('.chat-area');
+            if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+          }
+        } catch (e) {
+          // Ignorar errores de parsing JSON
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error durante el streaming:', error);
+    throw error;
+  } finally {
+    currentStreamReader = null;
+    updateStopButtonToSend();
+  }
+  
+  // Cuando termina: mostrar bloque colapsado + respuesta formateada
+  if (fullContent) {
+    let html = createWebThinkingBlock(fullContent, false);
+    html += '<div class="web-response-content">' + parseMarkdown(fullContent) + '</div>';
+    container.innerHTML = html;
+    
+    const responseEl = container.querySelector('.web-response-content');
+    if (responseEl && typeof renderMathInElement !== 'undefined') {
+      renderMathInElement(responseEl, {
+        delimiters: [
+          {left: '$$', right: '$$', display: true},
+          {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false
+      });
+    }
+  }
+
+  // Actualizar el mensaje en la conversación
+  assistantMessage.content = fullContent;
+  
+  // Guardar datos de búsqueda web en el mensaje para persistencia
+  if (searchResults && searchResults.organic) {
+    assistantMessage.webSearchData = {
+      query: window._webSearchQuery || '',
+      results: searchResults.organic.slice(0, 5).map(r => ({
+        title: r.title,
+        link: r.link,
+        snippet: r.snippet || ''
+      }))
+    };
+  }
+  
+  // Añadir botones de copiar, regenerar y fuentes (si es búsqueda web)
+  const copyContainer = document.createElement('div');
+  copyContainer.className = 'copy-message-container';
+  
+  const regenerateBtn = document.createElement('button');
+  regenerateBtn.className = 'regenerate-message-btn';
+  regenerateBtn.title = 'Regenerar respuesta';
+  regenerateBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M23 20v-6h-6"></path><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>';
+  
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'copy-message-btn';
+  copyBtn.title = 'Copiar mensaje';
+  copyBtn.innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>
+  `;
+  copyBtn.onclick = () => copyToClipboard(fullContent, copyBtn);
+  
+  copyContainer.appendChild(regenerateBtn);
+  copyContainer.appendChild(copyBtn);
+  
+  // Añadir botón de fuentes solo si hay resultados de búsqueda web
+  if (searchResults && searchResults.organic && searchResults.organic.length > 0) {
+    const sourcesBtn = document.createElement('button');
+    sourcesBtn.className = 'web-sources-btn';
+    sourcesBtn.title = 'Ver fuentes consultadas';
+    sourcesBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>
+      <span>${searchResults.organic.length}</span>
+    `;
+    
+    // Crear el popup de fuentes
+    const sourcesPopup = document.createElement('div');
+    sourcesPopup.className = 'web-sources-popup';
+    sourcesPopup.style.display = 'none';
+    
+    let popupContent = '<div class="web-sources-popup-header"><span>Fuentes consultadas</span></div>';
+    popupContent += '<div class="web-sources-popup-list">';
+    
+    searchResults.organic.slice(0, 5).forEach(result => {
+      let domain = '';
+      let faviconUrl = '';
+      try {
+        const urlObj = new URL(result.link);
+        domain = urlObj.hostname.replace('www.', '');
+        faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+      } catch (e) {
+        domain = 'web';
+      }
+      
+      popupContent += `
+        <a href="${result.link}" target="_blank" rel="noopener noreferrer" class="web-sources-popup-item">
+          <img src="${faviconUrl}" alt="" class="web-sources-popup-favicon" onerror="this.style.display='none'">
+          <div class="web-sources-popup-info">
+            <div class="web-sources-popup-title">${escapeHtml(result.title)}</div>
+            <div class="web-sources-popup-url">${domain}</div>
+          </div>
+        </a>
+      `;
+    });
+    
+    popupContent += '</div>';
+    sourcesPopup.innerHTML = popupContent;
+    
+    // Toggle del popup
+    sourcesBtn.onclick = (e) => {
+      e.stopPropagation();
+      const isVisible = sourcesPopup.style.display === 'block';
+      sourcesPopup.style.display = isVisible ? 'none' : 'block';
+    };
+    
+    // Cerrar popup al hacer clic fuera
+    document.addEventListener('click', (e) => {
+      if (!sourcesBtn.contains(e.target) && !sourcesPopup.contains(e.target)) {
+        sourcesPopup.style.display = 'none';
+      }
+    });
+    
+    copyContainer.appendChild(sourcesBtn);
+    copyContainer.appendChild(sourcesPopup);
+  }
+  
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'message-time';
+  timeSpan.textContent = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  
+  copyContainer.appendChild(timeSpan);
+  container.appendChild(copyContainer);
+  
+  persistState();
+  console.log('🌐 Respuesta completada');
 }
 
 // Sobrescribir handleSubmit globalmente
