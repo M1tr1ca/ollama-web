@@ -1,196 +1,208 @@
 <!doctype html>
 <html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ollama Web</title>
-    <link rel="icon" type="image/png" href="/assets/Fondo.png" />
-    <link rel="stylesheet" href="/styles.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
-  </head>
-  <body>
-    <div id="app" class="layout">
-      <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-          <span class="sidebar-logo">Ollama Web</span>
-          <button id="toggle-sidebar" class="toggle-sidebar-button" title="Minimizar barra lateral">
-            <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/>
-              <line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" stroke-width="1.5"/>
-            </svg>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ollama Web</title>
+  <link rel="icon" type="image/png" href="/assets/Fondo.png" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+    integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+    integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8"
+    crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05"
+    crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+  <script src="js/translation-manager.js"></script>
+</head>
+
+<body>
+  <div id="app" class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-logo">Ollama Web</span>
+        <button id="toggle-sidebar" class="toggle-sidebar-button" title="Minimizar barra lateral">
+          <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5" />
+            <line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </button>
+      </div>
+
+      <button id="new-conversation" class="new-conversation-button" data-i18n="sidebar.newConversation">
+        <span class="icon">＋</span>
+        Nueva conversación
+      </button>
+
+      <!-- Sección de Proyectos -->
+      <section class="projects-section" aria-label="Proyectos">
+        <header class="projects-header">
+          <h2 data-i18n="sidebar.projects">Proyectos</h2>
+          <button id="new-project-btn" class="new-project-btn" title="Nuevo proyecto">＋</button>
+        </header>
+        <ul id="projects-list" class="projects-list"></ul>
+      </section>
+
+      <section class="conversation-section" aria-label="Conversaciones recientes">
+        <header class="conversation-header">
+          <h2 data-i18n="sidebar.recent">Recientes</h2>
+          <button id="delete-all-conversations-btn" class="delete-all-btn icon-button small"
+            title="Borrar todas las conversaciones">🗑</button>
+        </header>
+        <ul id="conversation-list" class="conversation-list"></ul>
+      </section>
+
+      <footer class="sidebar-footer">
+        <div class="user-card" id="user-card">
+          <div class="avatar">D</div>
+          <div class="user-info">
+            <p class="user-name" id="user-name-display">Default</p>
+          </div>
+          <span class="chevron">▼</span>
+        </div>
+        <div id="user-menu" class="user-menu" style="display: none;">
+          <button class="user-menu-item" id="settings-btn">
+            <span class="menu-icon">⚙</span>
+            <span data-i18n="sidebar.settings">Configuración</span>
           </button>
         </div>
-
-        <button id="new-conversation" class="new-conversation-button">
-          <span class="icon">＋</span>
-          Nueva conversación
-        </button>
-
-        <!-- Sección de Proyectos -->
-        <section class="projects-section" aria-label="Proyectos">
-          <header class="projects-header">
-            <h2>Proyectos</h2>
-            <button id="new-project-btn" class="new-project-btn" title="Nuevo proyecto">＋</button>
-          </header>
-          <ul id="projects-list" class="projects-list"></ul>
-        </section>
-
-        <section class="conversation-section" aria-label="Conversaciones recientes">
-          <header class="conversation-header">
-            <h2>Recientes</h2>
-            <button id="delete-all-conversations-btn" class="delete-all-btn icon-button small" title="Borrar todas las conversaciones">🗑</button>
-          </header>
-          <ul id="conversation-list" class="conversation-list"></ul>
-        </section>
-
-        <footer class="sidebar-footer">
-          <div class="user-card" id="user-card">
-            <div class="avatar">D</div>
-            <div class="user-info">
-              <p class="user-name" id="user-name-display">Default</p>
-            </div>
-            <span class="chevron">▼</span>
+        <div id="settings-menu" class="settings-menu" style="display: none;">
+          <button class="user-menu-item" id="change-name-btn-menu">
+            <span class="menu-icon">✎</span>
+            <span data-i18n="sidebar.changeName">Cambiar nombre</span>
+          </button>
+          <button class="user-menu-item" id="ai-personalization-btn">
+            <span class="menu-icon">✨</span>
+            <span data-i18n="sidebar.aiPersonalization">Personalización de IA</span>
+          </button>
+          <button class="user-menu-item" id="memory-btn">
+            <span class="menu-icon">🧠</span>
+            <span data-i18n="sidebar.memory">Memoria</span>
+          </button>
+          <button class="user-menu-item" id="dashboard-btn">
+            <span class="menu-icon">📊</span>
+            <span data-i18n="sidebar.dashboard">Dashboard de uso</span>
+          </button>
+          <button class="user-menu-item" id="background-personalization-btn">
+            <span class="menu-icon">🖼️</span>
+            <span data-i18n="sidebar.backgroundPersonalization">Personalizar fondo</span>
+          </button>
+          <div class="settings-divider"></div>
+          <div class="settings-themes-label" data-i18n="sidebar.themes">Temas:</div>
+          <div class="settings-themes-grid">
+            <button class="theme-option-compact" data-theme="orange" title="Naranja">
+              <span class="theme-color-compact" style="background: linear-gradient(135deg, #d97757, #cc6b4d);"></span>
+            </button>
+            <button class="theme-option-compact" data-theme="green" title="Verde Oscuro">
+              <span class="theme-color-compact" style="background: linear-gradient(135deg, #065f46, #047857);"></span>
+            </button>
+            <button class="theme-option-compact" data-theme="purple" title="Morado">
+              <span class="theme-color-compact" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></span>
+            </button>
+            <button class="theme-option-compact" data-theme="pink" title="Rojo Cereza">
+              <span class="theme-color-compact" style="background: linear-gradient(135deg, #dc2626, #991b1b);"></span>
+            </button>
+            <button class="theme-option-compact" data-theme="cyan" title="Azul Cielo">
+              <span class="theme-color-compact" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);"></span>
+            </button>
+            <button class="theme-option-compact" data-theme="navy" title="Azul Marino">
+              <span class="theme-color-compact" style="background: linear-gradient(135deg, #1e40af, #1e3a8a);"></span>
+            </button>
+            <button class="theme-option-compact" data-theme="petroleum" title="Azul Petróleo">
+              <span class="theme-color-compact" style="background: linear-gradient(135deg, #24495e, #1a3442);"></span>
+            </button>
+            <button class="theme-option-compact theme-custom-color" id="custom-color-btn" title="Color personalizado">
+              <span class="theme-color-compact custom-color-icon">🎨</span>
+            </button>
+            <input type="color" id="custom-color-picker" style="display: none;" />
           </div>
-          <div id="user-menu" class="user-menu" style="display: none;">
-            <button class="user-menu-item" id="settings-btn">
-              <span class="menu-icon">⚙</span>
-              <span>Configuración</span>
+          <div class="settings-divider"></div>
+          <div class="settings-themes-label" data-i18n="sidebar.font">Fuente:</div>
+          <div class="font-selector">
+            <button class="font-option" data-font="normal" title="Fuente normal">
+              <span class="font-preview font-normal">Aa</span>
+              <span class="font-name" data-i18n="sidebar.fontNormal">Normal</span>
             </button>
-          </div>
-          <div id="settings-menu" class="settings-menu" style="display: none;">
-            <button class="user-menu-item" id="change-name-btn-menu">
-              <span class="menu-icon">✎</span>
-              <span>Cambiar nombre</span>
+            <button class="font-option" data-font="dyslexic" title="OpenDyslexic - Facilita la lectura">
+              <span class="font-preview font-dyslexic">Aa</span>
+              <span class="font-name" data-i18n="sidebar.fontDyslexic">Dislexia</span>
             </button>
-            <button class="user-menu-item" id="ai-personalization-btn">
-              <span class="menu-icon">✨</span>
-              <span>Personalización de IA</span>
-            </button>
-            <button class="user-menu-item" id="memory-btn">
-              <span class="menu-icon">🧠</span>
-              <span>Memoria</span>
-            </button>
-            <button class="user-menu-item" id="dashboard-btn">
-              <span class="menu-icon">📊</span>
-              <span>Dashboard de uso</span>
-            </button>
-            <button class="user-menu-item" id="background-personalization-btn">
-              <span class="menu-icon">🖼️</span>
-              <span>Personalizar fondo</span>
-            </button>
-            <div class="settings-divider"></div>
-            <div class="settings-themes-label">Temas:</div>
-            <div class="settings-themes-grid">
-              <button class="theme-option-compact" data-theme="orange" title="Naranja">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #d97757, #cc6b4d);"></span>
-              </button>
-              <button class="theme-option-compact" data-theme="green" title="Verde Oscuro">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #065f46, #047857);"></span>
-              </button>
-              <button class="theme-option-compact" data-theme="purple" title="Morado">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></span>
-              </button>
-              <button class="theme-option-compact" data-theme="pink" title="Rojo Cereza">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #dc2626, #991b1b);"></span>
-              </button>
-              <button class="theme-option-compact" data-theme="cyan" title="Azul Cielo">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);"></span>
-              </button>
-              <button class="theme-option-compact" data-theme="navy" title="Azul Marino">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #1e40af, #1e3a8a);"></span>
-              </button>
-              <button class="theme-option-compact" data-theme="petroleum" title="Azul Petróleo">
-                <span class="theme-color-compact" style="background: linear-gradient(135deg, #24495e, #1a3442);"></span>
-              </button>
-              <button class="theme-option-compact theme-custom-color" id="custom-color-btn" title="Color personalizado">
-                <span class="theme-color-compact custom-color-icon">🎨</span>
-              </button>
-              <input type="color" id="custom-color-picker" style="display: none;" />
-            </div>
-            <div class="settings-divider"></div>
-            <div class="settings-themes-label">Fuente:</div>
-            <div class="font-selector">
-              <button class="font-option" data-font="normal" title="Fuente normal">
-                <span class="font-preview font-normal">Aa</span>
-                <span class="font-name">Normal</span>
-              </button>
-              <button class="font-option" data-font="dyslexic" title="OpenDyslexic - Facilita la lectura">
-                <span class="font-preview font-dyslexic">Aa</span>
-                <span class="font-name">Dislexia</span>
-              </button>
-            </div>
-          </div>
-        </footer>
-        
-        <!-- Modal para cambiar nombre -->
-        <div id="change-name-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h3>Cambiar nombre</h3>
-              <button class="modal-close" id="close-name-modal">×</button>
-            </div>
-            <div class="modal-body">
-              <label for="new-name-input">Nuevo nombre:</label>
-              <input type="text" id="new-name-input" class="modal-input" placeholder="Ingresa tu nombre" />
-            </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="cancel-name-change">Cancelar</button>
-              <button class="modal-button primary" id="save-name-change">Guardar</button>
-            </div>
           </div>
         </div>
-        
-        <!-- Modal para personalización de IA -->
-        <div id="ai-personalization-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content modal-content-compact">
-            <div class="modal-header">
-              <h3>Personalización de IA</h3>
-              <button class="modal-close" id="close-ai-personalization-modal">×</button>
+      </footer>
+
+      <!-- Modal para cambiar nombre -->
+      <div id="change-name-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 data-i18n="modal.changeName.title">Cambiar nombre</h3>
+            <button class="modal-close" id="close-name-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <label for="new-name-input" data-i18n="modal.changeName.label">Nuevo nombre:</label>
+            <input type="text" id="new-name-input" class="modal-input" placeholder="Ingresa tu nombre"
+              data-i18n="modal.changeName.placeholder" data-i18n-target="placeholder" />
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="cancel-name-change" data-i18n="modal.cancel">Cancelar</button>
+            <button class="modal-button primary" id="save-name-change" data-i18n="modal.save">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal para personalización de IA -->
+      <div id="ai-personalization-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-content-compact">
+          <div class="modal-header">
+            <h3 data-i18n="modal.aiPersonalization.title">Personalización de IA</h3>
+            <button class="modal-close" id="close-ai-personalization-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="personalization-section">
+              <label for="ai-personal-info-input" class="section-label"
+                data-i18n="modal.aiPersonalization.personalInfo">
+                Información personal
+              </label>
+              <textarea id="ai-personal-info-input" class="modal-textarea-compact" rows="3"
+                placeholder="Ej: Estudio ingeniería informática, trabajo como desarrollador..."
+                data-i18n="modal.aiPersonalization.personalInfoPlaceholder" data-i18n-target="placeholder"></textarea>
             </div>
-            <div class="modal-body">
-              <div class="personalization-section">
-                <label for="ai-personal-info-input" class="section-label">
-                  Información personal
-                </label>
-                <textarea id="ai-personal-info-input" class="modal-textarea-compact" rows="3" placeholder="Ej: Estudio ingeniería informática, trabajo como desarrollador..."></textarea>
-              </div>
-              
-              <div class="personalization-section">
-                <label class="section-label">
-                  Estilo de respuesta
-                </label>
-                <div class="style-selector-grid">
-                  <button class="style-option-compact" data-style="normal">
-                    <span class="style-name-compact">Normal</span>
-                    <span class="style-desc-compact">Deja el modelo como está</span>
-                  </button>
-                  <button class="style-option-compact" data-style="aprendizaje">
-                    <span class="style-name-compact">Aprendizaje</span>
-                    <span class="style-desc-compact">Paciente y educativo</span>
-                  </button>
-                  <button class="style-option-compact" data-style="conciso">
-                    <span class="style-name-compact">Conciso</span>
-                    <span class="style-desc-compact">Respuestas cortas</span>
-                  </button>
-                  <button class="style-option-compact" data-style="explicativo">
-                    <span class="style-name-compact">Explicativo</span>
-                    <span class="style-desc-compact">Didáctico y claro</span>
-                  </button>
-                  <button class="style-option-compact" data-style="formal">
-                    <span class="style-name-compact">Formal</span>
-                    <span class="style-desc-compact">Estructurado</span>
-                  </button>
-                  <button class="style-option-compact" data-style="plan">
-                    <span class="style-name-compact">Plan</span>
-                    <span class="style-desc-compact">Estratégico y detallado</span>
-                  </button>
-                </div>
+
+            <div class="personalization-section">
+              <label class="section-label" data-i18n="modal.aiPersonalization.responseStyle">
+                Estilo de respuesta
+              </label>
+              <div class="style-selector-grid">
+                <button class="style-option-compact" data-style="normal">
+                  <span class="style-name-compact" data-i18n="style.normal">Normal</span>
+                  <span class="style-desc-compact" data-i18n="style.normalDesc">Deja el modelo como está</span>
+                </button>
+                <button class="style-option-compact" data-style="aprendizaje">
+                  <span class="style-name-compact" data-i18n="style.learning">Aprendizaje</span>
+                  <span class="style-desc-compact" data-i18n="style.learningDesc">Paciente y educativo</span>
+                </button>
+                <button class="style-option-compact" data-style="conciso">
+                  <span class="style-name-compact" data-i18n="style.concise">Conciso</span>
+                  <span class="style-desc-compact" data-i18n="style.conciseDesc">Respuestas cortas</span>
+                </button>
+                <button class="style-option-compact" data-style="explicativo">
+                  <span class="style-name-compact" data-i18n="style.explanatory">Explicativo</span>
+                  <span class="style-desc-compact" data-i18n="style.explanatoryDesc">Didáctico y claro</span>
+                </button>
+                <button class="style-option-compact" data-style="formal">
+                  <span class="style-name-compact" data-i18n="style.formal">Formal</span>
+                  <span class="style-desc-compact" data-i18n="style.formalDesc">Estructurado</span>
+                </button>
+                <button class="style-option-compact" data-style="plan">
+                  <span class="style-name-compact" data-i18n="style.plan">Plan</span>
+                  <span class="style-desc-compact" data-i18n="style.planDesc">Estratégico y detallado</span>
+                </button>
               </div>
               
               <div class="personalization-section">
@@ -230,516 +242,602 @@
                 </div>
               </div>
             </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="cancel-ai-personalization">Cancelar</button>
-              <button class="modal-button primary" id="save-ai-personalization">Guardar</button>
-            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="cancel-ai-personalization"
+              data-i18n="modal.cancel">Cancelar</button>
+            <button class="modal-button primary" id="save-ai-personalization" data-i18n="modal.save">Guardar</button>
           </div>
         </div>
-        
-        <!-- Modal para personalización de fondo -->
-        <div id="background-personalization-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content modal-content-compact">
-            <div class="modal-header">
-              <h3>Personalizar fondo</h3>
-              <button class="modal-close" id="close-background-personalization-modal">×</button>
-            </div>
-            <div class="modal-body">
-              <div class="personalization-section">
-                <div class="switch-container">
-                  <label class="switch-label">
-                    <span>Cambio automático diario</span>
-                    <span class="switch-description">El fondo cambiará automáticamente cada día a las 00:00</span>
-                  </label>
-                  <label class="switch">
-                    <input type="checkbox" id="auto-background-toggle" checked>
-                    <span class="slider"></span>
-                  </label>
-                </div>
-              </div>
-              
-              <div class="personalization-section" id="manual-background-section" style="display: none;">
-                <label class="section-label">
-                  Seleccionar fondo manualmente
+      </div>
+
+      <!-- Modal para personalización de fondo -->
+      <div id="background-personalization-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-content-compact">
+          <div class="modal-header">
+            <h3 data-i18n="modal.background.title">Personalizar fondo</h3>
+            <button class="modal-close" id="close-background-personalization-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="personalization-section">
+              <div class="switch-container">
+                <label class="switch-label">
+                  <span data-i18n="modal.background.auto">Cambio automático diario</span>
+                  <span class="switch-description" data-i18n="modal.background.autoDesc">El fondo cambiará
+                    automáticamente cada día a las 00:00</span>
                 </label>
-                <div class="background-gallery" id="background-gallery">
-                  <!-- Las imágenes se cargarán dinámicamente -->
-                </div>
+                <label class="switch">
+                  <input type="checkbox" id="auto-background-toggle" checked>
+                  <span class="slider"></span>
+                </label>
               </div>
             </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="cancel-background-personalization">Cancelar</button>
-              <button class="modal-button primary" id="save-background-personalization">Guardar</button>
+
+            <div class="personalization-section" id="manual-background-section" style="display: none;">
+              <label class="section-label" data-i18n="modal.background.manual">
+                Seleccionar fondo manualmente
+              </label>
+              <div class="background-gallery" id="background-gallery">
+                <!-- Las imágenes se cargarán dinámicamente -->
+              </div>
             </div>
           </div>
-        </div>
-        
-        <!-- Modal para Dashboard de uso -->
-        <div id="dashboard-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content modal-content-dashboard">
-            <div class="modal-header">
-              <h3>📊 Dashboard de Uso</h3>
-              <button class="modal-close" id="close-dashboard-modal">×</button>
-            </div>
-            <div class="modal-body">
-              <!-- Pestañas del dashboard -->
-              <div class="dashboard-tabs">
-                <button class="dashboard-tab active" data-tab="stats">Estadísticas</button>
-                <button class="dashboard-tab" data-tab="models">Modelos</button>
-              </div>
-              
-              <!-- Contenido: Estadísticas -->
-              <div id="dashboard-stats" class="dashboard-content active">
-                <!-- Tarjetas de resumen -->
-                <div class="dashboard-summary">
-                  <div class="summary-card">
-                    <div class="summary-icon">💬</div>
-                    <div class="summary-info">
-                      <span class="summary-value" id="stat-total-messages">0</span>
-                      <span class="summary-label">Mensajes totales</span>
-                    </div>
-                  </div>
-                  <div class="summary-card">
-                    <div class="summary-icon">📝</div>
-                    <div class="summary-info">
-                      <span class="summary-value" id="stat-total-conversations">0</span>
-                      <span class="summary-label">Conversaciones</span>
-                    </div>
-                  </div>
-                  <div class="summary-card">
-                    <div class="summary-icon">🔤</div>
-                    <div class="summary-info">
-                      <span class="summary-value" id="stat-total-tokens">~0</span>
-                      <span class="summary-label">Tokens estimados</span>
-                    </div>
-                  </div>
-                  <div class="summary-card">
-                    <div class="summary-icon">⏱️</div>
-                    <div class="summary-info">
-                      <span class="summary-value" id="stat-avg-response-time">0s</span>
-                      <span class="summary-label">Tiempo promedio respuesta</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Detalles estadísticos -->
-                <div class="dashboard-section">
-                  <h4 class="dashboard-section-title">📈 Uso detallado</h4>
-                  <div class="stats-grid">
-                    <div class="stat-item">
-                      <span class="stat-label">Mensajes enviados (usuario)</span>
-                      <span class="stat-value" id="stat-user-messages">0</span>
-                    </div>
-                    <div class="stat-item">
-                      <span class="stat-label">Respuestas recibidas (IA)</span>
-                      <span class="stat-value" id="stat-assistant-messages">0</span>
-                    </div>
-                    <div class="stat-item">
-                      <span class="stat-label">Caracteres enviados</span>
-                      <span class="stat-value" id="stat-chars-sent">0</span>
-                    </div>
-                    <div class="stat-item">
-                      <span class="stat-label">Caracteres recibidos</span>
-                      <span class="stat-value" id="stat-chars-received">0</span>
-                    </div>
-                    <div class="stat-item">
-                      <span class="stat-label">Archivos adjuntados</span>
-                      <span class="stat-value" id="stat-files-attached">0</span>
-                    </div>
-                    <div class="stat-item">
-                      <span class="stat-label">Proyectos creados</span>
-                      <span class="stat-value" id="stat-projects-count">0</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Actividad por día -->
-                <div class="dashboard-section">
-                  <h4 class="dashboard-section-title">📅 Actividad reciente (últimos 7 días)</h4>
-                  <div class="activity-chart" id="activity-chart"></div>
-                </div>
-                
-                <!-- Modelos más usados -->
-                <div class="dashboard-section">
-                  <h4 class="dashboard-section-title">🏆 Modelos más usados</h4>
-                  <div class="models-ranking" id="models-ranking"></div>
-                </div>
-              </div>
-              
-              <!-- Contenido: Modelos -->
-              <div id="dashboard-models" class="dashboard-content">
-                <div class="models-list" id="models-info-list">
-                  <div class="models-loading">
-                    <div class="loading-spinner"></div>
-                    <span>Cargando información de modelos...</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="close-dashboard-modal-btn">Cerrar</button>
-            </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="cancel-background-personalization"
+              data-i18n="modal.cancel">Cancelar</button>
+            <button class="modal-button primary" id="save-background-personalization"
+              data-i18n="modal.save">Guardar</button>
           </div>
         </div>
-        
-        <!-- Modal para gestión de memoria -->
-        <div id="memory-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content modal-content-memory">
-            <div class="modal-header">
-              <h3>🧠 Memoria</h3>
-              <button class="modal-close" id="close-memory-modal">×</button>
+      </div>
+
+      <!-- Modal para Dashboard de uso -->
+      <div id="dashboard-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-content-dashboard">
+          <div class="modal-header">
+            <h3 data-i18n="modal.dashboard.title">📊 Dashboard de Uso</h3>
+            <button class="modal-close" id="close-dashboard-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <!-- Pestañas del dashboard -->
+            <div class="dashboard-tabs">
+              <button class="dashboard-tab active" data-tab="stats"
+                data-i18n="modal.dashboard.tabStats">Estadísticas</button>
+              <button class="dashboard-tab" data-tab="models" data-i18n="modal.dashboard.tabModels">Modelos</button>
             </div>
-            <div class="modal-body">
-              <div class="personalization-section">
-                <div class="switch-container">
-                  <label class="switch-label">
-                    <span>Memoria activa</span>
-                    <span class="switch-description">La IA recordará información importante entre conversaciones</span>
-                  </label>
-                  <label class="switch">
-                    <input type="checkbox" id="memory-enabled-toggle" checked>
-                    <span class="slider"></span>
-                  </label>
+
+            <!-- Contenido: Estadísticas -->
+            <div id="dashboard-stats" class="dashboard-content active">
+              <!-- Tarjetas de resumen -->
+              <div class="dashboard-summary">
+                <div class="summary-card">
+                  <div class="summary-icon">💬</div>
+                  <div class="summary-info">
+                    <span class="summary-value" id="stat-total-messages">0</span>
+                    <span class="summary-label" data-i18n="modal.dashboard.totalMessages">Mensajes totales</span>
+                  </div>
+                </div>
+                <div class="summary-card">
+                  <div class="summary-icon">📝</div>
+                  <div class="summary-info">
+                    <span class="summary-value" id="stat-total-conversations">0</span>
+                    <span class="summary-label" data-i18n="modal.dashboard.totalConversations">Conversaciones</span>
+                  </div>
+                </div>
+                <div class="summary-card">
+                  <div class="summary-icon">🔤</div>
+                  <div class="summary-info">
+                    <span class="summary-value" id="stat-total-tokens">~0</span>
+                    <span class="summary-label" data-i18n="modal.dashboard.estimatedTokens">Tokens estimados</span>
+                  </div>
+                </div>
+                <div class="summary-card">
+                  <div class="summary-icon">⏱️</div>
+                  <div class="summary-info">
+                    <span class="summary-value" id="stat-avg-response-time">0s</span>
+                    <span class="summary-label" data-i18n="modal.dashboard.avgResponseTime">Tiempo promedio
+                      respuesta</span>
+                  </div>
                 </div>
               </div>
-              
-              <div class="personalization-section">
-                <label class="section-label">Añadir nuevo recuerdo</label>
-                <div class="memory-input-container">
-                  <input type="text" id="new-memory-input" class="modal-input" placeholder="Ej: Estudio ingeniería informática..." />
-                  <button class="memory-add-btn" id="add-memory-btn" title="Añadir recuerdo">+</button>
+
+              <!-- Detalles estadísticos -->
+              <div class="dashboard-section">
+                <h4 class="dashboard-section-title" data-i18n="modal.dashboard.detailedUsage">📈 Uso detallado</h4>
+                <div class="stats-grid">
+                  <div class="stat-item">
+                    <span class="stat-label" data-i18n="modal.dashboard.userMessages">Mensajes enviados (usuario)</span>
+                    <span class="stat-value" id="stat-user-messages">0</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label" data-i18n="modal.dashboard.assistantMessages">Respuestas recibidas
+                      (IA)</span>
+                    <span class="stat-value" id="stat-assistant-messages">0</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label" data-i18n="modal.dashboard.charsSent">Caracteres enviados</span>
+                    <span class="stat-value" id="stat-chars-sent">0</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label" data-i18n="modal.dashboard.charsReceived">Caracteres recibidos</span>
+                    <span class="stat-value" id="stat-chars-received">0</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label" data-i18n="modal.dashboard.filesAttached">Archivos adjuntados</span>
+                    <span class="stat-value" id="stat-files-attached">0</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label" data-i18n="modal.dashboard.projectsCreated">Proyectos creados</span>
+                    <span class="stat-value" id="stat-projects-count">0</span>
+                  </div>
                 </div>
               </div>
-              
-              <div class="personalization-section">
-                <div class="memory-header">
-                  <label class="section-label">Recuerdos guardados</label>
-                  <button class="memory-clear-all-btn" id="clear-all-memories-btn" title="Borrar todos">
-                    <span>🗑️</span> Borrar todos
+
+              <!-- Actividad por día -->
+              <div class="dashboard-section">
+                <h4 class="dashboard-section-title" data-i18n="modal.dashboard.recentActivity">📅 Actividad reciente
+                  (últimos 7 días)</h4>
+                <div class="activity-chart" id="activity-chart"></div>
+              </div>
+
+              <!-- Modelos más usados -->
+              <div class="dashboard-section">
+                <h4 class="dashboard-section-title" data-i18n="modal.dashboard.topModels">🏆 Modelos más usados</h4>
+                <div class="models-ranking" id="models-ranking"></div>
+              </div>
+            </div>
+
+            <!-- Contenido: Modelos -->
+            <div id="dashboard-models" class="dashboard-content">
+              <div class="models-list" id="models-info-list">
+                <div class="models-loading">
+                  <div class="loading-spinner"></div>
+                  <span data-i18n="modal.dashboard.loadingModels">Cargando información de modelos...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="close-dashboard-modal-btn"
+              data-i18n="modal.close">Cerrar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal para gestión de memoria -->
+      <div id="memory-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-content-memory">
+          <div class="modal-header">
+            <h3 data-i18n="modal.memory.title">🧠 Memoria</h3>
+            <button class="modal-close" id="close-memory-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="personalization-section">
+              <div class="switch-container">
+                <label class="switch-label">
+                  <span data-i18n="modal.memory.active">Memoria activa</span>
+                  <span class="switch-description" data-i18n="modal.memory.activeDesc">La IA recordará información
+                    importante entre conversaciones</span>
+                </label>
+                <label class="switch">
+                  <input type="checkbox" id="memory-enabled-toggle" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="personalization-section">
+              <label class="section-label" data-i18n="modal.memory.add">Añadir nuevo recuerdo</label>
+              <div class="memory-input-container">
+                <input type="text" id="new-memory-input" class="modal-input"
+                  placeholder="Ej: Estudio ingeniería informática..." data-i18n="modal.memory.addPlaceholder"
+                  data-i18n-target="placeholder" />
+                <button class="memory-add-btn" id="add-memory-btn" title="Añadir recuerdo">+</button>
+              </div>
+            </div>
+
+            <div class="personalization-section">
+              <div class="memory-header">
+                <label class="section-label" data-i18n="modal.memory.saved">Recuerdos guardados</label>
+                <button class="memory-clear-all-btn" id="clear-all-memories-btn" title="Borrar todos">
+                  <span>🗑️</span> <span data-i18n="modal.memory.clearAll">Borrar todos</span>
+                </button>
+              </div>
+              <div id="memories-list" class="memories-list">
+                <!-- Los recuerdos se cargarán dinámicamente -->
+                <div class="memory-empty-state">
+                  <span class="memory-empty-icon">💭</span>
+                  <p data-i18n="modal.memory.empty">No hay recuerdos guardados</p>
+                  <p class="memory-empty-hint" data-i18n="modal.memory.emptyHint">Añade información que quieras que la
+                    IA recuerde sobre ti</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="close-memory-modal-btn" data-i18n="modal.close">Cerrar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal para configuración de temas -->
+      <div id="settings-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 data-i18n="modal.settings.title">Configuración</h3>
+            <button class="modal-close" id="close-settings-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <label style="display: block; margin-bottom: 16px; font-size: 14px; color: rgba(255, 255, 255, 0.7);"
+              data-i18n="modal.settings.themeLabel">
+              Selecciona un color de tema:
+            </label>
+            <div class="theme-selector">
+              <button class="theme-option" data-theme="orange" title="Naranja">
+                <span class="theme-color" style="background: linear-gradient(135deg, #d97757, #cc6b4d);"></span>
+                <span class="theme-name" data-i18n="theme.orange">Naranja</span>
+              </button>
+              <button class="theme-option" data-theme="green" title="Verde Oscuro">
+                <span class="theme-color" style="background: linear-gradient(135deg, #065f46, #047857);"></span>
+                <span class="theme-name" data-i18n="theme.green">Verde Oscuro</span>
+              </button>
+              <button class="theme-option" data-theme="purple" title="Morado">
+                <span class="theme-color" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></span>
+                <span class="theme-name" data-i18n="theme.purple">Morado</span>
+              </button>
+              <button class="theme-option" data-theme="pink" title="Rojo Cereza">
+                <span class="theme-color" style="background: linear-gradient(135deg, #dc2626, #991b1b);"></span>
+                <span class="theme-name" data-i18n="theme.pink">Rojo Cereza</span>
+              </button>
+              <button class="theme-option" data-theme="cyan" title="Azul Cielo">
+                <span class="theme-color" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);"></span>
+                <span class="theme-name" data-i18n="theme.cyan">Azul Cielo</span>
+              </button>
+              <button class="theme-option" data-theme="navy" title="Azul Marino">
+                <span class="theme-color" style="background: linear-gradient(135deg, #1e40af, #1e3a8a);"></span>
+                <span class="theme-name" data-i18n="theme.navy">Azul Marino</span>
+              </button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="close-settings-btn" data-i18n="modal.close">Cerrar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal para gestión de proyectos -->
+      <div id="project-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-content-project">
+          <div class="modal-header">
+            <h3 id="project-modal-title" data-i18n="modal.project.title">Nuevo Proyecto</h3>
+            <button class="modal-close" id="close-project-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="personalization-section">
+              <label for="project-name-input" class="section-label" data-i18n="modal.project.name">
+                Nombre del proyecto
+              </label>
+              <input type="text" id="project-name-input" class="modal-input"
+                placeholder="Ej: Desarrollo Web, Tesis, etc." data-i18n="modal.project.namePlaceholder"
+                data-i18n-target="placeholder" />
+            </div>
+
+            <div class="personalization-section">
+              <label for="project-instructions-input" class="section-label" data-i18n="modal.project.instructions">
+                Instrucciones personalizadas para la IA
+              </label>
+              <textarea id="project-instructions-input" class="modal-textarea-compact" rows="4"
+                placeholder="Ej: Responde siempre en español técnico. Cuando expliques código, incluye comentarios detallados. Prioriza soluciones eficientes..."
+                data-i18n="modal.project.instructionsPlaceholder" data-i18n-target="placeholder"></textarea>
+              <span class="input-hint" data-i18n="modal.project.instructionsHint">Estas instrucciones se enviarán a la
+                IA en cada mensaje de este proyecto</span>
+            </div>
+
+            <div class="personalization-section">
+              <label class="section-label" data-i18n="modal.project.files">
+                Archivos de contexto
+              </label>
+              <div class="project-files-area">
+                <div class="project-files-dropzone" id="project-files-dropzone">
+                  <span class="dropzone-icon">📁</span>
+                  <span class="dropzone-text" data-i18n="modal.project.dropzone">Arrastra archivos aquí o haz clic para
+                    seleccionar</span>
+                  <span class="dropzone-hint" data-i18n="modal.project.dropzoneHint">Estos archivos se usarán como
+                    contexto en todas las conversaciones del
+                    proyecto</span>
+                  <input type="file" id="project-file-input" multiple
+                    accept=".txt,.md,.json,.csv,.py,.js,.html,.css,.xml,.pdf,.jpg,.jpeg,.png,.gif,.webp"
+                    style="display: none;">
+                </div>
+                <div id="project-files-list" class="project-files-list"></div>
+              </div>
+            </div>
+
+            <!-- Sección de información de contexto del modelo -->
+            <div class="personalization-section" id="project-context-info-section">
+              <label class="section-label">
+                <span class="section-label-icon">📊</span>
+                <span data-i18n="modal.project.contextUsage">Uso de contexto del modelo</span>
+              </label>
+              <div class="context-info-card" id="project-context-info">
+                <div class="context-info-header">
+                  <div class="context-model-info">
+                    <span class="context-model-icon">🤖</span>
+                    <div class="context-model-details">
+                      <span class="context-model-name" id="context-model-name"
+                        data-i18n="modal.project.selectModel">Selecciona un modelo</span>
+                      <span class="context-model-capacity" id="context-model-capacity">-- tokens disponibles</span>
+                    </div>
+                  </div>
+                  <button type="button" class="context-refresh-btn" id="context-refresh-btn"
+                    title="Actualizar información">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 4v6h6M23 20v-6h-6" />
+                      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+                    </svg>
                   </button>
                 </div>
-                <div id="memories-list" class="memories-list">
-                  <!-- Los recuerdos se cargarán dinámicamente -->
-                  <div class="memory-empty-state">
-                    <span class="memory-empty-icon">💭</span>
-                    <p>No hay recuerdos guardados</p>
-                    <p class="memory-empty-hint">Añade información que quieras que la IA recuerde sobre ti</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="close-memory-modal-btn">Cerrar</button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Modal para configuración de temas -->
-        <div id="settings-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h3>Configuración</h3>
-              <button class="modal-close" id="close-settings-modal">×</button>
-            </div>
-            <div class="modal-body">
-              <label style="display: block; margin-bottom: 16px; font-size: 14px; color: rgba(255, 255, 255, 0.7);">
-                Selecciona un color de tema:
-              </label>
-              <div class="theme-selector">
-                <button class="theme-option" data-theme="orange" title="Naranja">
-                  <span class="theme-color" style="background: linear-gradient(135deg, #d97757, #cc6b4d);"></span>
-                  <span class="theme-name">Naranja</span>
-                </button>
-                <button class="theme-option" data-theme="green" title="Verde Oscuro">
-                  <span class="theme-color" style="background: linear-gradient(135deg, #065f46, #047857);"></span>
-                  <span class="theme-name">Verde Oscuro</span>
-                </button>
-                <button class="theme-option" data-theme="purple" title="Morado">
-                  <span class="theme-color" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></span>
-                  <span class="theme-name">Morado</span>
-                </button>
-                <button class="theme-option" data-theme="pink" title="Rojo Cereza">
-                  <span class="theme-color" style="background: linear-gradient(135deg, #dc2626, #991b1b);"></span>
-                  <span class="theme-name">Rojo Cereza</span>
-                </button>
-                <button class="theme-option" data-theme="cyan" title="Azul Cielo">
-                  <span class="theme-color" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);"></span>
-                  <span class="theme-name">Azul Cielo</span>
-                </button>
-                <button class="theme-option" data-theme="navy" title="Azul Marino">
-                  <span class="theme-color" style="background: linear-gradient(135deg, #1e40af, #1e3a8a);"></span>
-                  <span class="theme-name">Azul Marino</span>
-                </button>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="close-settings-btn">Cerrar</button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Modal para gestión de proyectos -->
-        <div id="project-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content modal-content-project">
-            <div class="modal-header">
-              <h3 id="project-modal-title">Nuevo Proyecto</h3>
-              <button class="modal-close" id="close-project-modal">×</button>
-            </div>
-            <div class="modal-body">
-              <div class="personalization-section">
-                <label for="project-name-input" class="section-label">
-                  Nombre del proyecto
-                </label>
-                <input type="text" id="project-name-input" class="modal-input" placeholder="Ej: Desarrollo Web, Tesis, etc." />
-              </div>
-              
-              <div class="personalization-section">
-                <label for="project-instructions-input" class="section-label">
-                  Instrucciones personalizadas para la IA
-                </label>
-                <textarea id="project-instructions-input" class="modal-textarea-compact" rows="4" placeholder="Ej: Responde siempre en español técnico. Cuando expliques código, incluye comentarios detallados. Prioriza soluciones eficientes..."></textarea>
-                <span class="input-hint">Estas instrucciones se enviarán a la IA en cada mensaje de este proyecto</span>
-              </div>
-              
-              <div class="personalization-section">
-                <label class="section-label">
-                  Archivos de contexto
-                </label>
-                <div class="project-files-area">
-                  <div class="project-files-dropzone" id="project-files-dropzone">
-                    <span class="dropzone-icon">📁</span>
-                    <span class="dropzone-text">Arrastra archivos aquí o haz clic para seleccionar</span>
-                    <span class="dropzone-hint">Estos archivos se usarán como contexto en todas las conversaciones del proyecto</span>
-                    <input type="file" id="project-file-input" multiple accept=".txt,.md,.json,.csv,.py,.js,.html,.css,.xml,.pdf,.jpg,.jpeg,.png,.gif,.webp" style="display: none;">
-                  </div>
-                  <div id="project-files-list" class="project-files-list"></div>
-                </div>
-              </div>
-              
-              <!-- Sección de información de contexto del modelo -->
-              <div class="personalization-section" id="project-context-info-section">
-                <label class="section-label">
-                  <span class="section-label-icon">📊</span>
-                  Uso de contexto del modelo
-                </label>
-                <div class="context-info-card" id="project-context-info">
-                  <div class="context-info-header">
-                    <div class="context-model-info">
-                      <span class="context-model-icon">🤖</span>
-                      <div class="context-model-details">
-                        <span class="context-model-name" id="context-model-name">Selecciona un modelo</span>
-                        <span class="context-model-capacity" id="context-model-capacity">-- tokens disponibles</span>
-                      </div>
-                    </div>
-                    <button type="button" class="context-refresh-btn" id="context-refresh-btn" title="Actualizar información">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 4v6h6M23 20v-6h-6"/>
-                        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  <!-- Barra de progreso de uso de contexto -->
-                  <div class="context-usage-bar-container">
-                    <div class="context-usage-bar" id="context-usage-bar">
-                      <div class="context-usage-fill" id="context-usage-fill"></div>
-                    </div>
-                    <div class="context-usage-labels">
-                      <span class="context-usage-used" id="context-usage-used">0 tokens usados</span>
-                      <span class="context-usage-percent" id="context-usage-percent">0%</span>
-                    </div>
-                  </div>
-                  
-                  <!-- Desglose de tokens -->
-                  <div class="context-breakdown" id="context-breakdown">
-                    <div class="context-breakdown-item">
-                      <span class="breakdown-icon">📝</span>
-                      <span class="breakdown-label">Instrucciones:</span>
-                      <span class="breakdown-value" id="breakdown-instructions">0 tokens</span>
-                    </div>
-                    <div class="context-breakdown-item">
-                      <span class="breakdown-icon">📄</span>
-                      <span class="breakdown-label">Documentos:</span>
-                      <span class="breakdown-value" id="breakdown-documents">0 tokens</span>
-                    </div>
-                    <div class="context-breakdown-item">
-                      <span class="breakdown-icon">💬</span>
-                      <span class="breakdown-label">Reserva para chat:</span>
-                      <span class="breakdown-value" id="breakdown-chat">~2000 tokens</span>
-                    </div>
-                  </div>
-                  
-                  <!-- Advertencia si se excede el límite -->
-                  <div class="context-warning" id="context-warning" style="display: none;">
-                    <span class="warning-icon">⚠️</span>
-                    <div class="warning-content">
-                      <span class="warning-title" id="warning-title">Contexto excedido</span>
-                      <span class="warning-message" id="warning-message">El contenido supera la capacidad del modelo. Considera usar un modelo con más contexto o reducir los archivos.</span>
-                    </div>
-                  </div>
-                  
-                  <!-- Sugerencia de modelo alternativo -->
-                  <div class="context-suggestion" id="context-suggestion" style="display: none;">
-                    <span class="suggestion-icon">💡</span>
-                    <div class="suggestion-content">
-                      <span class="suggestion-text" id="suggestion-text">Modelos compatibles con tu contenido:</span>
-                      <div class="suggested-models" id="suggested-models"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="cancel-project">Cancelar</button>
-              <button class="modal-button primary" id="save-project">Guardar proyecto</button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Modal para renombrar conversación -->
-        <div id="rename-conversation-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content modal-content-small">
-            <div class="modal-header">
-              <h3>Renombrar conversación</h3>
-              <button class="modal-close" id="close-rename-modal">×</button>
-            </div>
-            <div class="modal-body">
-              <label for="rename-conversation-input">Nuevo nombre:</label>
-              <input type="text" id="rename-conversation-input" class="modal-input" placeholder="Nombre de la conversación" />
-            </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="cancel-rename-conversation">Cancelar</button>
-              <button class="modal-button primary" id="confirm-rename-conversation">Guardar</button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Modal para confirmar eliminación de conversación -->
-        <div id="delete-conversation-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content modal-content-small">
-            <div class="modal-header">
-              <h3>Eliminar conversación</h3>
-              <button class="modal-close" id="close-delete-conversation-modal">×</button>
-            </div>
-            <div class="modal-body">
-              <p class="delete-warning">¿Estás seguro de que quieres eliminar esta conversación?</p>
-              <p class="delete-conversation-name" id="delete-conversation-name"></p>
-            </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="cancel-delete-conversation">Cancelar</button>
-              <button class="modal-button danger" id="confirm-delete-conversation">Eliminar</button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Modal para confirmar eliminación de todas las conversaciones -->
-        <div id="delete-all-conversations-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content modal-content-small">
-            <div class="modal-header">
-              <h3>Borrar todas las conversaciones</h3>
-              <button class="modal-close" id="close-delete-all-modal">×</button>
-            </div>
-            <div class="modal-body">
-              <p class="delete-warning">⚠️ ¿Estás seguro de que quieres eliminar <strong>todas</strong> las conversaciones?</p>
-              <p class="delete-hint">Esta acción no se puede deshacer.</p>
-            </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="cancel-delete-all">Cancelar</button>
-              <button class="modal-button danger" id="confirm-delete-all">Eliminar todas</button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Modal para confirmar eliminación de proyecto -->
-        <div id="delete-project-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content modal-content-small">
-            <div class="modal-header">
-              <h3>Eliminar proyecto</h3>
-              <button class="modal-close" id="close-delete-project-modal">×</button>
-            </div>
-            <div class="modal-body">
-              <p class="delete-warning">¿Estás seguro de que quieres eliminar este proyecto? Se eliminarán también todas las conversaciones asociadas.</p>
-              <p class="delete-project-name" id="delete-project-name"></p>
-            </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="cancel-delete-project">Cancelar</button>
-              <button class="modal-button danger" id="confirm-delete-project">Eliminar</button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Modal para editar mensaje del usuario -->
-        <div id="edit-message-modal" class="modal-overlay" style="display: none;">
-          <div class="modal-content modal-content-edit">
-            <div class="modal-header">
-              <h3>Editar mensaje</h3>
-              <button class="modal-close" id="close-edit-message-modal">×</button>
-            </div>
-            <div class="modal-body">
-              <p class="edit-message-hint">Edita tu mensaje. Al guardar, se regenerará la respuesta desde este punto.</p>
-              <textarea id="edit-message-textarea" class="modal-textarea" placeholder="Escribe tu mensaje..."></textarea>
-            </div>
-            <div class="modal-footer">
-              <button class="modal-button secondary" id="cancel-edit-message">Cancelar</button>
-              <button class="modal-button primary" id="confirm-edit-message">Guardar y regenerar</button>
-            </div>
-          </div>
-        </div>
-      </aside>
 
-      <div class="main-column">
-        <div id="background-image" class="background-image"></div>
-        <div id="empty-state-header" class="empty-state-header">
-          <button id="screen-overlay-toggle-empty" class="screen-overlay-button icon-button" title="Modo Overlay - Chat sobre otras apps">
-            <svg class="screen-overlay-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="12" y="11" width="10" height="8" rx="1" stroke="currentColor" stroke-width="1.5" fill="rgba(255,255,255,0.1)"/>
-              <circle cx="17" cy="15" r="1.5" fill="currentColor"/>
-            </svg>
-          </button>
-          <button id="incognito-toggle-empty" class="incognito-button icon-button" title="Activar modo incógnito">
-            <svg class="incognito-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <!-- Sombrero -->
-              <path d="M8 8C8 6 9 5 10 5H14C15 5 16 6 16 8V9H8V8Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M6 9H18C18.5 9 19 9.5 19 10V11H5V10C5 9.5 5.5 9 6 9Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <!-- Gafas -->
-              <circle cx="9" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
-              <circle cx="15" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
-              <line x1="11.5" y1="14" x2="12.5" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </button>
+                <!-- Barra de progreso de uso de contexto -->
+                <div class="context-usage-bar-container">
+                  <div class="context-usage-bar" id="context-usage-bar">
+                    <div class="context-usage-fill" id="context-usage-fill"></div>
+                  </div>
+                  <div class="context-usage-labels">
+                    <span class="context-usage-used" id="context-usage-used">0 tokens usados</span>
+                    <span class="context-usage-percent" id="context-usage-percent">0%</span>
+                  </div>
+                </div>
+
+                <!-- Desglose de tokens -->
+                <div class="context-breakdown" id="context-breakdown">
+                  <div class="context-breakdown-item">
+                    <span class="breakdown-icon">📝</span>
+                    <span class="breakdown-label" data-i18n="modal.project.instructionsTokens">Instrucciones:</span>
+                    <span class="breakdown-value" id="breakdown-instructions">0 tokens</span>
+                  </div>
+                  <div class="context-breakdown-item">
+                    <span class="breakdown-icon">📄</span>
+                    <span class="breakdown-label" data-i18n="modal.project.documentsTokens">Documentos:</span>
+                    <span class="breakdown-value" id="breakdown-documents">0 tokens</span>
+                  </div>
+                  <div class="context-breakdown-item">
+                    <span class="breakdown-icon">💬</span>
+                    <span class="breakdown-label" data-i18n="modal.project.chatTokens">Reserva para chat:</span>
+                    <span class="breakdown-value" id="breakdown-chat">~2000 tokens</span>
+                  </div>
+                </div>
+
+                <!-- Advertencia si se excede el límite -->
+                <div class="context-warning" id="context-warning" style="display: none;">
+                  <span class="warning-icon">⚠️</span>
+                  <div class="warning-content">
+                    <span class="warning-title" id="warning-title" data-i18n="modal.project.warningTitle">Contexto
+                      excedido</span>
+                    <span class="warning-message" id="warning-message" data-i18n="modal.project.warningMessage">El
+                      contenido supera la capacidad del modelo.
+                      Considera usar un modelo con más contexto o reducir los archivos.</span>
+                  </div>
+                </div>
+
+                <!-- Sugerencia de modelo alternativo -->
+                <div class="context-suggestion" id="context-suggestion" style="display: none;">
+                  <span class="suggestion-icon">💡</span>
+                  <div class="suggestion-content">
+                    <span class="suggestion-text" id="suggestion-text" data-i18n="modal.project.suggestedModels">Modelos
+                      compatibles con tu contenido:</span>
+                    <div class="suggested-models" id="suggested-models"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="cancel-project" data-i18n="modal.cancel">Cancelar</button>
+            <button class="modal-button primary" id="save-project" data-i18n="modal.project.save">Guardar
+              proyecto</button>
+          </div>
         </div>
-        <div id="empty-state" class="empty-state">
-          <!-- Badge de proyecto activo en empty state -->
-          <div id="project-badge-empty" class="project-badge project-badge-floating" style="display: none;">
-            <span class="project-badge-icon">📂</span>
-            <span id="project-badge-name-empty" class="project-badge-name"></span>
-            <span class="project-context-indicator" id="project-context-indicator-empty" title="Uso de contexto">
-              <span class="context-mini-bar">
-                <span class="context-mini-fill" id="context-mini-fill-empty"></span>
-              </span>
-              <span class="context-mini-text" id="context-mini-text-empty">0%</span>
+      </div>
+
+      <!-- Modal para renombrar conversación -->
+      <div id="rename-conversation-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-content-small">
+          <div class="modal-header">
+            <h3 data-i18n="modal.rename.title">Renombrar conversación</h3>
+            <button class="modal-close" id="close-rename-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <label for="rename-conversation-input" data-i18n="modal.rename.label">Nuevo nombre:</label>
+            <input type="text" id="rename-conversation-input" class="modal-input"
+              placeholder="Nombre de la conversación" data-i18n="modal.rename.placeholder"
+              data-i18n-target="placeholder" />
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="cancel-rename-conversation"
+              data-i18n="modal.cancel">Cancelar</button>
+            <button class="modal-button primary" id="confirm-rename-conversation"
+              data-i18n="modal.save">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal para confirmar eliminación de conversación -->
+      <div id="delete-conversation-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-content-small">
+          <div class="modal-header">
+            <h3 data-i18n="modal.delete.title">Eliminar conversación</h3>
+            <button class="modal-close" id="close-delete-conversation-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <p class="delete-warning" data-i18n="modal.delete.warning">¿Estás seguro de que quieres eliminar esta
+              conversación?</p>
+            <p class="delete-conversation-name" id="delete-conversation-name"></p>
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="cancel-delete-conversation"
+              data-i18n="modal.cancel">Cancelar</button>
+            <button class="modal-button danger" id="confirm-delete-conversation"
+              data-i18n="modal.delete.confirm">Eliminar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal para confirmar eliminación de todas las conversaciones -->
+      <div id="delete-all-conversations-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-content-small">
+          <div class="modal-header">
+            <h3 data-i18n="modal.deleteAll.title">Borrar todas las conversaciones</h3>
+            <button class="modal-close" id="close-delete-all-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <p class="delete-warning" data-i18n="modal.deleteAll.warning">⚠️ ¿Estás seguro de que quieres eliminar
+              <strong>todas</strong> las
+              conversaciones?
+            </p>
+            <p class="delete-hint" data-i18n="modal.deleteAll.hint">Esta acción no se puede deshacer.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="cancel-delete-all" data-i18n="modal.cancel">Cancelar</button>
+            <button class="modal-button danger" id="confirm-delete-all" data-i18n="modal.deleteAll.confirm">Eliminar
+              todas</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal para confirmar eliminación de proyecto -->
+      <div id="delete-project-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-content-small">
+          <div class="modal-header">
+            <h3 data-i18n="modal.deleteProject.title">Eliminar proyecto</h3>
+            <button class="modal-close" id="close-delete-project-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <p class="delete-warning" data-i18n="modal.deleteProject.warning">¿Estás seguro de que quieres eliminar este
+              proyecto? Se eliminarán también todas
+              las conversaciones asociadas.</p>
+            <p class="delete-project-name" id="delete-project-name"></p>
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="cancel-delete-project" data-i18n="modal.cancel">Cancelar</button>
+            <button class="modal-button danger" id="confirm-delete-project"
+              data-i18n="modal.delete.confirm">Eliminar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal para editar mensaje del usuario -->
+      <div id="edit-message-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-content-edit">
+          <div class="modal-header">
+            <h3 data-i18n="modal.editMessage.title">Editar mensaje</h3>
+            <button class="modal-close" id="close-edit-message-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <p class="edit-message-hint" data-i18n="modal.editMessage.hint">Edita tu mensaje. Al guardar, se regenerará
+              la respuesta desde este punto.</p>
+            <textarea id="edit-message-textarea" class="modal-textarea" placeholder="Escribe tu mensaje..."
+              data-i18n="modal.editMessage.placeholder" data-i18n-target="placeholder"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="modal-button secondary" id="cancel-edit-message" data-i18n="modal.cancel">Cancelar</button>
+            <button class="modal-button primary" id="confirm-edit-message" data-i18n="modal.editMessage.save">Guardar y
+              regenerar</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main-column">
+      <div id="background-image" class="background-image"></div>
+      <div id="empty-state-header" class="empty-state-header">
+        <button id="screen-overlay-toggle-empty" class="screen-overlay-button icon-button"
+          title="Modo Overlay - Chat sobre otras apps">
+          <svg class="screen-overlay-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5" />
+            <rect x="12" y="11" width="10" height="8" rx="1" stroke="currentColor" stroke-width="1.5"
+              fill="rgba(255,255,255,0.1)" />
+            <circle cx="17" cy="15" r="1.5" fill="currentColor" />
+          </svg>
+        </button>
+        <button id="incognito-toggle-empty" class="incognito-button icon-button" title="Activar modo incógnito">
+          <svg class="incognito-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Sombrero -->
+            <path d="M8 8C8 6 9 5 10 5H14C15 5 16 6 16 8V9H8V8Z" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M6 9H18C18.5 9 19 9.5 19 10V11H5V10C5 9.5 5.5 9 6 9Z" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round" />
+            <!-- Gafas -->
+            <circle cx="9" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+            <circle cx="15" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+            <line x1="11.5" y1="14" x2="12.5" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+        <div class="language-selector-container">
+          <button id="language-toggle-empty" class="language-button icon-button" title="Cambiar idioma">
+            <svg class="language-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+              </path>
+            </svg>
+          </button>
+          <div id="language-menu-empty" class="language-menu" style="display: none;">
+            <button class="language-option" data-lang="es">Español</button>
+            <button class="language-option" data-lang="en">English</button>
+          </div>
+        </div>
+      </div>
+      <div id="empty-state" class="empty-state">
+        <!-- Badge de proyecto activo en empty state -->
+        <div id="project-badge-empty" class="project-badge project-badge-floating" style="display: none;">
+          <span class="project-badge-icon">📂</span>
+          <span id="project-badge-name-empty" class="project-badge-name"></span>
+          <span class="project-context-indicator" id="project-context-indicator-empty" title="Uso de contexto">
+            <span class="context-mini-bar">
+              <span class="context-mini-fill" id="context-mini-fill-empty"></span>
             </span>
-          </div>
-          
-          <div class="greeting">
-            <h1 id="greeting-text">Buenas noches, <span class="user-name">Default</span></h1>
-            <p id="greeting-subtitle" class="subtitle">¿Cómo puedo ayudarle hoy?</p>
-          </div>
+            <span class="context-mini-text" id="context-mini-text-empty">0%</span>
+          </span>
+        </div>
 
-          <div class="main-composer">
-            <div id="file-drop-area" class="file-drop-area">
-              <div class="file-drop-content">
-                <span class="file-drop-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                  </svg>
-                </span>
-                <span class="file-drop-text">Arrastra archivos aquí o haz clic para seleccionar</span>
-                <input type="file" id="file-input" multiple accept=".txt,.md,.json,.csv,.py,.js,.html,.css,.xml,.pdf,.jpg,.jpeg,.png,.gif,.webp" style="display: none;">
-              </div>
-              <div id="file-list" class="file-list"></div>
+        <div class="greeting">
+          <h1 id="greeting-text">Buenas noches, <span class="user-name">Default</span></h1>
+          <p id="greeting-subtitle" class="subtitle" data-i18n="greeting.subtitle">¿Cómo puedo ayudarle hoy?</p>
+        </div>
+
+        <div class="main-composer">
+          <div id="file-drop-area" class="file-drop-area">
+            <div class="file-drop-content">
+              <span class="file-drop-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path
+                    d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+              </span>
+              <span class="file-drop-text" data-i18n="chat.dropzone">Arrastra archivos aquí o haz clic para
+                seleccionar</span>
+              <input type="file" id="file-input" multiple
+                accept=".txt,.md,.json,.csv,.py,.js,.html,.css,.xml,.pdf,.jpg,.jpeg,.png,.gif,.webp"
+                style="display: none;">
             </div>
+            <div id="file-list" class="file-list"></div>
+          </div>
+          <form id="chat-form">
+            <div class="input-wrapper">
+              <textarea id="prompt-input" name="prompt" rows="1" placeholder="¿Cómo puedo ayudarle hoy?"
+                autocomplete="off" data-i18n="chat.placeholder" data-i18n-target="placeholder"></textarea>
+              <div class="input-controls">
+                <div class="input-controls-left">
+                  <!-- Toggle de modo de chat -->
+                  <div class="chat-mode-toggle" id="chat-mode-toggle">
+                    <button type="button" class="chat-mode-option active" data-mode="normal"
+                      title="Modo Normal - Respuestas rápidas">
+                      <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor"
+                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             <form id="chat-form">
               <div class="input-wrapper">
                 <textarea id="prompt-input" name="prompt" rows="1" placeholder="¿Cómo puedo ayudarle hoy?" autocomplete="off"></textarea>
@@ -780,88 +878,157 @@
                         <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                       </svg>
                     </button>
-                    <div class="model-select-wrapper">
-                      <select id="model-select" name="model" class="model-select"></select>
-                    </div>
-                    <button class="send-button" type="submit" title="Enviar">↑</button>
+                    <button type="button" class="chat-mode-option" data-mode="deep"
+                      title="Deep Research - Investigación profunda">
+                      <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+                        <path d="M11 8v6M8 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        <path d="M16 16l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                      </svg>
+                    </button>
+                    <button type="button" class="chat-mode-option" data-mode="study"
+                      title="Modo Estudio - Aprendizaje guiado">
+                      <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" stroke="currentColor" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" stroke="currentColor" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </button>
+                    <div class="chat-mode-slider"></div>
                   </div>
                 </div>
+                <div class="input-controls-right">
+                  <button type="button" class="input-icon-button attach-btn-minimal" id="attach-file-btn"
+                    title="Adjuntar archivo">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                      stroke-linecap="round" stroke-linejoin="round">
+                      <path
+                        d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                  </button>
+                  <div class="model-select-wrapper">
+                    <select id="model-select" name="model" class="model-select"></select>
+                  </div>
+                  <button class="send-button" type="submit" title="Enviar">↑</button>
+                </div>
               </div>
-            </form>
-          </div>
-
+            </div>
+          </form>
         </div>
 
-        <div id="chat-state" class="chat-state" style="display: none;">
-          <header class="chat-header">
-            <div class="chat-header-left">
-              <!-- Etiqueta de proyecto activo -->
-              <div id="project-badge" class="project-badge" style="display: none;">
-                <span class="project-badge-icon">📂</span>
-                <span id="project-badge-name" class="project-badge-name"></span>
-                <span class="project-context-indicator" id="project-context-indicator" title="Uso de contexto">
-                  <span class="context-mini-bar">
-                    <span class="context-mini-fill" id="context-mini-fill"></span>
-                  </span>
-                  <span class="context-mini-text" id="context-mini-text">0%</span>
+      </div>
+
+      <div id="chat-state" class="chat-state" style="display: none;">
+        <header class="chat-header">
+          <div class="chat-header-left">
+            <!-- Etiqueta de proyecto activo -->
+            <div id="project-badge" class="project-badge" style="display: none;">
+              <span class="project-badge-icon">📂</span>
+              <span id="project-badge-name" class="project-badge-name"></span>
+              <span class="project-context-indicator" id="project-context-indicator" title="Uso de contexto">
+                <span class="context-mini-bar">
+                  <span class="context-mini-fill" id="context-mini-fill"></span>
                 </span>
-              </div>
-              <h2 id="conversation-title">Nueva conversación</h2>
+                <span class="context-mini-text" id="context-mini-text">0%</span>
+              </span>
             </div>
-            <div class="chat-actions">
-              <button id="screen-overlay-toggle" class="screen-overlay-button icon-button" title="Modo Overlay - Chat sobre otras apps">
-                <svg class="screen-overlay-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
-                  <rect x="12" y="11" width="10" height="8" rx="1" stroke="currentColor" stroke-width="1.5" fill="rgba(255,255,255,0.1)"/>
-                  <circle cx="17" cy="15" r="1.5" fill="currentColor"/>
+            <h2 id="conversation-title" data-i18n="chat.newConversation">Nueva conversación</h2>
+          </div>
+          <div class="chat-actions">
+            <button id="screen-overlay-toggle" class="screen-overlay-button icon-button"
+              title="Modo Overlay - Chat sobre otras apps">
+              <svg class="screen-overlay-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5" />
+                <rect x="12" y="11" width="10" height="8" rx="1" stroke="currentColor" stroke-width="1.5"
+                  fill="rgba(255,255,255,0.1)" />
+                <circle cx="17" cy="15" r="1.5" fill="currentColor" />
+              </svg>
+            </button>
+            <button id="attachments-badge" class="attachments-badge" type="button" title="Ver archivos adjuntos"
+              style="display: none;">
+              <span class="attachments-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path
+                    d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+              </span>
+              <span id="attachments-count" class="attachments-count">0</span>
+            </button>
+            <button id="rename-conversation" class="icon-button" type="button" title="Renombrar conversación">✎</button>
+            <button id="delete-conversation" class="icon-button" type="button" title="Eliminar conversación">🗑</button>
+            <button id="incognito-toggle" class="incognito-button icon-button" title="Activar modo incógnito">
+              <svg class="incognito-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Sombrero -->
+                <path d="M8 8C8 6 9 5 10 5H14C15 5 16 6 16 8V9H8V8Z" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M6 9H18C18.5 9 19 9.5 19 10V11H5V10C5 9.5 5.5 9 6 9Z" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round" />
+                <!-- Gafas -->
+                <circle cx="9" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+                <circle cx="15" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+                <line x1="11.5" y1="14" x2="12.5" y2="14" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" />
+              </svg>
+            </button>
+            <div class="language-selector-container">
+              <button id="language-toggle" class="language-button icon-button" title="Cambiar idioma">
+                <svg class="language-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+                  </path>
                 </svg>
               </button>
-              <button id="attachments-badge" class="attachments-badge" type="button" title="Ver archivos adjuntos" style="display: none;">
-                <span class="attachments-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                  </svg>
-                </span>
-                <span id="attachments-count" class="attachments-count">0</span>
-              </button>
-              <button id="rename-conversation" class="icon-button" type="button" title="Renombrar conversación">✎</button>
-              <button id="delete-conversation" class="icon-button" type="button" title="Eliminar conversación">🗑</button>
-              <button id="incognito-toggle" class="incognito-button icon-button" title="Activar modo incógnito">
-                <svg class="incognito-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <!-- Sombrero -->
-                  <path d="M8 8C8 6 9 5 10 5H14C15 5 16 6 16 8V9H8V8Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  <path d="M6 9H18C18.5 9 19 9.5 19 10V11H5V10C5 9.5 5.5 9 6 9Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  <!-- Gafas -->
-                  <circle cx="9" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
-                  <circle cx="15" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
-                  <line x1="11.5" y1="14" x2="12.5" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <div id="language-menu" class="language-menu" style="display: none;">
+                <button class="language-option active" data-lang="es">Español</button>
+                <button class="language-option" data-lang="en">English</button>
+              </div>
+            </div>
+          </div>
+          <div id="attachments-dropdown" class="attachments-dropdown" style="display: none;">
+            <div class="attachments-dropdown-header">
+              <span data-i18n="chat.attachments">Archivos adjuntos</span>
+              <button id="close-attachments" class="close-attachments" type="button">×</button>
+            </div>
+            <div id="attachments-list" class="attachments-list"></div>
+          </div>
+        </header>
+        <main class="chat-area" aria-live="polite">
+          <ul id="chat-list" class="chat-list"></ul>
+        </main>
+        <footer class="composer">
+          <div id="file-drop-area-inline" class="file-drop-area">
+            <div class="file-drop-content">
+              <span class="file-drop-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path
+                    d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                 </svg>
-              </button>
+              </span>
+              <span class="file-drop-text">Arrastra archivos aquí o haz clic para seleccionar</span>
+              <input type="file" id="file-input-inline" multiple
+                accept=".txt,.md,.json,.csv,.py,.js,.html,.css,.xml,.pdf,.jpg,.jpeg,.png,.gif,.webp"
+                style="display: none;">
             </div>
-            <div id="attachments-dropdown" class="attachments-dropdown" style="display: none;">
-              <div class="attachments-dropdown-header">
-                <span>Archivos adjuntos</span>
-                <button id="close-attachments" class="close-attachments" type="button">×</button>
-              </div>
-              <div id="attachments-list" class="attachments-list"></div>
-            </div>
-          </header>
-          <main class="chat-area" aria-live="polite">
-            <ul id="chat-list" class="chat-list"></ul>
-          </main>
-          <footer class="composer">
-            <div id="file-drop-area-inline" class="file-drop-area">
-              <div class="file-drop-content">
-                <span class="file-drop-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                  </svg>
-                </span>
-                <span class="file-drop-text">Arrastra archivos aquí o haz clic para seleccionar</span>
-                <input type="file" id="file-input-inline" multiple accept=".txt,.md,.json,.csv,.py,.js,.html,.css,.xml,.pdf,.jpg,.jpeg,.png,.gif,.webp" style="display: none;">
-              </div>
-              <div id="file-list-inline" class="file-list"></div>
-            </div>
+            <div id="file-list-inline" class="file-list"></div>
+          </div>
+          <form id="chat-form-inline">
+            <div class="input-wrapper">
+              <textarea id="prompt-input-inline" name="prompt" rows="1" placeholder="Escribe tu mensaje..."
+                autocomplete="off"></textarea>
+              <div class="input-controls">
+                <div class="input-controls-left">
+                  <!-- Toggle de modo de chat inline -->
+                  <div class="chat-mode-toggle" id="chat-mode-toggle-inline">
+                    <button type="button" class="chat-mode-option active" data-mode="normal"
+                      title="Modo Normal - Respuestas rápidas">
+                      <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor"
+                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             <form id="chat-form-inline">
               <div class="input-wrapper">
                 <textarea id="prompt-input-inline" name="prompt" rows="1" placeholder="Escribe tu mensaje..." autocomplete="off"></textarea>
@@ -902,103 +1069,144 @@
                         <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                       </svg>
                     </button>
-                    <div class="model-select-wrapper">
-                      <select id="model-select-inline" name="model" class="model-select"></select>
-                    </div>
-                    <button class="send-button" type="submit" title="Enviar">↑</button>
+                    <button type="button" class="chat-mode-option" data-mode="deep"
+                      title="Deep Research - Investigación profunda">
+                      <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+                        <path d="M11 8v6M8 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        <path d="M16 16l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                      </svg>
+                    </button>
+                    <button type="button" class="chat-mode-option" data-mode="study"
+                      title="Modo Estudio - Aprendizaje guiado">
+                      <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" stroke="currentColor" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" stroke="currentColor" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </button>
+                    <div class="chat-mode-slider"></div>
                   </div>
                 </div>
+                <div class="input-controls-right">
+                  <button type="button" class="input-icon-button attach-btn-minimal" id="attach-file-btn-inline"
+                    title="Adjuntar archivo">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                      stroke-linecap="round" stroke-linejoin="round">
+                      <path
+                        d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                  </button>
+                  <div class="model-select-wrapper">
+                    <select id="model-select-inline" name="model" class="model-select"></select>
+                  </div>
+                  <button class="send-button" type="submit" title="Enviar">↑</button>
+                </div>
               </div>
-            </form>
-          </footer>
-        </div>
+            </div>
+          </form>
+        </footer>
       </div>
     </div>
-    
-    <!-- Screen Overlay Mode - Chat flotante sobre otras apps -->
-    <div id="screen-overlay-container" class="screen-overlay-container" style="display: none;">
-      <div class="screen-overlay-panel">
-        <div class="screen-overlay-header">
-          <div class="screen-overlay-title">
-            <svg class="screen-overlay-icon-small" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/>
-            </svg>
-            <span>Chat con Captura</span>
-          </div>
-          <div class="screen-overlay-actions">
-            <button id="screen-overlay-capture" class="screen-overlay-btn capture-btn" title="Capturar pantalla (Ctrl+Shift+S)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-            </button>
-            <button id="screen-overlay-popout" class="screen-overlay-btn popout-btn" title="Abrir en ventana flotante (siempre visible)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="7" width="15" height="12" rx="2"/>
-                <path d="M17 2h5v5"/>
-                <path d="M14 10L22 2"/>
-              </svg>
-            </button>
-            <button id="screen-overlay-minimize" class="screen-overlay-btn" title="Minimizar">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-            </button>
-            <button id="screen-overlay-close" class="screen-overlay-btn close-btn" title="Cerrar modo overlay">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-        
-        <div class="screen-overlay-preview" id="screen-overlay-preview" style="display: none;">
-          <div class="preview-label">Captura actual:</div>
-          <img id="screen-overlay-preview-img" src="" alt="Captura de pantalla"/>
-          <button id="screen-overlay-clear-capture" class="clear-capture-btn" title="Eliminar captura">×</button>
-        </div>
-        
-        <div class="screen-overlay-messages" id="screen-overlay-messages">
-          <div class="screen-overlay-empty">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
-              <rect x="2" y="3" width="20" height="14" rx="2"/>
-              <circle cx="12" cy="10" r="3"/>
-              <path d="M8 21l4-4 4 4"/>
-            </svg>
-            <p>Captura tu pantalla y pregunta sobre lo que ves</p>
-            <span class="hint">Presiona el botón de cámara o Ctrl+Shift+S para capturar</span>
-          </div>
-        </div>
-        
-        <div class="screen-overlay-input-container">
-          <div class="screen-overlay-input-wrapper">
-            <textarea id="screen-overlay-input" placeholder="Pregunta sobre lo que ves..." rows="1"></textarea>
-            <button id="screen-overlay-send" class="screen-overlay-send-btn" title="Enviar">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="19" x2="12" y2="5"/>
-                <polyline points="5 12 12 5 19 12"/>
-              </svg>
-            </button>
-          </div>
-          <div class="screen-overlay-model-select">
-            <select id="screen-overlay-model-select"></select>
-          </div>
-        </div>
-      </div>
-      
-      <div class="screen-overlay-minimized" id="screen-overlay-minimized" style="display: none;">
-        <button id="screen-overlay-restore" class="screen-overlay-restore-btn" title="Restaurar chat">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
-            <rect x="2" y="3" width="20" height="14" rx="2"/>
-            <circle cx="12" cy="10" r="3"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-    
-    <script type="module" src="/app.js"></script>
-  </body>
-</html>
+  </div>
 
+  <!-- Screen Overlay Mode - Chat flotante sobre otras apps -->
+  <div id="screen-overlay-container" class="screen-overlay-container" style="display: none;">
+    <div class="screen-overlay-panel">
+      <div class="screen-overlay-header">
+        <div class="screen-overlay-title">
+          <svg class="screen-overlay-icon-small" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5" />
+            <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+          <span data-i18n="screenOverlay.title">Chat con Captura</span>
+        </div>
+        <div class="screen-overlay-actions">
+          <button id="screen-overlay-capture" class="screen-overlay-btn capture-btn"
+            title="Capturar pantalla (Ctrl+Shift+S)" data-i18n="screenOverlay.capture" data-i18n-target="title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+          <button id="screen-overlay-popout" class="screen-overlay-btn popout-btn"
+            title="Abrir en ventana flotante (siempre visible)" data-i18n="screenOverlay.popout"
+            data-i18n-target="title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="7" width="15" height="12" rx="2" />
+              <path d="M17 2h5v5" />
+              <path d="M14 10L22 2" />
+            </svg>
+          </button>
+          <button id="screen-overlay-minimize" class="screen-overlay-btn" title="Minimizar"
+            data-i18n="screenOverlay.minimize" data-i18n-target="title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+          <button id="screen-overlay-close" class="screen-overlay-btn close-btn" title="Cerrar modo overlay"
+            data-i18n="screenOverlay.close" data-i18n-target="title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="screen-overlay-preview" id="screen-overlay-preview" style="display: none;">
+        <div class="preview-label" data-i18n="screenOverlay.currentCapture">Captura actual:</div>
+        <img id="screen-overlay-preview-img" src="" alt="Captura de pantalla" data-i18n="screenOverlay.screenshotAlt"
+          data-i18n-target="alt" />
+        <button id="screen-overlay-clear-capture" class="clear-capture-btn" title="Eliminar captura"
+          data-i18n="screenOverlay.clearCapture" data-i18n-target="title">×</button>
+      </div>
+
+      <div class="screen-overlay-messages" id="screen-overlay-messages">
+        <div class="screen-overlay-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <circle cx="12" cy="10" r="3" />
+            <path d="M8 21l4-4 4 4" />
+          </svg>
+          <p data-i18n="screenOverlay.placeholder">Captura tu pantalla y pregunta sobre lo que ves</p>
+          <span class="hint" data-i18n="screenOverlay.hint">Presiona el botón de cámara o Ctrl+Shift+S para
+            capturar</span>
+        </div>
+      </div>
+
+      <div class="screen-overlay-input-container">
+        <div class="screen-overlay-input-wrapper">
+          <textarea id="screen-overlay-input" placeholder="Pregunta sobre lo que ves..." rows="1"
+            data-i18n="screenOverlay.inputPlaceholder" data-i18n-target="placeholder"></textarea>
+          <button id="screen-overlay-send" class="screen-overlay-send-btn" title="Enviar" data-i18n="screenOverlay.send"
+            data-i18n-target="title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="19" x2="12" y2="5" />
+              <polyline points="5 12 12 5 19 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="screen-overlay-model-select">
+          <select id="screen-overlay-model-select"></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-overlay-minimized" id="screen-overlay-minimized" style="display: none;">
+      <button id="screen-overlay-restore" class="screen-overlay-restore-btn" title="Restaurar chat"
+        data-i18n="screenOverlay.restore" data-i18n-target="title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <circle cx="12" cy="10" r="3" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <script src="js/translation-manager.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+
+</html>

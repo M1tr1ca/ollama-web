@@ -33,7 +33,7 @@ const state = {
   loading: false,
 };
 
-// Archivos adjuntos por conversación
+//Archivos adjuntos por conversación
 const attachedFiles = {};
 
 let currentStreamReader = null;
@@ -86,7 +86,7 @@ function ensureConversationOrder() {
 function persistState() {
   // No guardar nada si estamos en modo incógnito
   if (incognitoMode) return;
-  
+
   if (!hasLocalStorage) return;
   const snapshot = {
     conversations: state.conversations,
@@ -144,7 +144,16 @@ function touchConversation(id) {
 
 function updateConversationTitleFromContent(conversation) {
   if (!conversation) return;
-  if (conversation.title && conversation.title !== DEFAULT_TITLE) return;
+
+  // Solo actualizar si el título es el predeterminado (o su traducción)
+  const currentTitle = conversation.title;
+  const isDefault = !currentTitle ||
+    currentTitle === 'Nueva conversación' ||
+    currentTitle === 'New Conversation' ||
+    currentTitle === DEFAULT_TITLE;
+
+  if (!isDefault) return;
+
   const firstUserMessage = conversation.messages.find((msg) => msg.role === 'user');
   if (!firstUserMessage) return;
   const trimmed = firstUserMessage.content.trim();
@@ -152,24 +161,30 @@ function updateConversationTitleFromContent(conversation) {
   conversation.title = trimmed.length > 42 ? `${trimmed.slice(0, 42)}…` : trimmed;
 }
 
+
+
 function formatRelativeTime(timestamp) {
   if (!timestamp) return '';
-  const diff = Date.now() - timestamp;
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now - date;
   const minute = 60 * 1000;
   const hour = 60 * minute;
   const day = 24 * hour;
 
-  if (diff < minute) return 'Actualizado hace unos segundos';
-  if (diff < hour) {
-    const minutes = Math.round(diff / minute);
-    return `Actualizado hace ${minutes} min`;
+  if (!window.translationManager) {
+    if (diff < minute) return 'Actualizado hace unos segundos';
+    if (diff < hour) return `Actualizado hace ${Math.floor(diff / minute)} min`;
+    if (diff < day) return `Actualizado hace ${Math.floor(diff / hour)} h`;
+    if (diff < 2 * day) return 'Ayer';
+    return date.toLocaleDateString();
   }
-  if (diff < day) {
-    const hours = Math.round(diff / hour);
-    return `Actualizado hace ${hours} h`;
-  }
-  const date = new Date(timestamp);
-  return `Actualizado ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+
+  if (diff < minute) return window.translationManager.translate('time.justNow');
+  if (diff < hour) return window.translationManager.translate('time.minutesAgo', { minutes: Math.floor(diff / minute) });
+  if (diff < day) return window.translationManager.translate('time.hoursAgo', { hours: Math.floor(diff / hour) });
+  if (diff < 2 * day) return window.translationManager.translate('time.yesterday');
+  return date.toLocaleDateString();
 }
 
 function formatTime(timestamp) {
@@ -180,12 +195,12 @@ function formatTime(timestamp) {
 
 function parseMarkdown(text) {
   if (!text) return '';
-  
+
   // Configurar marked y highlight.js una sola vez
   if (!window.markedConfigured && typeof marked !== 'undefined' && typeof hljs !== 'undefined') {
     marked.use({
       renderer: {
-        code({text, lang}) {
+        code({ text, lang }) {
           const validLanguage = hljs.getLanguage(lang) ? lang : 'plaintext';
           let highlighted;
           try {
@@ -193,7 +208,7 @@ function parseMarkdown(text) {
           } catch (e) {
             highlighted = text;
           }
-          
+
           return `
             <div class="code-block-wrapper">
               <div class="code-block-header">
@@ -245,38 +260,38 @@ function parseMarkdown(text) {
   html = html.replace(/MATH_BLOCK_PLACEHOLDER_(\d+)/g, (match, index) => {
     return mathBlocks[index];
   });
-  
+
   // Agregar clase markdown-table a todas las tablas para que se apliquen los estilos CSS
   html = html.replace(/<table>/g, '<table class="markdown-table">');
-  
+
   return html;
 }
 
 async function copyToClipboard(text, button) {
   try {
     await navigator.clipboard.writeText(text);
-    
+
     // Feedback visual
     // Si el botón tiene la clase copy-message-btn (mensaje completo), usar el comportamiento original (solo icono)
     if (button.classList.contains('copy-message-btn')) {
-    const originalHTML = button.innerHTML;
-    button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-    button.classList.add('copied');
-    
-    setTimeout(() => {
-      button.innerHTML = originalHTML;
-      button.classList.remove('copied');
-    }, 1500);
+      const originalHTML = button.innerHTML;
+      button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      button.classList.add('copied');
+
+      setTimeout(() => {
+        button.innerHTML = originalHTML;
+        button.classList.remove('copied');
+      }, 1500);
     } else {
       // Comportamiento para botones de código (con texto)
       const originalHTML = button.innerHTML;
       const textSpan = button.querySelector('.copy-text');
       const svg = button.querySelector('svg');
-      
+
       if (textSpan) textSpan.textContent = 'Copiado!';
       if (svg) svg.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>'; // Check icon content
       button.classList.add('copied');
-      
+
       setTimeout(() => {
         button.innerHTML = originalHTML;
         button.classList.remove('copied');
@@ -292,14 +307,14 @@ async function copyToClipboard(text, button) {
     document.body.appendChild(textArea);
     textArea.focus();
     textArea.select();
-    
+
     try {
       document.execCommand('copy');
       // Reutilizar lógica de feedback visual
       if (button.classList.contains('copy-message-btn')) {
-      const originalHTML = button.innerHTML;
-      button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-      button.classList.add('copied');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        button.classList.add('copied');
         setTimeout(() => { button.innerHTML = originalHTML; button.classList.remove('copied'); }, 1500);
       } else {
         const originalHTML = button.innerHTML;
@@ -316,13 +331,13 @@ async function copyToClipboard(text, button) {
 }
 
 // Función global para copiar bloques de código
-window.copyCodeBlock = async function(button) {
+window.copyCodeBlock = async function (button) {
   const wrapper = button.closest('.code-block-wrapper');
   if (!wrapper) return;
-  
+
   const codeElement = wrapper.querySelector('code');
   if (!codeElement) return;
-  
+
   const text = codeElement.innerText;
   await copyToClipboard(text, button);
 };
@@ -340,7 +355,7 @@ function formatFileSize(bytes) {
 function createFileAttachmentElement(file) {
   const fileExt = getFileExtension(file.name);
   const fileSize = formatFileSize(file.size);
-  
+
   // Si es una imagen, mostrar la miniatura
   if (file.isImage && file.content) {
     return `
@@ -353,7 +368,7 @@ function createFileAttachmentElement(file) {
       </div>
     `;
   }
-  
+
   // Para otros archivos, mostrar el icono normal
   return `
     <div class="message-attachment">
@@ -385,67 +400,67 @@ function appendMessageElement(message) {
 
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
-  
+
   let content = '';
-  
+
   // Agregar archivos adjuntos si existen (solo para mensajes del usuario)
   if (message.attachedFiles && message.attachedFiles.length > 0 && message.role === 'user') {
     message.attachedFiles.forEach(file => {
       content += createFileAttachmentElement(file);
     });
   }
-  
+
   // Agregar bloque de pensamiento si existe
   if (message.thinking && message.role === 'assistant') {
     content += createThinkingBlock(message.thinking, message.thinkingDuration, false);
   }
-  
+
   // Verificar si es un mensaje de Deep Research en progreso
   // SOLO mostrar la UI de progreso si hay una investigación activa Y este es el mensaje correcto
   const isResearchActive = isDeepResearchInProgress();
   const isCorrectMessage = message.id === deepResearchMessageId;
   const isCorrectConversation = state.activeId === deepResearchActiveConversationId;
   const hasNoFinalContent = !message.content || message.content === '';
-  
-  const isActiveDeepResearch = message.role === 'assistant' && 
-                                message.isDeepResearchInProgress === true &&
-                                hasNoFinalContent &&
-                                isResearchActive &&
-                                isCorrectMessage &&
-                                isCorrectConversation;
-  
+
+  const isActiveDeepResearch = message.role === 'assistant' &&
+    message.isDeepResearchInProgress === true &&
+    hasNoFinalContent &&
+    isResearchActive &&
+    isCorrectMessage &&
+    isCorrectConversation;
+
   // Si el mensaje tiene el flag pero ya tiene contenido, limpiar el flag (investigación terminada)
   if (message.isDeepResearchInProgress && message.content && message.deepResearch) {
     message.isDeepResearchInProgress = false;
     persistState();
   }
-  
+
   // Agregar el contenido del mensaje
   if (isActiveDeepResearch) {
     // Es el mensaje de Deep Research activo, crear contenedor de progreso
     bubble.innerHTML = '';
     const progressContainer = createDeepResearchProgressElement();
     bubble.appendChild(progressContainer);
-    
+
     // Actualizar con el estado actual
     if (deepResearchProgressState) {
       updateDeepResearchProgress(
-        progressContainer, 
-        deepResearchProgressState.progress, 
+        progressContainer,
+        deepResearchProgressState.progress,
         deepResearchProgressState.status
       );
     }
-    
+
     // Guardar referencia al nuevo contenedor
     deepResearchCurrentContainer = progressContainer;
-    
+
     // Restaurar los pasos completados si hay datos
     if (deepResearchStepsData && deepResearchStepsData.length > 0) {
       deepResearchStepsData.forEach((step) => {
         addResearchStep(progressContainer, step, step.isActive, step.isCompleted);
       });
     }
-    
+
     // Restaurar hallazgos
     if (deepResearchFindingsData && deepResearchFindingsData.length > 0) {
       deepResearchFindingsData.forEach(finding => {
@@ -478,11 +493,11 @@ function appendMessageElement(message) {
   } else if (message.content) {
     content += parseMarkdown(message.content);
   }
-  
+
   // Crear contenedor para botón de copiar y hora
   const copyContainer = document.createElement('div');
   copyContainer.className = 'copy-message-container';
-  
+
   // Crear botón de copiar pequeño
   const copyButton = document.createElement('button');
   copyButton.className = 'copy-message-btn';
@@ -494,7 +509,7 @@ function appendMessageElement(message) {
     const textToCopy = message.content || '';
     await copyToClipboard(textToCopy, copyButton);
   });
-  
+
   // Crear botón de regenerar respuesta (solo para mensajes del asistente)
   let webSourcesBtn = null;
   let webSourcesPopup = null;
@@ -563,7 +578,7 @@ function appendMessageElement(message) {
       });
     }
   }
-  
+
   // Crear botón de editar (solo para mensajes del usuario)
   if (message.role === 'user') {
     const editButton = document.createElement('button');
@@ -576,12 +591,16 @@ function appendMessageElement(message) {
     });
     copyContainer.insertBefore(editButton, copyContainer.firstChild);
   }
-  
+
   // Crear elemento para la hora
   const timeElement = document.createElement('span');
   timeElement.className = 'message-time';
   const messageTime = message.timestamp || message.createdAt || Date.now();
   timeElement.textContent = formatTime(messageTime);
+
+  copyContainer.appendChild(copyButton);
+  copyContainer.appendChild(timeElement)
+
   
   // Orden correcto: regenerar (ya añadido) → copiar → fuentes → hora
   copyContainer.appendChild(copyButton);
@@ -600,13 +619,13 @@ function appendMessageElement(message) {
     bubble.innerHTML = content;
   }
   bubble.appendChild(copyContainer);
-  
+
   // Renderizar matemáticas con KaTeX
   if (typeof renderMathInElement !== 'undefined') {
     renderMathInElement(bubble, {
       delimiters: [
-        {left: '$$', right: '$$', display: true},
-        {left: '$', right: '$', display: false}
+        { left: '$$', right: '$$', display: true },
+        { left: '$', right: '$', display: false }
       ],
       throwOnError: false
     });
@@ -633,7 +652,17 @@ function renderActiveConversation() {
     showChatState();
     conversation.messages.forEach((message) => appendMessageElement(message));
   }
-  conversationTitle.textContent = conversation.title ?? DEFAULT_TITLE;
+
+  // Traducir títulos predeterminados dinámicamente según el idioma actual
+  const currentTitle = conversation.title;
+  const isDefault = !currentTitle ||
+    currentTitle === 'Nueva conversación' ||
+    currentTitle === 'New Conversation' ||
+    currentTitle === DEFAULT_TITLE;
+
+  const defaultTitle = window.translationManager ? window.translationManager.translate('chat.newConversation') : DEFAULT_TITLE;
+  conversationTitle.textContent = isDefault ? defaultTitle : currentTitle;
+
   updateAttachmentsBadge(); // Actualizar badge al cambiar de conversación
 }
 
@@ -646,6 +675,10 @@ function showEmptyState() {
   // Mostrar botón overlay del empty-state
   const screenOverlayToggleEmpty = document.getElementById('screen-overlay-toggle-empty');
   if (screenOverlayToggleEmpty) screenOverlayToggleEmpty.style.display = 'flex';
+
+  // Show empty state header (contains language selector)
+  const emptyStateHeader = document.getElementById('empty-state-header');
+  if (emptyStateHeader) emptyStateHeader.style.display = 'flex';
 }
 
 function showChatState() {
@@ -657,6 +690,10 @@ function showChatState() {
   // Ocultar botón overlay del empty-state (ya hay uno en el chat header)
   const screenOverlayToggleEmpty = document.getElementById('screen-overlay-toggle-empty');
   if (screenOverlayToggleEmpty) screenOverlayToggleEmpty.style.display = 'none';
+
+  // Hide empty state header (contains language selector)
+  const emptyStateHeader = document.getElementById('empty-state-header');
+  if (emptyStateHeader) emptyStateHeader.style.display = 'none';
 }
 
 function renderConversationList() {
@@ -677,7 +714,7 @@ function renderConversationList() {
 
     const item = document.createElement('li');
     item.className = `conversation-item${id === state.activeId ? ' active' : ''}`;
-    
+
     // Añadir clase si pertenece a un proyecto
     if (conversation.projectId && projectsState?.projects[conversation.projectId]) {
       item.classList.add('has-project');
@@ -688,9 +725,22 @@ function renderConversationList() {
 
     const name = document.createElement('p');
     name.className = 'conversation-name';
-    name.textContent = conversation.title ?? DEFAULT_TITLE;
-    
-    // Mostrar etiqueta del proyecto si existe
+
+    const titleText = document.createElement('span');
+    titleText.className = 'conversation-title-text';
+
+    // Check if title is a default title in any language to allow translation
+    const currentTitle = conversation.title;
+    const isDefault = !currentTitle ||
+      currentTitle === 'Nueva conversación' ||
+      currentTitle === 'New Conversation' ||
+      currentTitle === DEFAULT_TITLE;
+
+    const defaultTitle = window.translationManager ? window.translationManager.translate('chat.newConversation') : DEFAULT_TITLE;
+    titleText.textContent = isDefault ? defaultTitle : currentTitle;
+    name.appendChild(titleText);
+
+    // Show project tag if exists
     if (conversation.projectId && projectsState?.projects[conversation.projectId]) {
       const projectTag = document.createElement('span');
       projectTag.className = 'conversation-project-tag';
@@ -701,7 +751,9 @@ function renderConversationList() {
     const preview = document.createElement('p');
     preview.className = 'conversation-preview';
     const lastMessage = conversation.messages[conversation.messages.length - 1];
-    preview.textContent = lastMessage ? lastMessage.content.slice(0, 60) : 'Sin mensajes aún';
+    preview.textContent = lastMessage
+      ? (lastMessage.content.slice(0, 60) + (lastMessage.content.length > 60 ? '...' : ''))
+      : (window.translationManager ? window.translationManager.translate('empty.noMessages') : 'Sin mensajes aún');
 
     textBlock.append(name, preview);
     item.appendChild(textBlock);
@@ -741,18 +793,18 @@ function renderConversationList() {
 
 function setActiveConversation(id) {
   if (!state.conversations[id]) return;
-  
+
   // NO cancelar Deep Research - permitir cambiar de chat para ver otras conversaciones
   // Solo bloquear la escritura en otros chats (se maneja en lockInputsDuringResearch)
-  
+
   state.activeId = id;
   if (!attachedFiles[id]) {
     attachedFiles[id] = [];
   }
-  
+
   // Mostrar/ocultar banner de investigación en progreso
   updateResearchBanner(id);
-  
+
   // Activar el proyecto asociado a la conversación (si tiene)
   const conversation = state.conversations[id];
   if (conversation.projectId && projectsState?.projects[conversation.projectId]) {
@@ -761,7 +813,7 @@ function setActiveConversation(id) {
     saveActiveProject(conversation.projectId);
     updateProjectBadge();
     renderProjectsList();
-    
+
     const chatState = document.getElementById('chat-state');
     if (chatState) chatState.classList.add('in-project');
   } else {
@@ -772,11 +824,11 @@ function setActiveConversation(id) {
       updateProjectBadge();
       renderProjectsList();
     }
-    
+
     const chatState = document.getElementById('chat-state');
     if (chatState) chatState.classList.remove('in-project');
   }
-  
+
   renderConversationList();
   renderActiveConversation();
   renderAttachedFiles();
@@ -807,15 +859,15 @@ let conversationToDelete = null;
 function handleRenameConversation(id) {
   const conversation = state.conversations[id];
   if (!conversation) return;
-  
+
   conversationToRename = id;
   const modal = document.getElementById('rename-conversation-modal');
   const input = document.getElementById('rename-conversation-input');
-  
+
   if (modal && input) {
     input.value = conversation.title ?? DEFAULT_TITLE;
     modal.style.display = 'flex';
-    
+
     // Animar la entrada del modal
     const content = modal.querySelector('.modal-content');
     if (content) {
@@ -823,7 +875,7 @@ function handleRenameConversation(id) {
       content.offsetHeight; // Forzar reflow
       content.style.animation = 'slideDown 0.3s ease';
     }
-    
+
     setTimeout(() => {
       input.focus();
       input.select();
@@ -833,29 +885,29 @@ function handleRenameConversation(id) {
 
 function confirmRenameConversation() {
   if (!conversationToRename) return;
-  
+
   const conversation = state.conversations[conversationToRename];
   const input = document.getElementById('rename-conversation-input');
-  
+
   if (!conversation || !input) return;
-  
+
   const newTitle = input.value.trim();
   if (!newTitle) return;
-  
+
   conversation.title = newTitle || DEFAULT_TITLE;
   touchConversation(conversationToRename);
-  
+
   // Añadir animación de highlight al elemento renombrado
   const conversationItem = document.querySelector(`.conversation-item.active`);
   if (conversationItem) {
     conversationItem.classList.add('renaming');
     setTimeout(() => conversationItem.classList.remove('renaming'), 500);
   }
-  
+
   renderConversationList();
   if (conversationToRename === state.activeId) renderActiveConversation();
   persistState();
-  
+
   closeRenameModal();
 }
 
@@ -878,16 +930,16 @@ function closeRenameModal() {
 
 function handleDeleteConversation(id) {
   if (!state.conversations[id]) return;
-  
+
   conversationToDelete = id;
   const modal = document.getElementById('delete-conversation-modal');
   const nameElement = document.getElementById('delete-conversation-name');
   const conversation = state.conversations[id];
-  
+
   if (modal && nameElement) {
     nameElement.textContent = conversation.title ?? DEFAULT_TITLE;
     modal.style.display = 'flex';
-    
+
     // Animar la entrada del modal
     const content = modal.querySelector('.modal-content');
     if (content) {
@@ -900,23 +952,23 @@ function handleDeleteConversation(id) {
 
 function confirmDeleteConversation() {
   if (!conversationToDelete) return;
-  
+
   // Encontrar el elemento de la conversación y animarlo
   const conversationItems = document.querySelectorAll('.conversation-item');
   const index = state.order.indexOf(conversationToDelete);
-  
+
   if (conversationItems[index]) {
     conversationItems[index].classList.add('deleting');
-    
+
     // Esperar a que termine la animación antes de eliminar
     setTimeout(() => {
       delete state.conversations[conversationToDelete];
       state.order = state.order.filter((convId) => convId !== conversationToDelete);
-      
+
       if (state.activeId === conversationToDelete) {
         state.activeId = state.order[0] ?? null;
       }
-      
+
       if (!state.activeId) {
         createConversation();
       } else {
@@ -924,18 +976,18 @@ function confirmDeleteConversation() {
         renderActiveConversation();
         persistState();
       }
-      
+
       conversationToDelete = null;
     }, 300);
   } else {
     // Si no se encuentra el elemento, eliminar directamente
     delete state.conversations[conversationToDelete];
     state.order = state.order.filter((convId) => convId !== conversationToDelete);
-    
+
     if (state.activeId === conversationToDelete) {
       state.activeId = state.order[0] ?? null;
     }
-    
+
     if (!state.activeId) {
       createConversation();
     } else {
@@ -943,10 +995,10 @@ function confirmDeleteConversation() {
       renderActiveConversation();
       persistState();
     }
-    
+
     conversationToDelete = null;
   }
-  
+
   closeDeleteConversationModal();
 }
 
@@ -968,11 +1020,11 @@ function closeDeleteConversationModal() {
 
 function handleDeleteAllConversations() {
   if (state.order.length === 0) return;
-  
+
   const modal = document.getElementById('delete-all-conversations-modal');
   if (modal) {
     modal.style.display = 'flex';
-    
+
     // Animar la entrada del modal
     const content = modal.querySelector('.modal-content');
     if (content) {
@@ -991,21 +1043,21 @@ function confirmDeleteAllConversations() {
       item.classList.add('deleting');
     }, index * 50); // Escalonar la animación
   });
-  
+
   // Esperar a que terminen todas las animaciones
   const totalAnimationTime = (conversationItems.length * 50) + 300;
-  
+
   setTimeout(() => {
     // Limpiar estado
     state.conversations = {};
     state.order = [];
     state.activeId = null;
-    
+
     // Crear nueva conversación
     createConversation();
     persistState();
   }, totalAnimationTime);
-  
+
   closeDeleteAllModal();
 }
 
@@ -1037,7 +1089,7 @@ function handleDeleteActive() {
 
 function createThinkingBlock(thinking, duration = null, isLoading = false) {
   const durationText = duration ? `${duration} segundos` : '';
-  
+
   if (isLoading) {
     if (thinking) {
       return `
@@ -1065,7 +1117,7 @@ function createThinkingBlock(thinking, duration = null, isLoading = false) {
       </div>
     `;
   }
-  
+
   // El bloque siempre empieza cerrado, el usuario debe hacer clic para expandirlo
   return `
     <div class="thinking-block" onclick="this.classList.toggle('expanded')">
@@ -1087,9 +1139,9 @@ const SCROLL_INTERVAL = 100; // Scroll máximo cada 100ms
 
 function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = false) {
   if (!bubble) return;
-  
+
   let content = '';
-  
+
   // Agregar bloque de pensamiento si existe
   if (thinkingData) {
     if (thinkingData.isLoading) {
@@ -1098,56 +1150,56 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
       content += createThinkingBlock(thinkingData.thinking, thinkingData.duration, false);
     }
   }
-  
+
   // Agregar el texto de la respuesta
   if (text) {
     content += parseMarkdown(text);
   }
-  
+
   // Usar requestAnimationFrame para actualizar el DOM de forma más eficiente
   requestAnimationFrame(() => {
-  bubble.innerHTML = content;
-  
+    bubble.innerHTML = content;
+
     // Renderizar matemáticas con KaTeX solo si hay contenido
     if (content && typeof renderMathInElement !== 'undefined') {
       // Usar setTimeout para no bloquear el frame principal
       setTimeout(() => {
-    renderMathInElement(bubble, {
-      delimiters: [
-        {left: '$$', right: '$$', display: true},
-        {left: '$', right: '$', display: false}
-      ],
-      throwOnError: false
-    });
+        renderMathInElement(bubble, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false }
+          ],
+          throwOnError: false
+        });
       }, 0);
-  }
-  
+    }
+
     // Asegurar que el botón de copiar existe dentro del bubble
     let copyContainer = bubble.querySelector('.copy-message-container');
     if (!copyContainer) {
       copyContainer = document.createElement('div');
       copyContainer.className = 'copy-message-container';
-      
+
       // Crear botón de regenerar
       const regenerateButton = document.createElement('button');
       regenerateButton.className = 'regenerate-message-btn';
       regenerateButton.title = 'Regenerar respuesta';
       regenerateButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M23 20v-6h-6"></path><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>';
-      
+
       const copyButton = document.createElement('button');
       copyButton.className = 'copy-message-btn';
       copyButton.title = 'Copiar mensaje';
       copyButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
-      
+
       const timeElement = document.createElement('span');
       timeElement.className = 'message-time';
-      
+
       copyContainer.appendChild(regenerateButton);
       copyContainer.appendChild(copyButton);
       copyContainer.appendChild(timeElement);
       bubble.appendChild(copyContainer);
     }
-    
+
     // Actualizar el evento de regenerar
     const regenerateButton = copyContainer.querySelector('.regenerate-message-btn');
     if (regenerateButton) {
@@ -1163,7 +1215,7 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
         }
       };
     }
-    
+
     // Actualizar el evento de copiar con el texto actual
     const copyButton = copyContainer.querySelector('.copy-message-btn');
     if (copyButton) {
@@ -1172,7 +1224,7 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
         await copyToClipboard(text || '', copyButton);
       };
     }
-    
+
     // Actualizar la hora si existe
     const timeElement = copyContainer.querySelector('.message-time');
     if (timeElement) {
@@ -1186,16 +1238,16 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
         }
       }
     }
-  
+
     // Scroll solo si ha pasado suficiente tiempo y no se debe saltar
     if (!skipScroll) {
       const now = Date.now();
-      if (now - lastScrollTime >= SCROLL_INTERVAL) {
+      if (now - lastUpdateTime >= UPDATE_INTERVAL) { // Use UPDATE_INTERVAL from streamAssistantResponse
         scrollChatToBottom();
-        lastScrollTime = now;
+        lastUpdateTime = now;
       }
     }
-    
+
     // Scroll automático del thinking-content hacia el final cuando está cargando
     const thinkingContent = bubble.querySelector('.thinking-content-streaming');
     if (thinkingContent) {
@@ -1213,7 +1265,7 @@ function syncModelSelects() {
 async function loadModels() {
   const selects = [modelSelect, modelSelectInline].filter(Boolean);
   if (selects.length === 0) return;
-  
+
   const storedModel = state.currentModel ?? selects[0].value;
   selects.forEach(select => {
     select.innerHTML = '<option>Cargando modelos...</option>';
@@ -1240,30 +1292,30 @@ async function loadModels() {
       models.forEach((model) => {
         const option = document.createElement('option');
         option.value = model.name;
-        
+
         // Formatear nombre del modelo
         let displayName = model.name;
-        
+
         // Limpiar el nombre y extraer información
         if (model.name.includes(':')) {
           const parts = model.name.split(':');
           const baseName = parts[0];
           const tag = parts[1] || '';
-          
+
           // Capitalizar primera letra del nombre base
           const formattedBase = baseName.charAt(0).toUpperCase() + baseName.slice(1);
-          
+
           // Formatear el tag
           let formattedTag = tag;
           if (tag.includes('-')) {
             // Para tags como "7b-instruct-v0.3-q4_K_M"
             const tagParts = tag.split('-');
             const size = tagParts[0]; // "7b"
-            const variant = tagParts.slice(1).filter(p => 
-              !p.toLowerCase().includes('q') && 
+            const variant = tagParts.slice(1).filter(p =>
+              !p.toLowerCase().includes('q') &&
               !p.toLowerCase().includes('_')
             ).join(' ');
-            
+
             formattedTag = size.toUpperCase();
             if (variant) {
               formattedTag += ` ${variant}`;
@@ -1271,13 +1323,13 @@ async function loadModels() {
           } else {
             formattedTag = tag.toUpperCase();
           }
-          
+
           displayName = `${formattedBase} ${formattedTag}`;
         } else {
           // Si no tiene ':', capitalizar
           displayName = model.name.charAt(0).toUpperCase() + model.name.slice(1);
         }
-        
+
         option.textContent = displayName;
         select.appendChild(option);
       });
@@ -1312,16 +1364,16 @@ async function streamAssistantResponse(conversation, payloadMessages) {
   conversation.messages.push(assistantMessage);
   touchConversation(conversation.id);
   const { bubble } = appendMessageElement(assistantMessage);
-  
+
   // Mostrar indicador de "pensando"
   updateAssistantBubble(bubble, '', { isLoading: true });
   persistState();
-  
+
   const startTime = Date.now();
 
   // Calcular el tamaño del contexto necesario basado en los mensajes
   const totalContentLength = payloadMessages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0);
-  
+
   // Configurar num_ctx dinámicamente según el contenido
   // 1 token ≈ 4 caracteres en promedio
   const estimatedTokens = Math.ceil(totalContentLength / 4);
@@ -1371,7 +1423,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
     console.error('Error del servidor:', response.status, response.statusText, errorText);
     throw new Error(`Error al consultar el modelo: ${response.statusText}. ${errorText.substring(0, 200)}`);
   }
-  
+
   if (!response.body) {
     throw new Error('No se recibió respuesta del servidor');
   }
@@ -1379,41 +1431,41 @@ async function streamAssistantResponse(conversation, payloadMessages) {
   const reader = response.body.getReader();
   currentStreamReader = reader; // Guardar el reader para poder cancelarlo
   updateSendButtonToStop();
-  
+
   const decoder = new TextDecoder();
   let buffer = '';
   let isFirstChunk = true;
   let thinkingComplete = false;
   let isThinkingStreaming = false;
   wasCancelled = false; // Resetear el flag de cancelación
-  
+
   // Sistema de batching para actualizaciones suaves
   let pendingUpdate = false;
   let updateScheduled = false;
   let lastUpdateTime = 0;
   const UPDATE_INTERVAL = 16; // ~60fps (16ms)
   const BATCH_SIZE = 50; // Número de caracteres antes de forzar actualización
-  
+
   // Función para programar actualización del DOM
   const scheduleUpdate = () => {
     if (updateScheduled) return;
     updateScheduled = true;
-    
+
     requestAnimationFrame(() => {
       updateScheduled = false;
       const now = Date.now();
-      
+
       // Solo actualizar si ha pasado suficiente tiempo o hay mucho contenido pendiente
       const currentTextLength = bubble.textContent?.length || 0;
       const contentDiff = assistantMessage.content.length - currentTextLength;
-      
+
       if (now - lastUpdateTime >= UPDATE_INTERVAL || contentDiff > BATCH_SIZE) {
         const thinkingData = assistantMessage.thinking ? {
           thinking: assistantMessage.thinking,
           duration: assistantMessage.thinkingDuration,
           isLoading: isThinkingStreaming
         } : null;
-        
+
         // Solo hacer scroll si hay mucho contenido nuevo
         const skipScroll = contentDiff < 20;
         updateAssistantBubble(bubble, assistantMessage.content, thinkingData, skipScroll);
@@ -1445,11 +1497,11 @@ async function streamAssistantResponse(conversation, payloadMessages) {
           if (parsed.thinking || parsed.reasoning || parsed.thought || parsed.message?.thinking) {
             isThinkingStreaming = true;
             const thinkingText = parsed.thinking || parsed.reasoning || parsed.thought || parsed.message?.thinking;
-            
+
             assistantMessage.thinking += thinkingText;
             const duration = ((Date.now() - startTime) / 1000).toFixed(0);
             assistantMessage.thinkingDuration = duration;
-            
+
             // Actualizar inmediatamente para thinking (con scroll)
             updateAssistantBubble(bubble, assistantMessage.content, {
               thinking: assistantMessage.thinking,
@@ -1463,7 +1515,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
           if (parsed.message?.content) {
             isThinkingStreaming = false;
             const contentChunk = parsed.message.content;
-            
+
             // Detectar si el contenido contiene marcadores de razonamiento
             // Algunos modelos incluyen el razonamiento en el contenido con tags especiales
             // Varios formatos posibles: <think>, <reasoning>, <thought>, etc.
@@ -1475,10 +1527,10 @@ async function streamAssistantResponse(conversation, payloadMessages) {
               /\[thinking\]([\s\S]*?)\[\/thinking\]/i,
               /\[reasoning\]([\s\S]*?)\[\/reasoning\]/i
             ];
-            
+
             let thinkingFound = false;
             let cleanContent = contentChunk;
-            
+
             for (const pattern of thinkingPatterns) {
               const match = contentChunk.match(pattern);
               if (match && match[1]) {
@@ -1496,7 +1548,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                 break;
               }
             }
-            
+
             if (thinkingFound) {
               // Si hay contenido limpio después de extraer el thinking, agregarlo
               if (cleanContent) {
@@ -1516,19 +1568,19 @@ async function streamAssistantResponse(conversation, payloadMessages) {
               if (isFirstChunk && !thinkingComplete) {
                 const duration = ((Date.now() - startTime) / 1000).toFixed(0);
                 assistantMessage.thinkingDuration = duration;
-                
+
                 // Solo mostrar el indicador de pensamiento genérico si tomó más de 1 segundo
                 // Y NO hay thinking real capturado
                 if (duration > 1 && !assistantMessage.thinking) {
                   assistantMessage.thinking = `Procesó la solicitud en ${duration} segundos antes de responder...`;
                 }
-                
+
                 isFirstChunk = false;
               }
-              
+
               assistantMessage.content += contentChunk;
               pendingUpdate = true;
-              
+
               // Programar actualización de forma asíncrona
               scheduleUpdate();
             }
@@ -1544,20 +1596,20 @@ async function streamAssistantResponse(conversation, payloadMessages) {
               thinking: assistantMessage.thinking,
               duration: assistantMessage.thinkingDuration
             } : null;
-            
+
             updateAssistantBubble(bubble, assistantMessage.content, thinkingData, false);
             conversation.updatedAt = Date.now();
             persistState();
             renderConversationList();
             currentStreamReader = null;
             updateStopButtonToSend();
-            
+
             // Registrar estadísticas de uso
             const responseTime = (Date.now() - startTime) / 1000;
             trackModelUsage(state.currentModel);
             trackDailyMessage();
             trackResponseTime(responseTime);
-            
+
             // Extraer información importante automáticamente
             const lastUserMessage = conversation.messages.filter(m => m.role === 'user').pop();
             if (lastUserMessage && assistantMessage.content) {
@@ -1570,12 +1622,12 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                   addedCount++;
                 }
               });
-              
+
               // Actualizar lista si se añadieron memorias
               if (addedCount > 0 && typeof window.renderMemoriesList === 'function') {
                 window.renderMemoriesList();
               }
-              
+
               // Si no se encontró nada con el método simple y hay suficiente contenido, usar IA
               if (simpleExtracted.length === 0 && assistantMessage.content.length > 100) {
                 // Ejecutar en segundo plano sin bloquear
@@ -1584,7 +1636,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                 }, 500);
               }
             }
-            
+
             // Scroll final garantizado
             setTimeout(() => scrollChatToBottom(), 0);
             return;
@@ -1593,13 +1645,13 @@ async function streamAssistantResponse(conversation, payloadMessages) {
           console.warn('No se pudo analizar un fragmento del stream', parseError, line);
         }
       }
-      
+
       // Dar tiempo al navegador periódicamente
       if (Math.random() < 0.1) { // ~10% de las veces
         await yieldToBrowser();
       }
     }
-    
+
     // Asegurar última actualización si hay contenido pendiente
     if (pendingUpdate) {
       const thinkingData = assistantMessage.thinking ? {
@@ -1607,13 +1659,13 @@ async function streamAssistantResponse(conversation, payloadMessages) {
         duration: assistantMessage.thinkingDuration
       } : null;
       updateAssistantBubble(bubble, assistantMessage.content, thinkingData, false);
-      
+
       // Registrar estadísticas de uso
       const responseTime = (Date.now() - startTime) / 1000;
       trackModelUsage(state.currentModel);
       trackDailyMessage();
       trackResponseTime(responseTime);
-      
+
       // Extraer información importante automáticamente al finalizar
       const lastUserMessage = conversation.messages.filter(m => m.role === 'user').pop();
       if (lastUserMessage && assistantMessage.content) {
@@ -1626,12 +1678,12 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             addedCount++;
           }
         });
-        
+
         // Actualizar lista si se añadieron memorias
         if (addedCount > 0 && typeof window.renderMemoriesList === 'function') {
           window.renderMemoriesList();
         }
-        
+
         // Si no se encontró nada con el método simple y hay suficiente contenido, usar IA
         if (simpleExtracted.length === 0 && assistantMessage.content.length > 100) {
           // Ejecutar en segundo plano sin bloquear
@@ -1640,7 +1692,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
           }, 500);
         }
       }
-      
+
       // Scroll final garantizado
       setTimeout(() => scrollChatToBottom(), 0);
     }
@@ -1659,7 +1711,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
     }
     currentStreamReader = null;
     updateStopButtonToSend();
-    
+
     // Solo actualizar si fue cancelado y aún no se ha actualizado el bubble
     if (wasCancelled) {
       // Verificar si el bubble ya fue actualizado en stopStream
@@ -1678,7 +1730,7 @@ function stopStream() {
     wasCancelled = true; // Marcar como cancelado antes de cancelar
     currentStreamReader.cancel();
     state.loading = false;
-    
+
     // Actualizar inmediatamente el bubble para eliminar la animación de carga
     const chatList = document.getElementById('chat-list');
     const lastMessage = chatList?.lastElementChild;
@@ -1707,18 +1759,18 @@ let messageToEdit = null;
 function openEditMessageModal(messageId) {
   const conversation = state.conversations[state.activeId];
   if (!conversation) return;
-  
+
   const message = conversation.messages.find(msg => msg.id === messageId);
   if (!message || message.role !== 'user') return;
-  
+
   messageToEdit = messageId;
   const modal = document.getElementById('edit-message-modal');
   const textarea = document.getElementById('edit-message-textarea');
-  
+
   if (modal && textarea) {
     textarea.value = message.content || '';
     modal.style.display = 'flex';
-    
+
     // Animar la entrada del modal
     const content = modal.querySelector('.modal-content');
     if (content) {
@@ -1726,7 +1778,7 @@ function openEditMessageModal(messageId) {
       content.offsetHeight; // Forzar reflow
       content.style.animation = 'slideDown 0.3s ease';
     }
-    
+
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(textarea.value.length, textarea.value.length);
@@ -1755,80 +1807,80 @@ function closeEditMessageModal() {
 // Función para confirmar la edición y regenerar desde ese punto
 async function confirmEditMessage() {
   if (!messageToEdit || state.loading) return;
-  
+
   const conversation = state.conversations[state.activeId];
   if (!conversation) return;
-  
+
   const textarea = document.getElementById('edit-message-textarea');
   if (!textarea) return;
-  
+
   const newContent = textarea.value.trim();
   if (!newContent) return;
-  
+
   // Encontrar el índice del mensaje a editar
   const messageIndex = conversation.messages.findIndex(msg => msg.id === messageToEdit);
   if (messageIndex === -1) return;
-  
+
   const message = conversation.messages[messageIndex];
   if (message.role !== 'user') return;
-  
+
   // Cerrar el modal
   closeEditMessageModal();
-  
+
   // Actualizar el contenido del mensaje
   message.content = newContent;
-  
+
   // Eliminar todos los mensajes posteriores (respuestas del asistente y mensajes siguientes)
   const messagesToRemove = conversation.messages.length - messageIndex - 1;
   conversation.messages.splice(messageIndex + 1, messagesToRemove);
-  
+
   // Re-renderizar la conversación completa
   renderActiveConversation();
-  
+
   // Guardar el estado
   persistState();
-  
+
   // Preparar los mensajes para la solicitud
   const payloadMessages = [];
-  
+
   // Agregar información personal del usuario como contexto del sistema
   const personalInfo = getAIPersonalization();
-  
+
   // Obtener contexto del proyecto activo
   const activeProject = getActiveProject();
   const projectContext = activeProject ? buildProjectContext(activeProject) : '';
-  
+
   // Obtener archivos adjuntos
   const currentFiles = attachedFiles[conversation.id] || [];
   const imageFiles = currentFiles.filter(f => f.isImage);
   const textFiles = currentFiles.filter(f => !f.isImage);
-  
+
   // Construir mensaje del sistema
   const shouldIncludeProjectContext = projectContext && projectContext.length > 0;
   let memoryContext = '';
   const isFirstUserMessage = messageIndex === 0;
-  
+
   if (isFirstUserMessage) {
     memoryContext = buildMemoryContext() || '';
   }
-  
+
   if (isFirstUserMessage || shouldIncludeProjectContext) {
     let systemContent = '';
-    
+
     if (projectContext) {
       systemContent += projectContext + '\n\n';
     }
-    
+
     if (isFirstUserMessage) {
       if (memoryContext) {
         systemContent += memoryContext + '\n\n';
       }
-      
+
       if (personalInfo.trim()) {
         systemContent += `Información personal del usuario: ${personalInfo.trim()}\n\n`;
       }
     }
-    
+
     if (textFiles.length > 0) {
       systemContent += '=== DOCUMENTOS ADJUNTOS AL CHAT (DEBES LEER Y USAR ESTE CONTENIDO) ===\n\n';
       textFiles.forEach((file, index) => {
@@ -1839,33 +1891,33 @@ async function confirmEditMessage() {
       });
       systemContent += '=== FIN DE DOCUMENTOS ADJUNTOS ===\n\n';
     }
-    
+
     const responseStyle = getAIResponseStyle();
     const styleInstructions = getStyleInstructions(responseStyle);
-    
+
     let instructions = '';
     const hasDocuments = textFiles.length > 0 || shouldIncludeProjectContext;
     const hasPersonalContext = personalInfo.trim() || memoryContext;
-    
+
     if (hasDocuments) {
       instructions = 'IMPORTANTE: Se te han proporcionado documentos arriba. DEBES leer y usar el contenido de estos documentos para responder las preguntas del usuario.';
     } else if (hasPersonalContext) {
       instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas.';
     }
-    
+
     if (systemContent || styleInstructions || instructions) {
       let finalContent = systemContent;
-      
+
       if (styleInstructions) {
         if (finalContent) finalContent += '\n';
         finalContent += `Instrucciones de estilo de respuesta: ${styleInstructions}`;
       }
-      
+
       if (instructions) {
         if (finalContent) finalContent += '\n\n';
         finalContent += instructions;
       }
-      
+
       if (finalContent.trim()) {
         payloadMessages.push({
           role: 'system',
@@ -1874,7 +1926,7 @@ async function confirmEditMessage() {
       }
     }
   }
-  
+
   // Añadir los mensajes de la conversación (hasta el mensaje editado, inclusive)
   for (let i = 0; i <= messageIndex; i++) {
     const msg = conversation.messages[i];
@@ -1882,10 +1934,10 @@ async function confirmEditMessage() {
       role: msg.role,
       content: msg.content || '',
     };
-    
+
     // Solo añadir imágenes al último mensaje del usuario
     const isLastUserMessage = msg.role === 'user' && i === messageIndex && imageFiles.length > 0;
-    
+
     if (isLastUserMessage) {
       payloadMessage.images = imageFiles.map(file => {
         if (file.content && file.content.startsWith('data:')) {
@@ -1894,12 +1946,12 @@ async function confirmEditMessage() {
         return file.content;
       }).filter(img => img !== null);
     }
-    
+
     payloadMessages.push(payloadMessage);
   }
-  
+
   state.loading = true;
-  
+
   try {
     await streamAssistantResponse(conversation, payloadMessages);
   } catch (error) {
@@ -1924,27 +1976,27 @@ async function confirmEditMessage() {
 // Función para regenerar la respuesta de un mensaje del asistente
 async function regenerateResponse(messageId) {
   if (state.loading) return;
-  
+
   const conversation = state.conversations[state.activeId];
   if (!conversation) return;
-  
+
   // Encontrar el índice del mensaje del asistente
   const messageIndex = conversation.messages.findIndex(msg => msg.id === messageId);
   if (messageIndex === -1) return;
-  
+
   const assistantMessage = conversation.messages[messageIndex];
   if (assistantMessage.role !== 'assistant') return;
-  
+
   // Verificar que hay un mensaje de usuario antes de este mensaje del asistente
   const userMessageIndex = messageIndex - 1;
   if (userMessageIndex < 0 || conversation.messages[userMessageIndex].role !== 'user') {
     console.warn('No se encontró un mensaje de usuario antes del mensaje del asistente');
     return;
   }
-  
+
   // Eliminar el mensaje del asistente del estado
   conversation.messages.splice(messageIndex, 1);
-  
+
   // Eliminar el elemento del DOM
   const chatListElement = document.getElementById('chat-list');
   if (chatListElement) {
@@ -1953,51 +2005,51 @@ async function regenerateResponse(messageId) {
       messageElements[messageIndex].remove();
     }
   }
-  
+
   // Guardar el estado
   persistState();
-  
+
   // Preparar los mensajes para la solicitud (hasta el mensaje del usuario, inclusive)
   const payloadMessages = [];
-  
+
   // Agregar información personal del usuario como contexto del sistema
   const personalInfo = getAIPersonalization();
-  
+
   // Obtener contexto del proyecto activo
   const activeProject = getActiveProject();
   const projectContext = activeProject ? buildProjectContext(activeProject) : '';
-  
+
   // Obtener archivos adjuntos
   const currentFiles = attachedFiles[conversation.id] || [];
   const imageFiles = currentFiles.filter(f => f.isImage);
   const textFiles = currentFiles.filter(f => !f.isImage);
-  
+
   // Construir mensaje del sistema
   const shouldIncludeProjectContext = projectContext && projectContext.length > 0;
   let memoryContext = '';
   const isFirstMessage = messageIndex === 1; // Si el mensaje a regenerar es el primero del asistente
-  
+
   if (isFirstMessage) {
     memoryContext = buildMemoryContext() || '';
   }
-  
+
   if (isFirstMessage || shouldIncludeProjectContext) {
     let systemContent = '';
-    
+
     if (projectContext) {
       systemContent += projectContext + '\n\n';
     }
-    
+
     if (isFirstMessage) {
       if (memoryContext) {
         systemContent += memoryContext + '\n\n';
       }
-      
+
       if (personalInfo.trim()) {
         systemContent += `Información personal del usuario: ${personalInfo.trim()}\n\n`;
       }
     }
-    
+
     if (textFiles.length > 0) {
       systemContent += '=== DOCUMENTOS ADJUNTOS AL CHAT (DEBES LEER Y USAR ESTE CONTENIDO) ===\n\n';
       textFiles.forEach((file, index) => {
@@ -2008,33 +2060,33 @@ async function regenerateResponse(messageId) {
       });
       systemContent += '=== FIN DE DOCUMENTOS ADJUNTOS ===\n\n';
     }
-    
+
     const responseStyle = getAIResponseStyle();
     const styleInstructions = getStyleInstructions(responseStyle);
-    
+
     let instructions = '';
     const hasDocuments = textFiles.length > 0 || shouldIncludeProjectContext;
     const hasPersonalContext = personalInfo.trim() || memoryContext;
-    
+
     if (hasDocuments) {
       instructions = 'IMPORTANTE: Se te han proporcionado documentos arriba. DEBES leer y usar el contenido de estos documentos para responder las preguntas del usuario.';
     } else if (hasPersonalContext) {
       instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas.';
     }
-    
+
     if (systemContent || styleInstructions || instructions) {
       let finalContent = systemContent;
-      
+
       if (styleInstructions) {
         if (finalContent) finalContent += '\n';
         finalContent += `Instrucciones de estilo de respuesta: ${styleInstructions}`;
       }
-      
+
       if (instructions) {
         if (finalContent) finalContent += '\n\n';
         finalContent += instructions;
       }
-      
+
       if (finalContent.trim()) {
         payloadMessages.push({
           role: 'system',
@@ -2043,7 +2095,7 @@ async function regenerateResponse(messageId) {
       }
     }
   }
-  
+
   // Añadir los mensajes de la conversación (hasta el mensaje del usuario)
   for (let i = 0; i <= userMessageIndex; i++) {
     const message = conversation.messages[i];
@@ -2051,10 +2103,10 @@ async function regenerateResponse(messageId) {
       role: message.role,
       content: message.content || '',
     };
-    
+
     // Solo añadir imágenes al último mensaje del usuario
     const isLastUserMessage = message.role === 'user' && i === userMessageIndex && imageFiles.length > 0;
-    
+
     if (isLastUserMessage) {
       payloadMessage.images = imageFiles.map(file => {
         if (file.content && file.content.startsWith('data:')) {
@@ -2063,12 +2115,12 @@ async function regenerateResponse(messageId) {
         return file.content;
       }).filter(img => img !== null);
     }
-    
+
     payloadMessages.push(payloadMessage);
   }
-  
+
   state.loading = true;
-  
+
   try {
     await streamAssistantResponse(conversation, payloadMessages);
   } catch (error) {
@@ -2091,7 +2143,7 @@ async function regenerateResponse(messageId) {
 
 function updateSendButtonToStop() {
   const sendButtons = document.querySelectorAll('.send-button');
-  
+
   sendButtons.forEach(button => {
     button.textContent = '■';
     button.title = 'Detener';
@@ -2107,7 +2159,7 @@ function updateSendButtonToStop() {
 
 function updateStopButtonToSend() {
   const sendButtons = document.querySelectorAll('.send-button');
-  
+
   sendButtons.forEach(button => {
     button.textContent = '↑';
     button.title = 'Enviar';
@@ -2138,29 +2190,36 @@ async function handleSubmit(event) {
   const userMessage = createMessage('user', prompt, currentFiles);
   conversation.messages.push(userMessage);
   touchConversation(conversation.id);
-  
+
   if (isEmptyState) {
     showChatState();
   }
-  
+
   appendMessageElement(userMessage);
 
   updateConversationTitleFromContent(conversation);
+
+  // Sincronizar UI con el nuevo título inmediatamente
+  const conversationTitle = document.getElementById('conversation-title');
+  if (conversationTitle) {
+    conversationTitle.textContent = conversation.title;
+  }
+
   conversation.updatedAt = Date.now();
   persistState();
   renderConversationList();
 
   // Construir mensajes incluyendo el contexto de archivos adjuntos
   const payloadMessages = [];
-  
+
   // Agregar información personal del usuario como contexto del sistema (solo en el primer mensaje)
   const isFirstMessage = conversation.messages.length === 1;
   const personalInfo = getAIPersonalization();
-  
+
   // Obtener contexto del proyecto activo
   const activeProject = getActiveProject();
   const projectContext = activeProject ? buildProjectContext(activeProject) : '';
-  
+
   // Log de depuración para proyecto activo
   if (activeProject) {
     console.log('📂 Proyecto activo:', activeProject.name);
@@ -2171,16 +2230,16 @@ async function handleSubmit(event) {
     });
     console.log(`   - Contexto del proyecto: ${projectContext.length} caracteres totales`);
   }
-  
+
   // Si hay archivos adjuntos, añadir el contexto al primer mensaje del usuario
   // Solo añadir el contexto una vez al inicio de la conversación con archivos
   const hasFiles = attachedFiles[conversation.id] && attachedFiles[conversation.id].length > 0;
   const isFirstMessageWithFiles = hasFiles && conversation.messages.length === 1;
-  
+
   // Separar imágenes de otros archivos
   const imageFiles = hasFiles ? attachedFiles[conversation.id].filter(f => f.isImage) : [];
   const textFiles = hasFiles ? attachedFiles[conversation.id].filter(f => !f.isImage) : [];
-  
+
   // Log de depuración para archivos adjuntos al chat
   if (hasFiles) {
     console.log('📎 Archivos adjuntos al chat:');
@@ -2190,38 +2249,38 @@ async function handleSubmit(event) {
       console.log(`   📄 ${f.name}: ${f.content?.length || 0} caracteres`);
     });
   }
-  
+
   // Construir mensaje del sistema combinando proyecto, información personal, estilo, memorias y archivos
   // NOTA: Para proyectos, SIEMPRE enviamos el contexto ya que los archivos son persistentes
   const shouldIncludeProjectContext = projectContext && projectContext.length > 0;
-  
+
   // Variables para contexto adicional
   let memoryContext = '';
   if (isFirstMessage) {
     memoryContext = buildMemoryContext() || '';
   }
-  
+
   // Si es el primer mensaje O hay un proyecto activo, construir el mensaje del sistema
   if (isFirstMessage || shouldIncludeProjectContext) {
     let systemContent = '';
-    
+
     // PRIMERO: Agregar contexto del proyecto (máxima prioridad) - SIEMPRE si hay proyecto
     if (projectContext) {
       systemContent += projectContext + '\n\n';
       console.log('📂 Contexto del proyecto incluido en el mensaje del sistema');
     }
-    
+
     // Agregar memorias e info personal (solo en primer mensaje)
     if (isFirstMessage) {
       if (memoryContext) {
         systemContent += memoryContext + '\n\n';
       }
-      
+
       if (personalInfo.trim()) {
         systemContent += `Información personal del usuario: ${personalInfo.trim()}\n\n`;
       }
     }
-    
+
     // Agregar contexto de archivos adjuntos al chat si existen
     if (textFiles.length > 0) {
       systemContent += '=== DOCUMENTOS ADJUNTOS AL CHAT (DEBES LEER Y USAR ESTE CONTENIDO) ===\n\n';
@@ -2235,11 +2294,11 @@ async function handleSubmit(event) {
       });
       systemContent += '=== FIN DE DOCUMENTOS ADJUNTOS ===\n\n';
     }
-    
+
     // Agregar instrucciones del estilo de respuesta
     const responseStyle = getAIResponseStyle();
     const styleInstructions = getStyleInstructions(responseStyle);
-    
+
     // Instrucciones especiales para modo estudio
     const studyModeInstructions = window._studyModeActive ? `
 MODO ESTUDIO ACTIVADO - Eres un tutor educativo experto. Tu rol es:
@@ -2289,16 +2348,18 @@ INSTRUCCIONES:
     let instructions = '';
     const hasDocuments = textFiles.length > 0 || shouldIncludeProjectContext;
     const hasPersonalContext = personalInfo.trim() || memoryContext;
-    
+
     if (hasDocuments) {
       instructions = 'IMPORTANTE: Se te han proporcionado documentos arriba. DEBES leer y usar el contenido de estos documentos para responder las preguntas del usuario. Responde basándote en la información de los documentos. Si el usuario pregunta sobre el contenido de los documentos, resume o explica lo que contienen.';
     } else if (hasPersonalContext) {
       instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas y proporciona respuestas más personalizadas cuando sea relevante.';
     }
-    
+
     // Combinar todas las instrucciones
     if (systemContent || styleInstructions || instructions || studyModeInstructions || webSearchInstructions) {
       let finalContent = systemContent;
+
+      // Añadir instrucciones del modo estudio primero (alta prioridad)
       
       // Añadir contexto de búsqueda web primero (máxima prioridad)
       if (webSearchInstructions) {
@@ -2317,7 +2378,7 @@ INSTRUCCIONES:
         finalContent += studyModeInstructions;
         console.log('📚 Modo Estudio activado - Añadiendo instrucciones de tutor');
       }
-      
+
       if (styleInstructions && !studyModeInstructions) {
         // Solo añadir estilo si no está en modo estudio (el modo estudio tiene su propio estilo)
         if (finalContent) {
@@ -2325,20 +2386,20 @@ INSTRUCCIONES:
         }
         finalContent += `Instrucciones de estilo de respuesta: ${styleInstructions}`;
       }
-      
+
       if (instructions) {
         if (finalContent) {
           finalContent += '\n\n';
         }
         finalContent += instructions;
       }
-      
+
       if (finalContent.trim()) {
         payloadMessages.push({
           role: 'system',
           content: finalContent.trim()
         });
-      
+
         // Log de depuración del mensaje del sistema
         console.log('📋 Mensaje del sistema enviado:');
         console.log(`   - Longitud total: ${finalContent.length} caracteres`);
@@ -2363,19 +2424,19 @@ INSTRUCCIONES:
       lastUserMessage.content = contextContent + '\n\nPregunta del usuario: ' + lastUserMessage.content;
     }
   }
-  
+
   // Añadir los mensajes de la conversación
   conversation.messages.forEach((message, index) => {
     const payloadMessage = {
       role: message.role,
       content: message.content || '', // Asegurar que siempre haya contenido (aunque sea vacío)
     };
-    
+
     // Solo añadir imágenes al último mensaje del usuario (el mensaje actual)
-    const isLastUserMessage = message.role === 'user' && 
-                              index === conversation.messages.length - 1 &&
-                              imageFiles.length > 0;
-    
+    const isLastUserMessage = message.role === 'user' &&
+      index === conversation.messages.length - 1 &&
+      imageFiles.length > 0;
+
     if (isLastUserMessage) {
       // Extraer solo el base64 sin el prefijo data:image/...
       payloadMessage.images = imageFiles.map(file => {
@@ -2383,28 +2444,28 @@ INSTRUCCIONES:
         if (file.content && file.content.startsWith('data:')) {
           const base64Part = file.content.split(',')[1]; // Extraer solo la parte después de la coma
           console.log(`Imagen ${file.name}: base64 length = ${base64Part ? base64Part.length : 0}`);
-          
+
           // Validar que el base64 no esté vacío
           if (!base64Part || base64Part.length === 0) {
             console.error(`Error: La imagen ${file.name} tiene base64 vacío`);
             return null;
           }
-          
+
           return base64Part;
         }
         console.warn(`Imagen ${file.name} no tiene formato data: correcto`);
         return file.content;
       }).filter(img => img !== null); // Filtrar imágenes nulas
-      
+
       console.log(`Añadidas ${payloadMessage.images.length} imagen(es) al mensaje del usuario`);
-      
+
       // Si no hay contenido de texto pero hay imágenes, agregar un prompt por defecto
       if (!payloadMessage.content.trim() && payloadMessage.images.length > 0) {
         payloadMessage.content = 'Describe esta imagen';
         console.log('No hay texto en el mensaje, agregando prompt por defecto');
       }
     }
-    
+
     payloadMessages.push(payloadMessage);
   });
 
@@ -2462,7 +2523,7 @@ async function readFileAsText(file) {
   return new Promise(async (resolve, reject) => {
     // Para archivos muy grandes (>5MB), procesar en chunks
     const MAX_SYNC_SIZE = 5 * 1024 * 1024; // 5MB
-    
+
     if (file.size > MAX_SYNC_SIZE) {
       // Procesar archivos grandes de forma asíncrona
       try {
@@ -2475,10 +2536,10 @@ async function readFileAsText(file) {
       }
     } else {
       // Archivos pequeños: procesamiento normal
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(new Error('Error al leer el archivo'));
-    reader.readAsText(file);
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(new Error('Error al leer el archivo'));
+      reader.readAsText(file);
     }
   });
 }
@@ -2524,30 +2585,30 @@ async function extractTextFromPDF(file, progressCallback) {
 
       // Leer el archivo como ArrayBuffer
       const arrayBuffer = await file.arrayBuffer();
-      
+
       // Cargar el documento PDF
-      const loadingTask = pdfjsLib.getDocument({ 
+      const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
         useSystemFonts: true
       });
       const pdf = await loadingTask.promise;
-      
+
       let fullText = '';
       const numPages = pdf.numPages;
-      
+
       // Extraer texto de cada página con pausas para no bloquear el navegador
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         // Dar tiempo al navegador cada página
         await yieldToBrowser();
-        
+
         // Actualizar progreso si hay callback
         if (progressCallback) {
           progressCallback(pageNum, numPages);
         }
-        
+
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
-        
+
         // Concatenar el texto de la página, preservando saltos de línea cuando sea apropiado
         const pageText = textContent.items
           .map((item, index, array) => {
@@ -2565,24 +2626,24 @@ async function extractTextFromPDF(file, progressCallback) {
             return text;
           })
           .join(' ');
-        
+
         fullText += `\n--- Página ${pageNum} de ${numPages} ---\n${pageText}\n`;
-        
+
         // Pausa adicional cada 5 páginas para archivos muy grandes
         if (pageNum % 5 === 0) {
           await yieldToBrowser();
         }
       }
-      
+
       if (!fullText.trim()) {
         reject(new Error('No se pudo extraer texto del PDF. El archivo podría estar escaneado (solo imágenes) o protegido con contraseña.'));
         return;
       }
-      
+
       resolve(fullText.trim());
     } catch (error) {
       console.error('Error al extraer texto del PDF:', error);
-      
+
       // Mensajes de error más específicos
       let errorMessage = 'Error al leer el PDF';
       if (error.message.includes('password') || error.message.includes('encrypted')) {
@@ -2592,7 +2653,7 @@ async function extractTextFromPDF(file, progressCallback) {
       } else {
         errorMessage = `Error al leer el PDF: ${error.message}`;
       }
-      
+
       reject(new Error(errorMessage));
     }
   });
@@ -2616,16 +2677,16 @@ function isImageFile(file) {
   const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
   const fileName = file.name.toLowerCase();
-  
-  return imageTypes.includes(file.type) || 
-         imageExtensions.some(ext => fileName.endsWith(ext));
+
+  return imageTypes.includes(file.type) ||
+    imageExtensions.some(ext => fileName.endsWith(ext));
 }
 
 // Función unificada para leer archivos (texto, PDF o imagen)
 async function readFileContent(file) {
   const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
   const isImage = isImageFile(file);
-  
+
   if (isImage) {
     // Para imágenes, devolvemos el base64 directamente
     return await convertImageToBase64(file);
@@ -2649,17 +2710,17 @@ function createProgressIndicator(fileName) {
       </div>
     </div>
   `;
-  
+
   // Agregar al área de archivos
   const isEmptyState = emptyState?.style.display !== 'none';
-  const fileList = isEmptyState 
+  const fileList = isEmptyState
     ? document.getElementById('file-list')
     : document.getElementById('file-list-inline');
-  
+
   if (fileList) {
     fileList.appendChild(progressDiv);
   }
-  
+
   return {
     update: (current, total) => {
       const statusEl = progressDiv.querySelector('.file-progress-status');
@@ -2687,38 +2748,40 @@ function createProgressIndicator(fileName) {
 
 async function handleFiles(files, isInline = false) {
   if (!state.activeId) return;
-  
+
   const fileArray = Array.from(files);
   const conversationId = state.activeId;
-  
+
   // Límites de tamaño
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
   const MAX_PDF_PAGES = 500; // Límite de páginas para PDFs
-  
+
   if (!attachedFiles[conversationId]) {
     attachedFiles[conversationId] = [];
   }
-  
+
   // Procesar archivos uno por uno con pausas entre ellos
   for (let i = 0; i < fileArray.length; i++) {
     const file = fileArray[i];
-    
+
     try {
       // Verificar tamaño del archivo
       if (file.size > MAX_FILE_SIZE) {
-        alert(`El archivo ${file.name} es demasiado grande (${formatFileSize(file.size)}). El tamaño máximo es ${formatFileSize(MAX_FILE_SIZE)}.`);
+        alert(window.translationManager
+          ? window.translationManager.translate('error.fileTooLarge', { name: file.name, size: formatFileSize(file.size), maxSize: formatFileSize(MAX_FILE_SIZE) })
+          : `El archivo ${file.name} es demasiado grande (${formatFileSize(file.size)}). El tamaño máximo es ${formatFileSize(MAX_FILE_SIZE)}.`);
         continue;
       }
-      
+
       const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       const isImage = isImageFile(file);
-      
+
       // Crear indicador de progreso
       const progress = createProgressIndicator(file.name);
-      
+
       if (isPDF) {
         console.log(`Procesando PDF: ${file.name}...`);
-        
+
         // Verificar número de páginas antes de procesar
         try {
           const isLoaded = await waitForPdfJs();
@@ -2726,32 +2789,34 @@ async function handleFiles(files, isInline = false) {
             const arrayBuffer = await file.arrayBuffer();
             const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
             const pdf = await loadingTask.promise;
-            
+
             if (pdf.numPages > MAX_PDF_PAGES) {
               progress.error(`El PDF tiene demasiadas páginas (${pdf.numPages}). El máximo es ${MAX_PDF_PAGES} páginas.`);
-              alert(`El PDF ${file.name} tiene demasiadas páginas (${pdf.numPages}). El máximo permitido es ${MAX_PDF_PAGES} páginas.`);
+              alert(window.translationManager
+                ? window.translationManager.translate('error.pdfTooManyPages', { name: file.name, pages: pdf.numPages, maxPages: MAX_PDF_PAGES })
+                : `El PDF ${file.name} tiene demasiadas páginas (${pdf.numPages}). El máximo permitido es ${MAX_PDF_PAGES} páginas.`);
               continue;
             }
           }
         } catch (e) {
           // Si falla la verificación, continuar de todos modos
         }
-        
+
         // Procesar PDF con callback de progreso
         const content = await extractTextFromPDF(file, (current, total) => {
           progress.update(current, total);
         });
-        
-      attachedFiles[conversationId].push({
-        id: generateId('file'),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        content: content,
+
+        attachedFiles[conversationId].push({
+          id: generateId('file'),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: content,
           isImage: false,
-        uploadedAt: Date.now()
-      });
-        
+          uploadedAt: Date.now()
+        });
+
         progress.complete();
         console.log(`Archivo ${file.name} procesado correctamente`);
       } else if (isImage) {
@@ -2783,7 +2848,7 @@ async function handleFiles(files, isInline = false) {
         progress.complete();
         console.log(`Archivo ${file.name} procesado correctamente`);
       }
-      
+
       // Pausa entre archivos para no sobrecargar el navegador
       if (i < fileArray.length - 1) {
         await yieldToBrowser();
@@ -2801,14 +2866,14 @@ async function handleFiles(files, isInline = false) {
       alert(errorMessage);
     }
   }
-  
+
   renderAttachedFiles();
 }
 
 function removeFile(fileId) {
   if (!state.activeId) return;
   const conversationId = state.activeId;
-  
+
   if (attachedFiles[conversationId]) {
     attachedFiles[conversationId] = attachedFiles[conversationId].filter(f => f.id !== fileId);
     renderAttachedFiles();
@@ -2822,29 +2887,29 @@ function removeFile(fileId) {
 
 function renderAttachedFiles() {
   if (!state.activeId) return;
-  
+
   const conversationId = state.activeId;
   const files = attachedFiles[conversationId] || [];
-  
+
   const isEmptyState = emptyState?.style.display !== 'none';
-  const fileList = isEmptyState 
+  const fileList = isEmptyState
     ? document.getElementById('file-list')
     : document.getElementById('file-list-inline');
   const fileDropArea = isEmptyState
     ? document.getElementById('file-drop-area')
     : document.getElementById('file-drop-area-inline');
-  
+
   if (!fileList || !fileDropArea) return;
-  
+
   fileList.innerHTML = '';
-  
+
   if (files.length > 0) {
     fileDropArea.classList.add('has-files');
-    
+
     files.forEach(file => {
       const fileItem = document.createElement('div');
       fileItem.className = 'file-item';
-      
+
       // Si es una imagen, mostrar miniatura
       if (file.isImage && file.content) {
         const imagePreview = document.createElement('img');
@@ -2854,18 +2919,18 @@ function renderAttachedFiles() {
         imagePreview.title = file.name;
         fileItem.appendChild(imagePreview);
       }
-      
+
       const fileName = document.createElement('span');
       fileName.className = 'file-item-name';
       fileName.textContent = file.name;
       fileName.title = file.name;
-      
+
       const removeBtn = document.createElement('button');
       removeBtn.className = 'file-item-remove';
       removeBtn.textContent = '×';
       removeBtn.title = 'Eliminar archivo';
       removeBtn.onclick = () => removeFile(file.id);
-      
+
       fileItem.appendChild(fileName);
       fileItem.appendChild(removeBtn);
       fileList.appendChild(fileItem);
@@ -2873,19 +2938,19 @@ function renderAttachedFiles() {
   } else {
     fileDropArea.classList.remove('has-files');
   }
-  
+
   // Actualizar badge de archivos en el header
   updateAttachmentsBadge();
 }
 
 function updateAttachmentsBadge() {
   if (!state.activeId) return;
-  
+
   const conversationId = state.activeId;
   const files = attachedFiles[conversationId] || [];
   const badge = document.getElementById('attachments-badge');
   const count = document.getElementById('attachments-count');
-  
+
   if (badge && count) {
     if (files.length > 0) {
       count.textContent = files.length;
@@ -2898,16 +2963,16 @@ function updateAttachmentsBadge() {
 
 function showAttachmentsDropdown() {
   if (!state.activeId) return;
-  
+
   const conversationId = state.activeId;
   const files = attachedFiles[conversationId] || [];
   const dropdown = document.getElementById('attachments-dropdown');
   const list = document.getElementById('attachments-list');
-  
+
   if (!dropdown || !list) return;
-  
+
   list.innerHTML = '';
-  
+
   if (files.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'attachments-list-item';
@@ -2919,29 +2984,29 @@ function showAttachmentsDropdown() {
     files.forEach(file => {
       const item = document.createElement('div');
       item.className = 'attachments-list-item';
-      
+
       const fileExt = getFileExtension(file.name);
       const fileSize = formatFileSize(file.size);
-      
+
       const icon = document.createElement('div');
       icon.className = 'attachments-list-item-icon';
       icon.textContent = fileExt;
-      
+
       const info = document.createElement('div');
       info.className = 'attachments-list-item-info';
-      
+
       const name = document.createElement('div');
       name.className = 'attachments-list-item-name';
       name.textContent = file.name;
       name.title = file.name;
-      
+
       const size = document.createElement('div');
       size.className = 'attachments-list-item-size';
       size.textContent = fileSize;
-      
+
       info.appendChild(name);
       info.appendChild(size);
-      
+
       const removeBtn = document.createElement('button');
       removeBtn.className = 'attachments-list-item-remove';
       removeBtn.textContent = '×';
@@ -2950,14 +3015,14 @@ function showAttachmentsDropdown() {
         e.stopPropagation();
         removeFile(file.id);
       };
-      
+
       item.appendChild(icon);
       item.appendChild(info);
       item.appendChild(removeBtn);
       list.appendChild(item);
     });
   }
-  
+
   dropdown.style.display = 'flex';
 }
 
@@ -2970,13 +3035,13 @@ function hideAttachmentsDropdown() {
 
 function toggleSidebar() {
   if (!sidebar || !layout || !toggleSidebarButton) return;
-  
+
   const isMinimized = sidebar.classList.toggle('minimized');
   layout.classList.toggle('sidebar-minimized', isMinimized);
-  
+
   // Actualizar el título del botón
   toggleSidebarButton.title = isMinimized ? 'Expandir barra lateral' : 'Minimizar barra lateral';
-  
+
   // Guardar el estado en localStorage
   if (hasLocalStorage) {
     try {
@@ -2989,7 +3054,7 @@ function toggleSidebar() {
 
 function loadSidebarState() {
   if (!sidebar || !layout || !toggleSidebarButton || !hasLocalStorage) return;
-  
+
   try {
     const saved = localStorage.getItem('sidebar-minimized');
     if (saved === 'true') {
@@ -3004,7 +3069,7 @@ function loadSidebarState() {
 
 function toggleIncognitoMode() {
   incognitoMode = !incognitoMode;
-  
+
   // Actualizar estado visual de ambos botones
   const buttons = [incognitoButton, incognitoButtonEmpty].filter(Boolean);
   buttons.forEach(button => {
@@ -3016,14 +3081,14 @@ function toggleIncognitoMode() {
       button.title = 'Activar modo incógnito';
     }
   });
-  
+
   // Ocultar/mostrar la barra lateral
   if (sidebar && layout) {
     if (incognitoMode) {
       // ENTRANDO en modo incógnito
       sidebar.classList.add('hidden');
       layout.classList.add('sidebar-hidden');
-      
+
       // Guardar el estado actual antes de entrar en modo incógnito
       stateBeforeIncognito = {
         conversations: JSON.parse(JSON.stringify(state.conversations)),
@@ -3032,38 +3097,38 @@ function toggleIncognitoMode() {
         currentModel: state.currentModel,
         attachedFiles: JSON.parse(JSON.stringify(attachedFiles))
       };
-      
+
       // Limpiar el estado actual y crear una conversación temporal
       state.conversations = {};
       state.order = [];
       state.activeId = null;
-      
+
       // Limpiar archivos adjuntos
       Object.keys(attachedFiles).forEach(key => delete attachedFiles[key]);
-      
+
       // Crear una nueva conversación temporal para el modo incógnito
       createConversation();
       renderConversationList();
       renderActiveConversation();
-      
+
     } else {
       // SALIENDO del modo incógnito
       sidebar.classList.remove('hidden');
       layout.classList.remove('sidebar-hidden');
-      
+
       // Restaurar el estado anterior (sin guardar las conversaciones incógnito)
       if (stateBeforeIncognito) {
         state.conversations = stateBeforeIncognito.conversations;
         state.order = stateBeforeIncognito.order;
         state.activeId = stateBeforeIncognito.activeId;
         state.currentModel = stateBeforeIncognito.currentModel;
-        
+
         // Restaurar archivos adjuntos
         Object.keys(attachedFiles).forEach(key => delete attachedFiles[key]);
         Object.assign(attachedFiles, stateBeforeIncognito.attachedFiles);
-        
+
         stateBeforeIncognito = null;
-        
+
         // Renderizar el estado restaurado
         renderConversationList();
         if (state.activeId && state.conversations[state.activeId]) {
@@ -3073,11 +3138,11 @@ function toggleIncognitoMode() {
         } else {
           createConversation();
         }
-        
+
         // Sincronizar los selectores de modelo
         syncModelSelects();
       }
-      
+
       // Restaurar el estado del sidebar si estaba minimizado
       loadSidebarState();
     }
@@ -3089,11 +3154,11 @@ function init() {
 
   loadState();
   loadSidebarState();
-  
+
   // Cargar preferencia de fuente disléxica al iniciar
   const dyslexicFontEnabled = getDyslexicFontEnabled();
   applyDyslexicFont(dyslexicFontEnabled);
-  
+
   if (!state.activeId || !state.conversations[state.activeId]) {
     createConversation();
   } else {
@@ -3134,11 +3199,11 @@ function init() {
   newConversationButton?.addEventListener('click', createConversation);
   renameConversationButton?.addEventListener('click', handleRenameActive);
   deleteConversationButton?.addEventListener('click', handleDeleteActive);
-  
+
   toggleSidebarButton?.addEventListener('click', toggleSidebar);
   incognitoButton?.addEventListener('click', toggleIncognitoMode);
   incognitoButtonEmpty?.addEventListener('click', toggleIncognitoMode);
-  
+
   // Atajos de teclado
   document.addEventListener('keydown', (e) => {
     // Control+B para abrir/cerrar la barra lateral
@@ -3157,23 +3222,23 @@ function init() {
       toggleIncognitoMode();
     }
   });
-  
+
   // Configurar manejo de archivos
   setupFileHandlers();
-  
+
   // Configurar badge de archivos
   const attachmentsBadge = document.getElementById('attachments-badge');
   const closeAttachments = document.getElementById('close-attachments');
-  
+
   attachmentsBadge?.addEventListener('click', (e) => {
     e.stopPropagation();
     showAttachmentsDropdown();
   });
-  
+
   closeAttachments?.addEventListener('click', () => {
     hideAttachmentsDropdown();
   });
-  
+
   // Cerrar dropdown al hacer clic fuera
   document.addEventListener('click', (e) => {
     const dropdown = document.getElementById('attachments-dropdown');
@@ -3182,7 +3247,7 @@ function init() {
       hideAttachmentsDropdown();
     }
   });
-  
+
   // Event listeners para modales de conversación
   setupConversationModals();
 }
@@ -3195,11 +3260,11 @@ function setupConversationModals() {
   const cancelRenameBtn = document.getElementById('cancel-rename-conversation');
   const confirmRenameBtn = document.getElementById('confirm-rename-conversation');
   const renameInput = document.getElementById('rename-conversation-input');
-  
+
   closeRenameBtn?.addEventListener('click', closeRenameModal);
   cancelRenameBtn?.addEventListener('click', closeRenameModal);
   confirmRenameBtn?.addEventListener('click', confirmRenameConversation);
-  
+
   renameInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -3209,52 +3274,52 @@ function setupConversationModals() {
       closeRenameModal();
     }
   });
-  
+
   renameModal?.addEventListener('click', (e) => {
     if (e.target === renameModal) closeRenameModal();
   });
-  
+
   // Modal de eliminar conversación
   const deleteModal = document.getElementById('delete-conversation-modal');
   const closeDeleteBtn = document.getElementById('close-delete-conversation-modal');
   const cancelDeleteBtn = document.getElementById('cancel-delete-conversation');
   const confirmDeleteBtn = document.getElementById('confirm-delete-conversation');
-  
+
   closeDeleteBtn?.addEventListener('click', closeDeleteConversationModal);
   cancelDeleteBtn?.addEventListener('click', closeDeleteConversationModal);
   confirmDeleteBtn?.addEventListener('click', confirmDeleteConversation);
-  
+
   deleteModal?.addEventListener('click', (e) => {
     if (e.target === deleteModal) closeDeleteConversationModal();
   });
-  
+
   // Modal de eliminar todas las conversaciones
   const deleteAllBtn = document.getElementById('delete-all-conversations-btn');
   const deleteAllModal = document.getElementById('delete-all-conversations-modal');
   const closeDeleteAllBtn = document.getElementById('close-delete-all-modal');
   const cancelDeleteAllBtn = document.getElementById('cancel-delete-all');
   const confirmDeleteAllBtn = document.getElementById('confirm-delete-all');
-  
+
   deleteAllBtn?.addEventListener('click', handleDeleteAllConversations);
   closeDeleteAllBtn?.addEventListener('click', closeDeleteAllModal);
   cancelDeleteAllBtn?.addEventListener('click', closeDeleteAllModal);
   confirmDeleteAllBtn?.addEventListener('click', confirmDeleteAllConversations);
-  
+
   deleteAllModal?.addEventListener('click', (e) => {
     if (e.target === deleteAllModal) closeDeleteAllModal();
   });
-  
+
   // Modal de editar mensaje
   const editMessageModal = document.getElementById('edit-message-modal');
   const closeEditMessageBtn = document.getElementById('close-edit-message-modal');
   const cancelEditMessageBtn = document.getElementById('cancel-edit-message');
   const confirmEditMessageBtn = document.getElementById('confirm-edit-message');
   const editMessageTextarea = document.getElementById('edit-message-textarea');
-  
+
   closeEditMessageBtn?.addEventListener('click', closeEditMessageModal);
   cancelEditMessageBtn?.addEventListener('click', closeEditMessageModal);
   confirmEditMessageBtn?.addEventListener('click', confirmEditMessage);
-  
+
   editMessageTextarea?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
@@ -3264,7 +3329,7 @@ function setupConversationModals() {
       closeEditMessageModal();
     }
   });
-  
+
   editMessageModal?.addEventListener('click', (e) => {
     if (e.target === editMessageModal) closeEditMessageModal();
   });
@@ -3277,7 +3342,7 @@ function setupClipboardPaste() {
     // Verificar si hay items en el portapapeles
     const clipboardItems = e.clipboardData?.items;
     if (!clipboardItems) return;
-    
+
     // Buscar imágenes en el portapapeles
     const imageItems = [];
     for (let i = 0; i < clipboardItems.length; i++) {
@@ -3286,19 +3351,19 @@ function setupClipboardPaste() {
         imageItems.push(item);
       }
     }
-    
+
     // Si no hay imágenes, permitir el comportamiento normal (pegar texto)
     if (imageItems.length === 0) return;
-    
+
     // Prevenir el comportamiento por defecto solo si hay imágenes
     e.preventDefault();
-    
+
     // Verificar que hay una conversación activa
     if (!state.activeId) {
       // Si no hay conversación activa, crear una
       createConversation();
     }
-    
+
     // Procesar cada imagen del portapapeles
     const files = [];
     for (const item of imageItems) {
@@ -3308,22 +3373,22 @@ function setupClipboardPaste() {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const extension = file.type.split('/')[1] || 'png';
         const fileName = `imagen-pegada-${timestamp}.${extension}`;
-        
+
         // Crear un nuevo File con nombre personalizado
         const renamedFile = new File([file], fileName, { type: file.type });
         files.push(renamedFile);
       }
     }
-    
+
     // Si hay archivos, procesarlos
     if (files.length > 0) {
       const isEmptyState = emptyState?.style.display !== 'none';
       await handleFiles(files, !isEmptyState);
-      
+
       // Enfocar el input correspondiente después de pegar
       const activeInput = isEmptyState ? promptInput : promptInputInline;
       activeInput?.focus();
-      
+
       // Mostrar notificación visual
       showPasteNotification(files.length);
     }
@@ -3359,15 +3424,15 @@ function showPasteNotification(count) {
     `;
     document.body.appendChild(notification);
   }
-  
-  const message = count === 1 
-    ? 'Imagen pegada desde el portapapeles' 
+
+  const message = count === 1
+    ? 'Imagen pegada desde el portapapeles'
     : `${count} imágenes pegadas desde el portapapeles`;
-  
+
   notification.innerHTML = `<span>📋</span><span>${message}</span>`;
   notification.style.opacity = '1';
   notification.style.transform = 'translateY(0)';
-  
+
   // Ocultar después de 2.5 segundos
   setTimeout(() => {
     notification.style.opacity = '0';
@@ -3387,14 +3452,14 @@ function setupFileHandlers() {
   const attachFileBtnInline = document.getElementById('attach-file-btn-inline');
   const fileDropArea = document.getElementById('file-drop-area');
   const fileDropAreaInline = document.getElementById('file-drop-area-inline');
-  
+
   // Botones para abrir selector de archivos
   attachFileBtn?.addEventListener('click', () => fileInput?.click());
   attachFileBtnInline?.addEventListener('click', () => fileInputInline?.click());
-  
+
   // Manejar pegado de imágenes desde el portapapeles (Ctrl+V)
   setupClipboardPaste();
-  
+
   // Manejar selección de archivos
   fileInput?.addEventListener('change', (e) => {
     if (e.target.files.length > 0) {
@@ -3402,14 +3467,14 @@ function setupFileHandlers() {
       e.target.value = ''; // Resetear input
     }
   });
-  
+
   fileInputInline?.addEventListener('change', (e) => {
     if (e.target.files.length > 0) {
       handleFiles(e.target.files, true);
       e.target.value = ''; // Resetear input
     }
   });
-  
+
   // Drag and drop en empty-state (página principal)
   if (emptyState) {
     emptyState.addEventListener('dragover', (e) => {
@@ -3417,7 +3482,7 @@ function setupFileHandlers() {
       e.stopPropagation();
       emptyState.classList.add('drag-over');
     });
-    
+
     emptyState.addEventListener('dragleave', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -3426,18 +3491,18 @@ function setupFileHandlers() {
         emptyState.classList.remove('drag-over');
       }
     });
-    
+
     emptyState.addEventListener('drop', (e) => {
       e.preventDefault();
       e.stopPropagation();
       emptyState.classList.remove('drag-over');
-      
+
       if (e.dataTransfer.files.length > 0) {
         handleFiles(e.dataTransfer.files, false);
       }
     });
   }
-  
+
   // Drag and drop en chat-state
   if (chatState) {
     chatState.addEventListener('dragover', (e) => {
@@ -3445,7 +3510,7 @@ function setupFileHandlers() {
       e.stopPropagation();
       chatState.classList.add('drag-over');
     });
-    
+
     chatState.addEventListener('dragleave', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -3453,31 +3518,31 @@ function setupFileHandlers() {
         chatState.classList.remove('drag-over');
       }
     });
-    
+
     chatState.addEventListener('drop', (e) => {
       e.preventDefault();
       e.stopPropagation();
       chatState.classList.remove('drag-over');
-      
+
       if (e.dataTransfer.files.length > 0) {
         handleFiles(e.dataTransfer.files, true);
       }
     });
   }
-  
+
   // Drag and drop en áreas de archivos (solo cuando hay archivos)
   [fileDropArea, fileDropAreaInline].forEach(area => {
     if (!area) return;
-    
+
     area.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.stopPropagation();
     });
-    
+
     area.addEventListener('drop', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      
+
       if (e.dataTransfer.files.length > 0) {
         const isInline = area === fileDropAreaInline;
         handleFiles(e.dataTransfer.files, isInline);
@@ -3541,36 +3606,36 @@ function shouldChangeBackground() {
   if (!getBackgroundAutoMode()) {
     return false;
   }
-  
+
   const storedDate = localStorage.getItem(BACKGROUND_STORAGE_KEY);
   const today = getTodayDateString();
-  
+
   // Cambiar solo cuando cambia el día (a las 00:00)
   if (!storedDate || storedDate !== today) {
     return true;
   }
-  
+
   return false;
 }
 
 function selectDailyImage() {
   const today = getTodayDateString();
-  
+
   // Usar la fecha como semilla para seleccionar una imagen consistente durante el día
   // La imagen cambia a las 00:00 cuando cambia el día
   const dateSeed = parseInt(today.replace(/-/g, '')) % PHOTOS.length;
   const selectedIndex = dateSeed;
-  
+
   // Guardar la fecha del cambio
   localStorage.setItem(BACKGROUND_STORAGE_KEY, today);
-  
+
   return PHOTOS[selectedIndex];
 }
 
 function setBackgroundImage() {
   const backgroundElement = document.getElementById('background-image');
   if (!backgroundElement) return;
-  
+
   // Si el modo automático está desactivado, usar la imagen manual
   if (!getBackgroundAutoMode()) {
     const manualImage = getManualBackground();
@@ -3585,7 +3650,7 @@ function setBackgroundImage() {
     localStorage.setItem('ollama-web-background-image', defaultImage);
     return;
   }
-  
+
   if (shouldChangeBackground()) {
     const imagePath = selectDailyImage();
     backgroundElement.style.backgroundImage = `url('${imagePath}')`;
@@ -3606,9 +3671,9 @@ function setBackgroundImage() {
 function getGreetingMessage() {
   const now = new Date();
   const hour = now.getHours();
-  
+
   let greeting, subtitle;
-  
+
   if (hour >= 6 && hour < 12) {
     // Mañana: 6:00 - 11:59
     greeting = 'Buenos días';
@@ -3622,7 +3687,7 @@ function getGreetingMessage() {
     greeting = 'Buenas noches';
     subtitle = '¿Cómo puedo ayudarte esta noche?';
   }
-  
+
   return { greeting, subtitle };
 }
 
@@ -3837,7 +3902,7 @@ function saveMemories(memories) {
 
 function addMemory(content) {
   if (!content || !content.trim()) return null;
-  
+
   const memories = getMemories();
   const newMemory = {
     id: generateId('mem'),
@@ -3869,17 +3934,17 @@ function formatMemoryDate(timestamp) {
 // Función para construir el contexto de memorias para el modelo
 function buildMemoryContext() {
   if (!getMemoryEnabled()) return '';
-  
+
   const memories = getMemories();
   if (memories.length === 0) return '';
-  
+
   // Construir un contexto más estructurado y claro
   let context = 'INFORMACIÓN IMPORTANTE SOBRE EL USUARIO (usa estos datos para personalizar tus respuestas):\n';
   memories.forEach((memory, index) => {
     context += `• ${memory.content}\n`;
   });
   context += '\nIMPORTANTE: Ten en cuenta esta información al responder. Úsala naturalmente cuando sea relevante, pero no la menciones explícitamente ni digas que tienes esta información guardada.';
-  
+
   return context;
 }
 
@@ -3917,11 +3982,11 @@ function showMemoryNotification(message) {
     `;
     document.body.appendChild(notification);
   }
-  
+
   notification.innerHTML = `<span>🧠</span><span>${escapeHtml(message)}</span>`;
   notification.style.opacity = '1';
   notification.style.transform = 'translateY(0)';
-  
+
   // Ocultar después de 3 segundos
   setTimeout(() => {
     notification.style.opacity = '0';
@@ -3944,10 +4009,10 @@ function memoryExists(content) {
 // Función para extraer información importante de una conversación usando la IA
 async function extractImportantInfoFromConversation(userMessage, assistantResponse) {
   if (!getMemoryEnabled() || !state.currentModel) return;
-  
+
   // Solo procesar si hay contenido suficiente
   if (!userMessage || !assistantResponse || assistantResponse.length < 20) return;
-  
+
   try {
     // Crear un prompt más preciso para extraer información personal del usuario
     const extractionPrompt = `Eres un extractor de información personal. Analiza lo que el USUARIO dijo y extrae SOLO datos personales sobre él/ella.
@@ -3955,7 +4020,7 @@ async function extractImportantInfoFromConversation(userMessage, assistantRespon
 REGLAS ESTRICTAS:
 1. Solo extraer información personal del usuario (nombre, trabajo, estudios, gustos, familia, ubicación)
 2. NO extraer información general, definiciones o explicaciones
-3. Cada dato debe ser UNA FRASE CORTA en tercera persona (ej: "Estudia medicina", "Vive en Madrid")
+3. Cada dato debe ser UNA FRASE CORTA en tercera persona (ej: "Se llama Juan", "Estudia derecho", "Vive en Madrid")
 4. Máximo 8 palabras por frase
 5. Si el usuario pregunta algo pero NO revela información personal, responde: NINGUNA
 6. Separar múltiples datos con |
@@ -3991,11 +4056,11 @@ Extrae información personal del usuario (o responde NINGUNA si no hay):`;
     const extractedText = data.response?.trim() || '';
 
     // Si no hay información, salir
-    if (!extractedText || 
-        extractedText.toUpperCase() === 'NINGUNA' || 
-        extractedText.toLowerCase().includes('ninguna') ||
-        extractedText.toLowerCase().includes('no hay información') ||
-        extractedText.toLowerCase().includes('no se menciona')) {
+    if (!extractedText ||
+      extractedText.toUpperCase() === 'NINGUNA' ||
+      extractedText.toLowerCase().includes('ninguna') ||
+      extractedText.toLowerCase().includes('no hay información') ||
+      extractedText.toLowerCase().includes('no se menciona')) {
       return;
     }
 
@@ -4006,18 +4071,18 @@ Extrae información personal del usuario (o responde NINGUNA si no hay):`;
       .filter(p => {
         const wordCount = countWords(p);
         const pLower = p.toLowerCase();
-        
+
         // Filtrar frases válidas
-        return p.length >= 5 && 
-               p.length <= 80 &&
-               wordCount >= 2 && 
-               wordCount <= 10 && 
-               !pLower.includes('ninguna') &&
-               !pLower.includes('no hay') &&
-               !pLower.includes('no se') &&
-               !pLower.includes('el usuario') &&
-               !pLower.includes('información personal') &&
-               !memoryExists(p);
+        return p.length >= 5 &&
+          p.length <= 80 &&
+          wordCount >= 2 &&
+          wordCount <= 10 &&
+          !pLower.includes('ninguna') &&
+          !pLower.includes('no hay') &&
+          !pLower.includes('no se') &&
+          !pLower.includes('el usuario') &&
+          !pLower.includes('información personal') &&
+          !memoryExists(p);
       });
 
     // Añadir cada frase como memoria (máximo 3 por mensaje)
@@ -4043,9 +4108,9 @@ Extrae información personal del usuario (o responde NINGUNA si no hay):`;
 // Función mejorada para extraer información usando análisis de texto simple
 function extractInfoSimple(userMessage, assistantResponse) {
   if (!getMemoryEnabled()) return [];
-  
+
   const extracted = [];
-  
+
   // Patrones para extraer información COMPLETA del mensaje del usuario
   // Capturamos la frase completa incluyendo el verbo introductorio
   const userPatterns = [
@@ -4069,7 +4134,7 @@ function extractInfoSimple(userMessage, assistantResponse) {
     // Profesión directa
     /soy\s+(programador|ingeniero|médico|profesor|estudiante|diseñador|abogado|arquitecto|enfermero|contador|[a-záéíóúñ]+(?:or|ero|ista|ente|dor)(?:a)?)/gi,
   ];
-  
+
   userPatterns.forEach(pattern => {
     let match;
     // Usar exec para obtener grupos de captura correctamente
@@ -4079,11 +4144,11 @@ function extractInfoSimple(userMessage, assistantResponse) {
         // Reconstruir la frase completa con contexto
         const fullMatch = match[0].trim();
         const captured = match[1].trim();
-        
+
         // Limpiar y validar
         const cleaned = captured.replace(/[.,!?;:]+$/, '').trim();
         const wordCount = countWords(cleaned);
-        
+
         // Para nombres, usar solo el nombre capturado
         if (pattern.source.includes('me llamo|mi nombre es')) {
           if (cleaned.length >= 2 && !memoryExists(`Se llama ${cleaned}`)) {
@@ -4094,7 +4159,7 @@ function extractInfoSimple(userMessage, assistantResponse) {
         else if (wordCount >= 1 && wordCount <= 12 && cleaned.length >= 3) {
           // Crear frase con contexto
           let contextPhrase = fullMatch.replace(/[.,!?;:]+$/, '').trim();
-          
+
           // Convertir a tercera persona si es necesario
           contextPhrase = contextPhrase
             .replace(/^me llamo\s+/i, 'Se llama ')
@@ -4115,7 +4180,7 @@ function extractInfoSimple(userMessage, assistantResponse) {
             .replace(/^practico\s+/i, 'Practica ')
             .replace(/^juego\s+/i, 'Juega ')
             .replace(/^hago\s+/i, 'Hace ');
-          
+
           if (!memoryExists(contextPhrase) && contextPhrase.length >= 5) {
             extracted.push(contextPhrase);
           }
@@ -4123,7 +4188,7 @@ function extractInfoSimple(userMessage, assistantResponse) {
       }
     }
   });
-  
+
   // Eliminar duplicados y limitar cantidad
   const unique = [...new Set(extracted)];
   return unique.slice(0, 3); // Máximo 3 memorias por mensaje
@@ -4161,15 +4226,38 @@ function applyDyslexicFont(enabled) {
 function updateGreeting() {
   const greetingElement = document.getElementById('greeting-text');
   const subtitleElement = document.getElementById('greeting-subtitle');
-  
-  if (!greetingElement || !subtitleElement) return;
-  
-  const { greeting, subtitle } = getGreetingMessage();
+
+  if (!greetingElement) return;
+
   const userName = getUserName();
   const firstName = userName.split(' ')[0];
-  
-  greetingElement.innerHTML = `${greeting}, <span class="user-name">${firstName}</span>`;
-  subtitleElement.textContent = subtitle;
+
+  if (window.translationManager) {
+    // Determine time of day for correct greeting key
+    const now = new Date();
+    const hour = now.getHours();
+    let greetingKey = 'greeting.evening'; // Default
+
+    if (hour >= 5 && hour < 12) {
+      greetingKey = 'greeting.morning';
+    } else if (hour >= 12 && hour < 20) {
+      greetingKey = 'greeting.afternoon';
+    }
+
+    const translated = window.translationManager.translate(greetingKey, { name: firstName });
+    greetingElement.innerHTML = translated;
+
+    if (subtitleElement) {
+      subtitleElement.textContent = window.translationManager.translate('greeting.subtitle');
+    }
+  } else {
+    // Fallback
+    const { greeting, subtitle } = getGreetingMessage();
+    greetingElement.innerHTML = `${greeting}, <span class="user-name">${firstName}</span>`;
+    if (subtitleElement) {
+      subtitleElement.textContent = subtitle;
+    }
+  }
 }
 
 // Precargar todas las imágenes de fondo en caché al iniciar
@@ -4184,9 +4272,9 @@ function preloadBackgroundImages() {
 function initBackgroundSystem() {
   setBackgroundImage();
   updateGreeting();
-  
-  // Precargar todas las imágenes de fondo en segundo plano
-  // Usar requestIdleCallback si está disponible, sino setTimeout
+
+  // Preload all background images in background
+  // Use requestIdleCallback if available, otherwise setTimeout
   if (window.requestIdleCallback) {
     requestIdleCallback(() => {
       preloadBackgroundImages();
@@ -4196,13 +4284,13 @@ function initBackgroundSystem() {
       preloadBackgroundImages();
     }, 1000);
   }
-  
-  // Verificar cada minuto si hay que cambiar el fondo (a las 00:00)
+
+  // Check every minute if background needs to change (at 00:00)
   setInterval(() => {
     if (shouldChangeBackground()) {
       setBackgroundImage();
     }
-    updateGreeting(); // Actualizar saludo cada minuto por si cambia la hora
+    updateGreeting(); // Update greeting every minute in case hour changes
   }, 60000); // Cada minuto
 }
 
@@ -4212,15 +4300,11 @@ function updateUserNameDisplay() {
   if (userNameDisplay) {
     userNameDisplay.textContent = userName;
   }
-  
+
   // Actualizar también en el saludo
-  const greetingElement = document.getElementById('greeting-text');
-  if (greetingElement) {
-    const firstName = userName.split(' ')[0];
-    const { greeting } = getGreetingMessage();
-    greetingElement.innerHTML = `${greeting}, <span class="user-name">${firstName}</span>`;
-  }
-  
+  updateGreeting();
+
+
   // Actualizar avatar con primera letra
   const avatar = document.querySelector('.user-card .avatar');
   if (avatar && userName) {
@@ -4245,9 +4329,9 @@ function initUserMenu() {
   const cancelAIPersonalization = document.getElementById('cancel-ai-personalization');
   const saveAIPersonalizationBtn = document.getElementById('save-ai-personalization');
   const aiPersonalInfoInput = document.getElementById('ai-personal-info-input');
-  
+
   if (!userCard || !userMenu) return;
-  
+
   // Toggle del menú al hacer clic en la tarjeta de usuario
   userCard.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -4259,11 +4343,11 @@ function initUserMenu() {
       settingsMenu.style.display = 'none';
     }
   });
-  
+
   // Cerrar menú al hacer clic fuera
   document.addEventListener('click', (e) => {
-    if (!userCard.contains(e.target) && !userMenu.contains(e.target) && 
-        (!settingsMenu || !settingsMenu.contains(e.target))) {
+    if (!userCard.contains(e.target) && !userMenu.contains(e.target) &&
+      (!settingsMenu || !settingsMenu.contains(e.target))) {
       userMenu.style.display = 'none';
       userCard.classList.remove('active');
       if (settingsMenu) {
@@ -4271,7 +4355,7 @@ function initUserMenu() {
       }
     }
   });
-  
+
   // Configuración - Abrir submenú de configuración
   if (settingsBtn) {
     settingsBtn.addEventListener('click', (e) => {
@@ -4279,7 +4363,7 @@ function initUserMenu() {
       if (settingsMenu) {
         const isOpen = settingsMenu.style.display !== 'none';
         settingsMenu.style.display = isOpen ? 'none' : 'block';
-        
+
         // Marcar el tema actual como seleccionado
         if (!isOpen) {
           const currentTheme = getCurrentTheme();
@@ -4291,13 +4375,13 @@ function initUserMenu() {
               option.classList.remove('active');
             }
           });
-          
+
           // Marcar la fuente actual como seleccionada
           const isDyslexicEnabled = getDyslexicFontEnabled();
           const fontOptions = settingsMenu.querySelectorAll('.font-option');
           fontOptions.forEach(option => {
             const isCurrentFont = (option.dataset.font === 'dyslexic' && isDyslexicEnabled) ||
-                                  (option.dataset.font === 'normal' && !isDyslexicEnabled);
+              (option.dataset.font === 'normal' && !isDyslexicEnabled);
             if (isCurrentFont) {
               option.classList.add('active');
             } else {
@@ -4308,7 +4392,7 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Manejar selección de fuente en el submenú
   const fontOptions = settingsMenu?.querySelectorAll('.font-option');
   if (fontOptions) {
@@ -4317,18 +4401,18 @@ function initUserMenu() {
         e.stopPropagation();
         const fontType = option.dataset.font;
         const enableDyslexic = fontType === 'dyslexic';
-        
+
         // Guardar y aplicar la preferencia
         saveDyslexicFontEnabled(enableDyslexic);
         applyDyslexicFont(enableDyslexic);
-        
+
         // Actualizar estado visual
         fontOptions.forEach(opt => opt.classList.remove('active'));
         option.classList.add('active');
       });
     });
   }
-  
+
   // Abrir modal de cambio de nombre desde el submenú
   if (changeNameBtnMenu) {
     changeNameBtnMenu.addEventListener('click', (e) => {
@@ -4347,7 +4431,7 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Abrir modal de personalización de IA desde el submenú
   if (aiPersonalizationBtn) {
     aiPersonalizationBtn.addEventListener('click', (e) => {
@@ -4357,7 +4441,7 @@ function initUserMenu() {
         if (aiPersonalInfoInput) {
           aiPersonalInfoInput.value = getAIPersonalization();
         }
-        
+
         // Cargar y marcar el estilo seleccionado
         const currentStyle = getAIResponseStyle();
         const styleOptions = aiPersonalizationModal.querySelectorAll('.style-option-compact');
@@ -4368,6 +4452,7 @@ function initUserMenu() {
             option.classList.remove('active');
           }
         });
+
         
         // Cargar modos de chat visibles
         const visibleModes = getVisibleChatModes();
@@ -4385,7 +4470,7 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // ========================================
   // Modal de Memoria
   // ========================================
@@ -4398,14 +4483,14 @@ function initUserMenu() {
   const addMemoryBtn = document.getElementById('add-memory-btn');
   const clearAllMemoriesBtn = document.getElementById('clear-all-memories-btn');
   const memoriesList = document.getElementById('memories-list');
-  
+
   // Función para renderizar la lista de memorias (accesible globalmente)
-  window.renderMemoriesList = function() {
+  window.renderMemoriesList = function () {
     const memoriesListEl = document.getElementById('memories-list');
     if (!memoriesListEl) return;
-    
+
     const memories = getMemories();
-    
+
     if (memories.length === 0) {
       memoriesListEl.innerHTML = `
         <div class="memory-empty-state">
@@ -4416,7 +4501,7 @@ function initUserMenu() {
       `;
       return;
     }
-    
+
     memoriesListEl.innerHTML = memories.map(memory => `
       <div class="memory-item" data-memory-id="${memory.id}">
         <div class="memory-icon">💡</div>
@@ -4427,7 +4512,7 @@ function initUserMenu() {
         <button class="memory-delete-btn" title="Eliminar recuerdo" data-memory-id="${memory.id}">×</button>
       </div>
     `).join('');
-    
+
     // Añadir handlers de eliminación
     memoriesListEl.querySelectorAll('.memory-delete-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -4438,26 +4523,26 @@ function initUserMenu() {
       });
     });
   };
-  
+
   const renderMemoriesList = window.renderMemoriesList;
-  
+
   // Abrir modal de memoria
   if (memoryBtn) {
     memoryBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (memoryModal) {
         memoryModal.style.display = 'flex';
-        
+
         // Cargar estado del toggle
         if (memoryEnabledToggle) {
           memoryEnabledToggle.checked = getMemoryEnabled();
         }
-        
+
         // Renderizar lista de memorias
         if (typeof window.renderMemoriesList === 'function') {
           window.renderMemoriesList();
         }
-        
+
         if (settingsMenu) {
           settingsMenu.style.display = 'none';
         }
@@ -4466,7 +4551,7 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Cerrar modal de memoria
   const closeMemoryModalFunc = () => {
     if (memoryModal) {
@@ -4476,15 +4561,15 @@ function initUserMenu() {
       }
     }
   };
-  
+
   if (closeMemoryModal) {
     closeMemoryModal.addEventListener('click', closeMemoryModalFunc);
   }
-  
+
   if (closeMemoryModalBtn) {
     closeMemoryModalBtn.addEventListener('click', closeMemoryModalFunc);
   }
-  
+
   // Cerrar modal al hacer clic fuera
   if (memoryModal) {
     memoryModal.addEventListener('click', (e) => {
@@ -4493,14 +4578,14 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Guardar estado del toggle de memoria
   if (memoryEnabledToggle) {
     memoryEnabledToggle.addEventListener('change', (e) => {
       setMemoryEnabled(e.target.checked);
     });
   }
-  
+
   // Añadir nuevo recuerdo
   if (addMemoryBtn && newMemoryInput) {
     const addNewMemory = () => {
@@ -4513,9 +4598,9 @@ function initUserMenu() {
         }
       }
     };
-    
+
     addMemoryBtn.addEventListener('click', addNewMemory);
-    
+
     // Permitir añadir con Enter
     newMemoryInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -4527,11 +4612,11 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Borrar todas las memorias
   if (clearAllMemoriesBtn) {
     clearAllMemoriesBtn.addEventListener('click', () => {
-      if (confirm('¿Estás seguro de que quieres borrar todos los recuerdos?')) {
+      if (confirm(window.translationManager ? window.translationManager.translate('confirm.clearMemories') : '¿Estás seguro de que quieres borrar todos los recuerdos?')) {
         clearAllMemories();
         if (typeof window.renderMemoriesList === 'function') {
           window.renderMemoriesList();
@@ -4539,7 +4624,7 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Manejar selección de estilos
   const styleOptions = aiPersonalizationModal?.querySelectorAll('.style-option-compact');
   if (styleOptions) {
@@ -4552,7 +4637,7 @@ function initUserMenu() {
       });
     });
   }
-  
+
   // Cerrar modal de cambio de nombre
   const closeNameModalFunc = () => {
     if (changeNameModal) {
@@ -4562,15 +4647,15 @@ function initUserMenu() {
       }
     }
   };
-  
+
   if (closeNameModal) {
     closeNameModal.addEventListener('click', closeNameModalFunc);
   }
-  
+
   if (cancelNameChange) {
     cancelNameChange.addEventListener('click', closeNameModalFunc);
   }
-  
+
   // Cerrar modal de cambio de nombre al hacer clic fuera
   if (changeNameModal) {
     changeNameModal.addEventListener('click', (e) => {
@@ -4579,7 +4664,7 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Cerrar modal de personalización de IA
   const closeAIPersonalizationModalFunc = () => {
     if (aiPersonalizationModal) {
@@ -4589,15 +4674,15 @@ function initUserMenu() {
       }
     }
   };
-  
+
   if (closeAIPersonalizationModal) {
     closeAIPersonalizationModal.addEventListener('click', closeAIPersonalizationModalFunc);
   }
-  
+
   if (cancelAIPersonalization) {
     cancelAIPersonalization.addEventListener('click', closeAIPersonalizationModalFunc);
   }
-  
+
   // Cerrar modal de personalización de IA al hacer clic fuera
   if (aiPersonalizationModal) {
     aiPersonalizationModal.addEventListener('click', (e) => {
@@ -4606,7 +4691,7 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Guardar nombre
   if (saveNameChange && newNameInput) {
     saveNameChange.addEventListener('click', () => {
@@ -4617,7 +4702,7 @@ function initUserMenu() {
         closeNameModalFunc();
       }
     });
-    
+
     // Permitir guardar con Enter
     newNameInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -4629,19 +4714,20 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Guardar personalización de IA
   if (saveAIPersonalizationBtn && aiPersonalInfoInput) {
     saveAIPersonalizationBtn.addEventListener('click', () => {
       const personalInfo = aiPersonalInfoInput.value.trim();
       saveAIPersonalization(personalInfo);
-      
+
       // Guardar el estilo seleccionado
       const selectedStyleOption = aiPersonalizationModal?.querySelector('.style-option-compact.active');
       if (selectedStyleOption) {
         const selectedStyle = selectedStyleOption.dataset.style || 'normal';
         saveAIResponseStyle(selectedStyle);
       }
+
       
       // Guardar modos de chat visibles
       const modeCheckboxes = aiPersonalizationModal?.querySelectorAll('#chat-modes-selector input[type="checkbox"]');
@@ -4657,7 +4743,7 @@ function initUserMenu() {
       
       closeAIPersonalizationModalFunc();
     });
-    
+
     // Permitir guardar con Ctrl+Enter o Cmd+Enter
     aiPersonalInfoInput.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -4669,13 +4755,13 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Cargar y mostrar el nombre guardado
   updateUserNameDisplay();
-  
+
   // Inicializar sistema de temas
   initThemeSystem();
-  
+
   // Personalización de fondo
   const backgroundPersonalizationBtn = document.getElementById('background-personalization-btn');
   const backgroundPersonalizationModal = document.getElementById('background-personalization-modal');
@@ -4685,46 +4771,46 @@ function initUserMenu() {
   const autoBackgroundToggle = document.getElementById('auto-background-toggle');
   const manualBackgroundSection = document.getElementById('manual-background-section');
   const backgroundGallery = document.getElementById('background-gallery');
-  
+
   // Función para cargar la galería de imágenes (ya precargadas en caché)
   function loadBackgroundGallery() {
     if (!backgroundGallery) return;
-    
+
     const manualImage = getManualBackground();
     const isAutoMode = getBackgroundAutoMode();
-    
+
     // Limpiar galería
     backgroundGallery.innerHTML = '';
-    
+
     // Cargar imágenes de forma asíncrona para no bloquear el UI
     // Usar requestAnimationFrame para permitir que el modal se renderice primero
     requestAnimationFrame(() => {
       // Dividir la carga en pequeños lotes para no bloquear
       let index = 0;
-      
+
       const loadNextBatch = () => {
         const batchSize = 3; // Cargar 3 imágenes por frame
         const endIndex = Math.min(index + batchSize, PHOTOS.length);
-        
+
         for (let i = index; i < endIndex; i++) {
           const photoPath = PHOTOS[i];
           const item = document.createElement('div');
           item.className = 'background-gallery-item';
           item.dataset.imagePath = photoPath;
-          
+
           const img = document.createElement('img');
           img.src = photoPath;
           img.alt = `Fondo ${i + 1}`;
           img.loading = 'eager';
-          
+
           item.appendChild(img);
           backgroundGallery.appendChild(item);
-          
+
           // Marcar como activa si es la imagen manual seleccionada
           if (!isAutoMode && manualImage === photoPath) {
             item.classList.add('active');
           }
-          
+
           // Seleccionar imagen al hacer clic
           item.addEventListener('click', () => {
             // Remover active de todos los items
@@ -4735,20 +4821,20 @@ function initUserMenu() {
             item.classList.add('active');
           });
         }
-        
+
         index = endIndex;
-        
+
         // Continuar cargando el siguiente lote si quedan imágenes
         if (index < PHOTOS.length) {
           requestAnimationFrame(loadNextBatch);
         }
       };
-      
+
       // Iniciar la carga
       loadNextBatch();
     });
   }
-  
+
   // Abrir modal de personalización de fondo
   if (backgroundPersonalizationBtn) {
     backgroundPersonalizationBtn.addEventListener('click', (e) => {
@@ -4762,7 +4848,7 @@ function initUserMenu() {
         if (manualBackgroundSection) {
           manualBackgroundSection.style.display = autoMode ? 'none' : 'block';
         }
-        
+
         // Mostrar el modal inmediatamente
         backgroundPersonalizationModal.style.display = 'flex';
         if (settingsMenu) {
@@ -4770,10 +4856,10 @@ function initUserMenu() {
         }
         userMenu.style.display = 'none';
         userCard.classList.remove('active');
-        
+
         // Forzar un reflow para asegurar que el modal se renderice
         void backgroundPersonalizationModal.offsetHeight;
-        
+
         // Cargar galería de forma completamente asíncrona después de mostrar el modal
         // Usar requestIdleCallback si está disponible para no bloquear
         if (window.requestIdleCallback) {
@@ -4790,29 +4876,29 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Manejar toggle del switch
   if (autoBackgroundToggle && manualBackgroundSection) {
     autoBackgroundToggle.addEventListener('change', (e) => {
       manualBackgroundSection.style.display = e.target.checked ? 'none' : 'block';
     });
   }
-  
+
   // Cerrar modal de personalización de fondo
   const closeBackgroundPersonalizationModalFunc = () => {
     if (backgroundPersonalizationModal) {
       backgroundPersonalizationModal.style.display = 'none';
     }
   };
-  
+
   if (closeBackgroundPersonalizationModal) {
     closeBackgroundPersonalizationModal.addEventListener('click', closeBackgroundPersonalizationModalFunc);
   }
-  
+
   if (cancelBackgroundPersonalization) {
     cancelBackgroundPersonalization.addEventListener('click', closeBackgroundPersonalizationModalFunc);
   }
-  
+
   // Cerrar modal al hacer clic fuera
   if (backgroundPersonalizationModal) {
     backgroundPersonalizationModal.addEventListener('click', (e) => {
@@ -4821,13 +4907,13 @@ function initUserMenu() {
       }
     });
   }
-  
+
   // Guardar personalización de fondo
   if (saveBackgroundPersonalizationBtn && autoBackgroundToggle) {
     saveBackgroundPersonalizationBtn.addEventListener('click', () => {
       const autoMode = autoBackgroundToggle.checked;
       setBackgroundAutoMode(autoMode);
-      
+
       if (!autoMode) {
         // Si el modo automático está desactivado, guardar la imagen seleccionada
         const selectedItem = backgroundGallery?.querySelector('.background-gallery-item.active');
@@ -4839,10 +4925,10 @@ function initUserMenu() {
           setManualBackground(PHOTOS[0]);
         }
       }
-      
+
       // Actualizar el fondo inmediatamente
       setBackgroundImage();
-      
+
       closeBackgroundPersonalizationModalFunc();
     });
   }
@@ -4911,17 +4997,17 @@ function setCustomTheme(color) {
     const primary = color;
     const primaryDark = darkenColor(color, 15);
     const primaryLight = lightenColor(color, 20);
-    
+
     // Guardar el color personalizado
     window.localStorage.setItem(CUSTOM_THEME_KEY, color);
     window.localStorage.setItem(THEME_STORAGE_KEY, 'custom');
-    
+
     // Aplicar variables CSS dinámicamente
     const root = document.documentElement;
     root.style.setProperty('--theme-primary', primary);
     root.style.setProperty('--theme-primary-dark', primaryDark);
     root.style.setProperty('--theme-primary-light', primaryLight);
-    
+
     // Calcular transparencias
     const rgb = hexToRgb(primary);
     if (rgb) {
@@ -4932,9 +5018,9 @@ function setCustomTheme(color) {
       root.style.setProperty('--theme-primary-alpha-30', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`);
       root.style.setProperty('--theme-primary-alpha-35', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)`);
     }
-    
+
     document.documentElement.setAttribute('data-theme', 'custom');
-    
+
     // Actualizar el botón de color personalizado para mostrar el color seleccionado
     const customColorBtn = document.getElementById('custom-color-btn');
     if (customColorBtn) {
@@ -4955,7 +5041,7 @@ function loadCustomTheme() {
   try {
     const customColor = window.localStorage.getItem(CUSTOM_THEME_KEY);
     const currentTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    
+
     if (customColor && currentTheme === 'custom') {
       setCustomTheme(customColor);
     }
@@ -4979,10 +5065,10 @@ function setTheme(themeName) {
       document.documentElement.style.removeProperty('--theme-primary-alpha-30');
       document.documentElement.style.removeProperty('--theme-primary-alpha-35');
     }
-    
+
     window.localStorage.setItem(THEME_STORAGE_KEY, themeName);
     document.documentElement.setAttribute('data-theme', themeName);
-    
+
     // Si no es custom, cargar el tema personalizado guardado
     if (themeName === 'custom') {
       loadCustomTheme();
@@ -4996,31 +5082,31 @@ function initThemeSystem() {
   // Cargar tema guardado
   const savedTheme = getCurrentTheme();
   document.documentElement.setAttribute('data-theme', savedTheme);
-  
+
   // Cargar tema personalizado si está guardado
   if (savedTheme === 'custom') {
     loadCustomTheme();
   }
-  
+
   // Configurar modal de temas (por si se usa en el futuro)
   const settingsModal = document.getElementById('settings-modal');
   const closeSettingsModal = document.getElementById('close-settings-modal');
   const closeSettingsBtn = document.getElementById('close-settings-btn');
-  
+
   const closeModal = () => {
     if (settingsModal) {
       settingsModal.style.display = 'none';
     }
   };
-  
+
   if (closeSettingsModal) {
     closeSettingsModal.addEventListener('click', closeModal);
   }
-  
+
   if (closeSettingsBtn) {
     closeSettingsBtn.addEventListener('click', closeModal);
   }
-  
+
   // Cerrar modal al hacer clic fuera
   if (settingsModal) {
     settingsModal.addEventListener('click', (e) => {
@@ -5029,7 +5115,7 @@ function initThemeSystem() {
       }
     });
   }
-  
+
   // Manejar selección de temas en el modal (si existe)
   const themeOptions = settingsModal?.querySelectorAll('.theme-option');
   if (themeOptions) {
@@ -5038,11 +5124,11 @@ function initThemeSystem() {
         const themeName = option.dataset.theme;
         if (themeName) {
           setTheme(themeName);
-          
+
           // Actualizar estado visual en el modal
           themeOptions.forEach(opt => opt.classList.remove('active'));
           option.classList.add('active');
-          
+
           // Actualizar estado visual en el submenú también
           const settingsMenu = document.getElementById('settings-menu');
           if (settingsMenu) {
@@ -5059,7 +5145,7 @@ function initThemeSystem() {
       });
     });
   }
-  
+
   // Manejar selección de temas en el submenú compacto
   const settingsMenu = document.getElementById('settings-menu');
   const compactThemeOptions = settingsMenu?.querySelectorAll('.theme-option-compact:not(.theme-custom-color)');
@@ -5069,17 +5155,17 @@ function initThemeSystem() {
         const themeName = option.dataset.theme;
         if (themeName) {
           setTheme(themeName);
-          
+
           // Actualizar estado visual en el submenú
           compactThemeOptions.forEach(opt => opt.classList.remove('active'));
           option.classList.add('active');
-          
+
           // Desactivar botón de color personalizado
           const customColorBtn = document.getElementById('custom-color-btn');
           if (customColorBtn) {
             customColorBtn.classList.remove('active');
           }
-          
+
           // Actualizar estado visual en el modal también (si existe)
           if (settingsModal) {
             const modalOptions = settingsModal.querySelectorAll('.theme-option');
@@ -5095,11 +5181,11 @@ function initThemeSystem() {
       });
     });
   }
-  
+
   // Manejar selector de color personalizado
   const customColorBtn = document.getElementById('custom-color-btn');
   const customColorPicker = document.getElementById('custom-color-picker');
-  
+
   if (customColorBtn && customColorPicker) {
     // Cargar y mostrar el color personalizado guardado si existe
     const savedColor = localStorage.getItem(CUSTOM_THEME_KEY);
@@ -5115,7 +5201,7 @@ function initThemeSystem() {
       }
       customColorBtn.classList.add('active');
     }
-    
+
     // Abrir selector de color al hacer clic en el botón
     customColorBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -5125,18 +5211,18 @@ function initThemeSystem() {
       }
       customColorPicker.click();
     });
-    
+
     // Aplicar color cuando se seleccione
     customColorPicker.addEventListener('change', (e) => {
       const selectedColor = e.target.value;
       setCustomTheme(selectedColor);
-      
+
       // Actualizar estado visual en el submenú
       if (compactThemeOptions) {
         compactThemeOptions.forEach(opt => opt.classList.remove('active'));
         customColorBtn.classList.add('active');
       }
-      
+
       // Actualizar estado visual en el modal también (si existe)
       if (settingsModal) {
         const modalOptions = settingsModal.querySelectorAll('.theme-option');
@@ -5219,19 +5305,19 @@ function calculateDashboardStats() {
     modelUsage: {},
     dailyMessages: {}
   };
-  
+
   // Contar mensajes y caracteres de las conversaciones
   conversations.forEach(conv => {
     if (!conv.messages) return;
-    
+
     conv.messages.forEach(msg => {
       stats.totalMessages++;
       const contentLength = msg.content?.length || 0;
-      
+
       if (msg.role === 'user') {
         stats.userMessages++;
         stats.charsSent += contentLength;
-        
+
         // Contar archivos adjuntos
         if (msg.attachedFiles && msg.attachedFiles.length > 0) {
           stats.filesAttached += msg.attachedFiles.length;
@@ -5242,21 +5328,21 @@ function calculateDashboardStats() {
       }
     });
   });
-  
+
   // Estimar tokens (1 token ≈ 4 caracteres en promedio)
   stats.tokensEstimated = Math.round((stats.charsSent + stats.charsReceived) / 4);
-  
+
   // Obtener estadísticas guardadas
   const usageStats = getUsageStats();
   stats.modelUsage = usageStats.modelUsage || {};
   stats.dailyMessages = usageStats.dailyMessages || {};
-  
+
   // Calcular tiempo promedio de respuesta
   if (usageStats.responseTimes && usageStats.responseTimes.length > 0) {
     const sum = usageStats.responseTimes.reduce((a, b) => a + b, 0);
     stats.avgResponseTime = (sum / usageStats.responseTimes.length).toFixed(1);
   }
-  
+
   return stats;
 }
 
@@ -5275,11 +5361,11 @@ function formatNumber(num) {
 function renderActivityChart(dailyMessages) {
   const chartContainer = document.getElementById('activity-chart');
   if (!chartContainer) return;
-  
+
   // Obtener los últimos 7 días
   const days = [];
   const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  
+
   for (let i = 6; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
@@ -5290,14 +5376,14 @@ function renderActivityChart(dailyMessages) {
       count: dailyMessages[dateStr] || 0
     });
   }
-  
+
   const maxCount = Math.max(...days.map(d => d.count), 1);
-  
+
   if (maxCount === 0 || days.every(d => d.count === 0)) {
     chartContainer.innerHTML = '<div class="activity-empty">No hay actividad registrada en los últimos 7 días</div>';
     return;
   }
-  
+
   chartContainer.innerHTML = days.map(day => {
     const height = Math.max(4, (day.count / maxCount) * 80);
     return `
@@ -5313,23 +5399,23 @@ function renderActivityChart(dailyMessages) {
 function renderModelsRanking(modelUsage) {
   const container = document.getElementById('models-ranking');
   if (!container) return;
-  
+
   const models = Object.entries(modelUsage)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
-  
+
   if (models.length === 0) {
     container.innerHTML = '<div class="models-ranking-empty">No hay datos de uso de modelos aún</div>';
     return;
   }
-  
+
   const maxCount = models[0].count;
-  
+
   container.innerHTML = models.map((model, index) => {
     const positionClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : 'normal';
     const percentage = Math.round((model.count / maxCount) * 100);
-    
+
     // Formatear nombre del modelo
     let displayName = model.name;
     if (model.name.includes(':')) {
@@ -5339,7 +5425,7 @@ function renderModelsRanking(modelUsage) {
         displayName += ' ' + parts[1].split('-')[0].toUpperCase();
       }
     }
-    
+
     return `
       <div class="model-rank-item">
         <div class="model-rank-position ${positionClass}">${index + 1}</div>
@@ -5370,21 +5456,21 @@ function formatModelSize(size) {
 async function loadModelsInfo() {
   const container = document.getElementById('models-info-list');
   if (!container) return;
-  
+
   container.innerHTML = `
     <div class="models-loading">
       <div class="loading-spinner"></div>
       <span>Cargando información de modelos...</span>
     </div>
   `;
-  
+
   try {
     const response = await fetch(`${API_BASE}/api/tags`);
     if (!response.ok) throw new Error('Error al cargar modelos');
-    
+
     const data = await response.json();
     const models = data?.models ?? [];
-    
+
     if (models.length === 0) {
       container.innerHTML = `
         <div class="models-empty">
@@ -5394,7 +5480,7 @@ async function loadModelsInfo() {
       `;
       return;
     }
-    
+
     container.innerHTML = models.map(model => {
       // Formatear nombre
       let displayName = model.name;
@@ -5402,7 +5488,7 @@ async function loadModelsInfo() {
         const parts = model.name.split(':');
         displayName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
       }
-      
+
       // Extraer información del modelo
       const details = model.details || {};
       const size = formatModelSize(model.size);
@@ -5410,7 +5496,7 @@ async function loadModelsInfo() {
       const parameterSize = details.parameter_size || 'N/A';
       const quantization = details.quantization_level || 'N/A';
       const format = details.format || 'N/A';
-      
+
       // Detectar capacidades del modelo basándose en el nombre
       const capabilities = [];
       const nameLower = model.name.toLowerCase();
@@ -5432,11 +5518,11 @@ async function loadModelsInfo() {
       if (nameLower.includes('math')) {
         capabilities.push('Matemáticas');
       }
-      
+
       if (capabilities.length === 0) {
         capabilities.push('General');
       }
-      
+
       return `
         <div class="model-info-card" data-model="${escapeHtml(model.name)}">
           <div class="model-info-header">
@@ -5475,7 +5561,7 @@ async function loadModelsInfo() {
         </div>
       `;
     }).join('');
-    
+
     // Añadir event listeners para expandir/colapsar
     container.querySelectorAll('.model-info-card').forEach(card => {
       const header = card.querySelector('.model-info-header');
@@ -5483,7 +5569,7 @@ async function loadModelsInfo() {
         card.classList.toggle('expanded');
       });
     });
-    
+
   } catch (error) {
     console.error('Error cargando modelos:', error);
     container.innerHTML = `
@@ -5499,7 +5585,7 @@ async function loadModelsInfo() {
 // Actualizar estadísticas del dashboard
 function updateDashboardStats() {
   const stats = calculateDashboardStats();
-  
+
   // Actualizar valores en las tarjetas
   const elements = {
     'stat-total-messages': formatNumber(stats.totalMessages),
@@ -5513,15 +5599,15 @@ function updateDashboardStats() {
     'stat-files-attached': formatNumber(stats.filesAttached),
     'stat-projects-count': formatNumber(stats.projectsCount)
   };
-  
+
   Object.entries(elements).forEach(([id, value]) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
   });
-  
+
   // Renderizar gráfico de actividad
   renderActivityChart(stats.dailyMessages);
-  
+
   // Renderizar ranking de modelos
   renderModelsRanking(stats.modelUsage);
 }
@@ -5530,12 +5616,12 @@ function updateDashboardStats() {
 function openDashboard() {
   const modal = document.getElementById('dashboard-modal');
   if (!modal) return;
-  
+
   modal.style.display = 'flex';
-  
+
   // Actualizar estadísticas
   updateDashboardStats();
-  
+
   // Cargar información de modelos si está en esa pestaña
   const activeTab = modal.querySelector('.dashboard-tab.active');
   if (activeTab?.dataset.tab === 'models') {
@@ -5561,23 +5647,23 @@ function initDashboard() {
     const userMenu = document.getElementById('user-menu');
     if (settingsMenu) settingsMenu.style.display = 'none';
     if (userMenu) userMenu.style.display = 'none';
-    
+
     openDashboard();
   });
-  
+
   // Botones para cerrar
   const closeBtn = document.getElementById('close-dashboard-modal');
   const closeBtn2 = document.getElementById('close-dashboard-modal-btn');
-  
+
   closeBtn?.addEventListener('click', closeDashboard);
   closeBtn2?.addEventListener('click', closeDashboard);
-  
+
   // Cerrar al hacer clic fuera
   const modal = document.getElementById('dashboard-modal');
   modal?.addEventListener('click', (e) => {
     if (e.target === modal) closeDashboard();
   });
-  
+
   // Pestañas
   const tabs = document.querySelectorAll('.dashboard-tab');
   tabs.forEach(tab => {
@@ -5585,7 +5671,7 @@ function initDashboard() {
       // Cambiar pestaña activa
       tabs.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
-      
+
       // Cambiar contenido activo
       const tabName = tab.dataset.tab;
       document.querySelectorAll('.dashboard-content').forEach(content => {
@@ -5594,7 +5680,7 @@ function initDashboard() {
       const content = document.getElementById(`dashboard-${tabName}`);
       if (content) {
         content.classList.add('active');
-        
+
         // Si es la pestaña de modelos, cargar la info
         if (tabName === 'models') {
           loadModelsInfo();
@@ -5612,14 +5698,19 @@ document.addEventListener('DOMContentLoaded', () => {
   initDashboard();
   initDeepResearch();
   initScreenOverlay();
+  try {
+    initTranslationSystem();
+  } catch (error) {
+    console.warn('Translation system failed to initialize:', error);
+  }
 });
 
 // ========================================
-// Sistema de Proyectos
+// Project System
 // ========================================
 const PROJECTS_STORAGE_KEY = 'ollama-web-projects';
 
-// Estado de proyectos
+// Project state
 const projectsState = {
   projects: {},
   activeProjectId: null,
@@ -5649,7 +5740,7 @@ function saveProjects(projects) {
 
 function loadProjectsState() {
   projectsState.projects = getProjects();
-  
+
   // Limpiar proyectos corruptos o con estructura incompleta
   Object.keys(projectsState.projects).forEach(id => {
     const project = projectsState.projects[id];
@@ -5663,10 +5754,10 @@ function loadProjectsState() {
     if (!project.name) project.name = 'Proyecto sin nombre';
     if (!project.instructions) project.instructions = '';
   });
-  
+
   // Guardar proyectos limpios
   saveProjects(projectsState.projects);
-  
+
   // Cargar proyecto activo si había uno guardado
   if (hasLocalStorage) {
     try {
@@ -5711,7 +5802,7 @@ function createProject(name, instructions, files = []) {
     createdAt: Date.now(),
     updatedAt: Date.now()
   };
-  
+
   projectsState.projects[id] = project;
   saveProjects(projectsState.projects);
   return project;
@@ -5720,7 +5811,7 @@ function createProject(name, instructions, files = []) {
 function updateProject(projectId, updates) {
   const project = projectsState.projects[projectId];
   if (!project) return null;
-  
+
   if (updates.name !== undefined) project.name = updates.name.trim() || 'Proyecto sin nombre';
   if (updates.instructions !== undefined) project.instructions = updates.instructions.trim();
   if (updates.files !== undefined) {
@@ -5733,7 +5824,7 @@ function updateProject(projectId, updates) {
       isImage: f.isImage || false
     }));
   }
-  
+
   project.updatedAt = Date.now();
   saveProjects(projectsState.projects);
   return project;
@@ -5742,7 +5833,7 @@ function updateProject(projectId, updates) {
 function deleteProject(projectId) {
   const project = projectsState.projects[projectId];
   if (!project) return false;
-  
+
   // Eliminar conversaciones asociadas al proyecto
   project.conversationIds.forEach(convId => {
     if (state.conversations[convId]) {
@@ -5750,29 +5841,29 @@ function deleteProject(projectId) {
       state.order = state.order.filter(id => id !== convId);
     }
   });
-  
+
   // Si era el proyecto activo, desactivarlo
   if (projectsState.activeProjectId === projectId) {
     projectsState.activeProjectId = null;
     saveActiveProject(null);
     updateProjectBadge();
   }
-  
+
   delete projectsState.projects[projectId];
   saveProjects(projectsState.projects);
   persistState();
-  
+
   return true;
 }
 
 function setActiveProject(projectId) {
   if (projectId && !projectsState.projects[projectId]) return false;
-  
+
   projectsState.activeProjectId = projectId;
   saveActiveProject(projectId);
   updateProjectBadge();
   renderProjectsList();
-  
+
   // Actualizar clase del chat-state
   const chatState = document.getElementById('chat-state');
   if (chatState) {
@@ -5782,40 +5873,40 @@ function setActiveProject(projectId) {
       chatState.classList.remove('in-project');
     }
   }
-  
+
   // Si hay un proyecto activo, crear una nueva conversación para él
   if (projectId) {
     createProjectConversation(projectId);
   }
-  
+
   return true;
 }
 
 function createProjectConversation(projectId) {
   const project = projectsState.projects[projectId];
   if (!project) return null;
-  
+
   // Crear nueva conversación
   const convId = generateId('conv');
   const conversation = {
     id: convId,
-    title: `${project.name} - Nueva conversación`,
+    title: `${project.name} - ${window.translationManager ? window.translationManager.translate('chat.newConversation') : 'Nueva conversación'}`,
     projectId: projectId, // Asociar con el proyecto
     createdAt: Date.now(),
     updatedAt: Date.now(),
     messages: [],
   };
-  
+
   state.conversations[convId] = conversation;
   attachedFiles[convId] = [];
-  
+
   // Añadir a la lista de conversaciones del proyecto
   project.conversationIds.push(convId);
   saveProjects(projectsState.projects);
-  
+
   touchConversation(convId);
   setActiveConversation(convId);
-  
+
   return conversation;
 }
 
@@ -5826,9 +5917,9 @@ function getActiveProject() {
 
 function buildProjectContext(project) {
   if (!project) return '';
-  
+
   let context = '';
-  
+
   // Añadir instrucciones del proyecto
   if (project.instructions) {
     context += `══════════════════════════════════════════════════════════════\n`;
@@ -5836,29 +5927,29 @@ function buildProjectContext(project) {
     context += `══════════════════════════════════════════════════════════════\n\n`;
     context += `${project.instructions}\n\n`;
   }
-  
+
   // Añadir contenido de archivos del proyecto (solo texto/PDF, no imágenes)
   const textFiles = (project.files || []).filter(f => !f.isImage);
   if (textFiles.length > 0) {
     context += `=== DOCUMENTOS DEL PROYECTO (DEBES LEER Y USAR ESTE CONTENIDO) ===\n\n`;
-    
+
     textFiles.forEach((file, index) => {
       const contentLength = file.content?.length || 0;
       console.log(`📂 Proyecto - Incluyendo archivo ${index + 1}: ${file.name} (${contentLength} caracteres)`);
-      
+
       context += `══════════════════════════════════════════════════════════════\n`;
       context += `📄 DOCUMENTO ${index + 1}: ${file.name}\n`;
       context += `══════════════════════════════════════════════════════════════\n\n`;
       context += `${file.content}\n\n`;
     });
-    
+
     context += `=== FIN DE DOCUMENTOS DEL PROYECTO ===\n\n`;
   }
-  
+
   if (context) {
     context += 'IMPORTANTE: Debes seguir las instrucciones del proyecto y USAR el contenido de los documentos proporcionados para responder las preguntas del usuario. Si el usuario pregunta sobre los documentos, resume o explica lo que contienen.\n';
   }
-  
+
   return context;
 }
 
@@ -5866,13 +5957,13 @@ function updateProjectBadge() {
   // Badge en el chat header
   const badge = document.getElementById('project-badge');
   const badgeName = document.getElementById('project-badge-name');
-  
+
   // Badge en el empty state (pantalla principal)
   const badgeEmpty = document.getElementById('project-badge-empty');
   const badgeNameEmpty = document.getElementById('project-badge-name-empty');
-  
+
   const project = getActiveProject();
-  
+
   if (project) {
     // Mostrar badge en chat header
     if (badge && badgeName) {
@@ -5884,7 +5975,7 @@ function updateProjectBadge() {
       badgeNameEmpty.textContent = project.name;
       badgeEmpty.style.display = 'flex';
     }
-    
+
     // Actualizar indicadores compactos de contexto
     updateCompactContextIndicators(project);
   } else {
@@ -5897,21 +5988,21 @@ function updateProjectBadge() {
 // Actualizar los indicadores compactos de contexto en los badges
 async function updateCompactContextIndicators(project) {
   if (!project) return;
-  
+
   try {
     // Obtener info del modelo actual
     const currentModel = state.currentModel;
     if (!currentModel) return;
-    
+
     const modelInfo = await getModelContextInfo(currentModel);
     const contextLength = modelInfo?.contextLength || MODEL_CONTEXT_DEFAULTS?.default || 4096;
-    
+
     // Calcular tokens del proyecto
     const tokenUsage = calculateProjectTokens(project.instructions || '', project.files || []);
     const chatReserve = 2000;
     const totalWithReserve = tokenUsage.total + chatReserve;
     const usagePercent = Math.min(100, Math.round((totalWithReserve / contextLength) * 100));
-    
+
     // Actualizar ambos indicadores (chat header y empty state)
     const indicators = [
       {
@@ -5923,7 +6014,7 @@ async function updateCompactContextIndicators(project) {
         text: document.getElementById('context-mini-text-empty')
       }
     ];
-    
+
     indicators.forEach(({ fill, text }) => {
       if (fill) {
         fill.style.width = `${usagePercent}%`;
@@ -5936,7 +6027,7 @@ async function updateCompactContextIndicators(project) {
           fill.classList.add('warning');
         }
       }
-      
+
       if (text) {
         text.textContent = `${usagePercent}%`;
         text.classList.remove('warning', 'danger', 'critical');
@@ -5957,25 +6048,27 @@ async function updateCompactContextIndicators(project) {
 function renderProjectsList() {
   const listElement = document.getElementById('projects-list');
   if (!listElement) return;
-  
+
   const projects = Object.values(projectsState.projects);
-  
+
   if (projects.length === 0) {
     listElement.innerHTML = `
-      <li class="projects-empty">
-        No hay proyectos aún.<br>
-        <span style="font-size: 11px; opacity: 0.7;">Crea uno para organizar tus chats</span>
-      </li>
-    `;
+        <div style="text-align: center; padding: 20px; color: var(--text-secondary);">
+        ${window.translationManager ? window.translationManager.translate('sidebar.noProjects') : 'No hay proyectos aún.'}<br>
+        <span style="font-size: 11px; opacity: 0.7;">${window.translationManager ? window.translationManager.translate('sidebar.createProjectHint') : 'Crea uno para organizar tus chats'}</span>
+        </div>
+      `;
     return;
   }
-  
+
   // Ordenar por fecha de actualización (más reciente primero)
   projects.sort((a, b) => b.updatedAt - a.updatedAt);
-  
+
   listElement.innerHTML = projects.map(project => {
     const isActive = project.id === projectsState.activeProjectId;
     const fileCount = (project.files || []).length;
+    const convCount = (project.conversationIds || []).length;
+
     
     return `
       <li class="project-item ${isActive ? 'active' : ''}" data-project-id="${project.id}">
@@ -5991,24 +6084,24 @@ function renderProjectsList() {
       </li>
     `;
   }).join('');
-  
+
   // Añadir event listeners
   listElement.querySelectorAll('.project-item').forEach(item => {
     const projectId = item.dataset.projectId;
-    
+
     // Click en el item para activar el proyecto
     item.addEventListener('click', (e) => {
       if (e.target.closest('.project-action-btn')) return; // Ignorar clicks en botones de acción
       setActiveProject(projectId);
     });
-    
+
     // Botón editar
     const editBtn = item.querySelector('.project-action-btn.edit');
     editBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       openProjectModal(projectId);
     });
-    
+
     // Botón eliminar
     const deleteBtn = item.querySelector('.project-action-btn.delete');
     deleteBtn?.addEventListener('click', (e) => {
@@ -6021,16 +6114,16 @@ function renderProjectsList() {
 function renderProjectFiles() {
   const listElement = document.getElementById('project-files-list');
   if (!listElement) return;
-  
+
   if (projectsState.tempProjectFiles.length === 0) {
     listElement.innerHTML = '';
     return;
   }
-  
+
   listElement.innerHTML = projectsState.tempProjectFiles.map(file => {
     const ext = getFileExtension(file.name);
     const size = formatFileSize(file.size);
-    
+
     return `
       <div class="project-file-item" data-file-id="${file.id}">
         <div class="project-file-icon">${ext}</div>
@@ -6042,7 +6135,7 @@ function renderProjectFiles() {
       </div>
     `;
   }).join('');
-  
+
   // Añadir event listeners para eliminar
   listElement.querySelectorAll('.project-file-remove').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -6062,16 +6155,16 @@ function openProjectModal(projectId = null) {
   const title = document.getElementById('project-modal-title');
   const nameInput = document.getElementById('project-name-input');
   const instructionsInput = document.getElementById('project-instructions-input');
-  
+
   if (!modal || !nameInput || !instructionsInput) return;
-  
+
   projectsState.editingProjectId = projectId;
-  
+
   if (projectId) {
     // Modo edición
     const project = projectsState.projects[projectId];
     if (!project) return;
-    
+
     title.textContent = 'Editar Proyecto';
     nameInput.value = project.name;
     instructionsInput.value = project.instructions;
@@ -6083,7 +6176,7 @@ function openProjectModal(projectId = null) {
     instructionsInput.value = '';
     projectsState.tempProjectFiles = [];
   }
-  
+
   renderProjectFiles();
   modal.style.display = 'flex';
   setTimeout(() => {
@@ -6107,18 +6200,18 @@ function closeProjectModal() {
 function saveProjectFromModal() {
   const nameInput = document.getElementById('project-name-input');
   const instructionsInput = document.getElementById('project-instructions-input');
-  
+
   if (!nameInput || !instructionsInput) return;
-  
+
   const name = nameInput.value.trim();
   const instructions = instructionsInput.value.trim();
   const files = [...projectsState.tempProjectFiles];
-  
+
   if (!name) {
     nameInput.focus();
     return;
   }
-  
+
   if (projectsState.editingProjectId) {
     // Actualizar proyecto existente
     updateProject(projectsState.editingProjectId, { name, instructions, files });
@@ -6126,7 +6219,7 @@ function saveProjectFromModal() {
     // Crear nuevo proyecto
     createProject(name, instructions, files);
   }
-  
+
   closeProjectModal();
   renderProjectsList();
   updateProjectBadge();
@@ -6135,12 +6228,12 @@ function saveProjectFromModal() {
 function openDeleteProjectModal(projectId) {
   const modal = document.getElementById('delete-project-modal');
   const nameElement = document.getElementById('delete-project-name');
-  
+
   if (!modal || !nameElement) return;
-  
+
   const project = projectsState.projects[projectId];
   if (!project) return;
-  
+
   projectsState.editingProjectId = projectId;
   nameElement.textContent = project.name;
   modal.style.display = 'flex';
@@ -6159,7 +6252,7 @@ function confirmDeleteProject() {
     deleteProject(projectsState.editingProjectId);
     renderProjectsList();
     renderConversationList();
-    
+
     // Si no hay conversación activa, crear una nueva
     if (!state.activeId || !state.conversations[state.activeId]) {
       if (state.order.length > 0) {
@@ -6174,21 +6267,23 @@ function confirmDeleteProject() {
 
 async function handleProjectFiles(files) {
   const fileArray = Array.from(files);
-  
+
   for (const file of fileArray) {
     try {
       // Límite de tamaño
       if (file.size > 50 * 1024 * 1024) {
-        alert(`El archivo ${file.name} es demasiado grande. El tamaño máximo es 50MB.`);
+        alert(window.translationManager
+          ? window.translationManager.translate('error.genericFileTooLarge', { name: file.name })
+          : `El archivo ${file.name} es demasiado grande. El tamaño máximo es 50MB.`);
         continue;
       }
-      
+
       const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       console.log(`📂 Proyecto - Procesando archivo: ${file.name} (${isPDF ? 'PDF' : 'texto'})`);
-      
+
       const content = await readFileContent(file);
       const isImage = isImageFile(file);
-      
+
       // Log de depuración para verificar el contenido extraído
       console.log(`📂 Proyecto - Archivo procesado: ${file.name}`);
       console.log(`   - Tipo: ${isImage ? 'Imagen' : (isPDF ? 'PDF' : 'Texto')}`);
@@ -6196,7 +6291,7 @@ async function handleProjectFiles(files) {
       if (!isImage && content) {
         console.log(`   - Primeros 200 chars: ${content.substring(0, 200)}...`);
       }
-      
+
       projectsState.tempProjectFiles.push({
         id: generateId('pfile'),
         name: file.name,
@@ -6207,12 +6302,14 @@ async function handleProjectFiles(files) {
       });
     } catch (error) {
       console.error(`Error al leer el archivo ${file.name}:`, error);
-      alert(`Error al leer el archivo ${file.name}: ${error.message}`);
+      alert(window.translationManager
+        ? window.translationManager.translate('error.fileReadError', { name: file.name, error: error.message })
+        : `Error al leer el archivo ${file.name}: ${error.message}`);
     }
   }
-  
+
   renderProjectFiles();
-  
+
   // Actualizar info de contexto después de añadir archivos
   if (typeof updateProjectContextInfo === 'function') {
     updateProjectContextInfo();
@@ -6223,7 +6320,7 @@ function initProjectSystem() {
   loadProjectsState();
   renderProjectsList();
   updateProjectBadge();
-  
+
   // Botón nuevo proyecto
   const newProjectBtn = document.getElementById('new-project-btn');
   if (newProjectBtn) {
@@ -6233,16 +6330,16 @@ function initProjectSystem() {
       openProjectModal();
     });
   }
-  
+
   // Modal de proyecto
   const closeProjectModalBtn = document.getElementById('close-project-modal');
   const cancelProjectBtn = document.getElementById('cancel-project');
   const saveProjectBtn = document.getElementById('save-project');
-  
+
   closeProjectModalBtn?.addEventListener('click', closeProjectModal);
   cancelProjectBtn?.addEventListener('click', closeProjectModal);
   saveProjectBtn?.addEventListener('click', saveProjectFromModal);
-  
+
   // Modal de proyecto - cerrar al hacer clic fuera
   const projectModal = document.getElementById('project-modal');
   projectModal?.addEventListener('click', (e) => {
@@ -6250,16 +6347,16 @@ function initProjectSystem() {
       closeProjectModal();
     }
   });
-  
+
   // Modal de eliminar proyecto
   const closeDeleteBtn = document.getElementById('close-delete-project-modal');
   const cancelDeleteBtn = document.getElementById('cancel-delete-project');
   const confirmDeleteBtn = document.getElementById('confirm-delete-project');
-  
+
   closeDeleteBtn?.addEventListener('click', closeDeleteProjectModal);
   cancelDeleteBtn?.addEventListener('click', closeDeleteProjectModal);
   confirmDeleteBtn?.addEventListener('click', confirmDeleteProject);
-  
+
   // Modal de eliminar - cerrar al hacer clic fuera
   const deleteModal = document.getElementById('delete-project-modal');
   deleteModal?.addEventListener('click', (e) => {
@@ -6267,36 +6364,36 @@ function initProjectSystem() {
       closeDeleteProjectModal();
     }
   });
-  
+
   // Dropzone de archivos del proyecto
   const dropzone = document.getElementById('project-files-dropzone');
   const fileInput = document.getElementById('project-file-input');
-  
+
   if (dropzone && fileInput) {
     dropzone.addEventListener('click', () => fileInput.click());
-    
+
     dropzone.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.stopPropagation();
       dropzone.classList.add('drag-over');
     });
-    
+
     dropzone.addEventListener('dragleave', (e) => {
       e.preventDefault();
       e.stopPropagation();
       dropzone.classList.remove('drag-over');
     });
-    
+
     dropzone.addEventListener('drop', (e) => {
       e.preventDefault();
       e.stopPropagation();
       dropzone.classList.remove('drag-over');
-      
+
       if (e.dataTransfer.files.length > 0) {
         handleProjectFiles(e.dataTransfer.files);
       }
     });
-    
+
     fileInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
         handleProjectFiles(e.target.files);
@@ -6304,30 +6401,30 @@ function initProjectSystem() {
       }
     });
   }
-  
+
   // Botón salir del proyecto (en chat header)
   const exitProjectBtn = document.getElementById('exit-project-btn');
   exitProjectBtn?.addEventListener('click', () => {
     setActiveProject(null);
   });
-  
+
   // Botón salir del proyecto (en empty state)
   const exitProjectBtnEmpty = document.getElementById('exit-project-btn-empty');
   exitProjectBtnEmpty?.addEventListener('click', () => {
     setActiveProject(null);
   });
-  
+
   // Si había un proyecto activo, actualizarlo
   if (projectsState.activeProjectId) {
     updateProjectBadge();
-    
+
     // Actualizar clase del chat-state
     const chatState = document.getElementById('chat-state');
     if (chatState) {
       chatState.classList.add('in-project');
     }
   }
-  
+
   // Inicializar sistema de información de contexto
   initProjectContextInfo();
 }
@@ -6381,28 +6478,28 @@ function formatTokens(tokens) {
 // Obtener información de contexto de un modelo usando la API de Ollama
 async function getModelContextInfo(modelName) {
   if (!modelName) return null;
-  
+
   // Revisar cache primero
   if (modelContextCache[modelName]) {
     return modelContextCache[modelName];
   }
-  
+
   try {
     const response = await fetch(`${API_BASE}/api/show`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: modelName })
     });
-    
+
     if (!response.ok) {
       throw new Error('No se pudo obtener información del modelo');
     }
-    
+
     const data = await response.json();
-    
+
     // Extraer num_ctx de los parámetros del modelo
     let contextLength = MODEL_CONTEXT_DEFAULTS.default;
-    
+
     // Buscar en los parámetros del modelfile
     if (data.parameters) {
       const ctxMatch = data.parameters.match(/num_ctx\s+(\d+)/i);
@@ -6410,7 +6507,7 @@ async function getModelContextInfo(modelName) {
         contextLength = parseInt(ctxMatch[1]);
       }
     }
-    
+
     // Si no se encontró, usar valores por defecto basados en el nombre del modelo
     if (contextLength === MODEL_CONTEXT_DEFAULTS.default) {
       const baseName = modelName.split(':')[0].toLowerCase();
@@ -6421,7 +6518,7 @@ async function getModelContextInfo(modelName) {
         }
       }
     }
-    
+
     // Extraer información adicional del modelo
     const info = {
       name: modelName,
@@ -6432,25 +6529,25 @@ async function getModelContextInfo(modelName) {
       template: data.template || '',
       modelfile: data.modelfile || ''
     };
-    
+
     // Guardar en cache
     modelContextCache[modelName] = info;
-    
+
     return info;
   } catch (error) {
     console.warn('Error al obtener información del modelo:', error);
-    
+
     // Devolver información por defecto
     const baseName = modelName.split(':')[0].toLowerCase();
     let defaultContext = MODEL_CONTEXT_DEFAULTS.default;
-    
+
     for (const [key, value] of Object.entries(MODEL_CONTEXT_DEFAULTS)) {
       if (baseName.includes(key)) {
         defaultContext = value;
         break;
       }
     }
-    
+
     return {
       name: modelName,
       contextLength: defaultContext,
@@ -6467,32 +6564,32 @@ async function getModelContextInfo(modelName) {
 function calculateProjectTokens(instructionsText, files) {
   let instructionsTokens = 0;
   let documentsTokens = 0;
-  
+
   // Tokens de instrucciones
   if (instructionsText) {
     // Incluir el formato del contexto
     const formattedInstructions = `══════════════════════════════════════════════════════════════\n📋 INSTRUCCIONES DEL PROYECTO: "Proyecto"\n══════════════════════════════════════════════════════════════\n\n${instructionsText}\n\n`;
     instructionsTokens = estimateTokens(formattedInstructions);
   }
-  
+
   // Tokens de documentos (solo archivos de texto, no imágenes)
   const textFiles = (files || []).filter(f => !f.isImage);
   if (textFiles.length > 0) {
     let documentContext = '=== DOCUMENTOS DEL PROYECTO (DEBES LEER Y USAR ESTE CONTENIDO) ===\n\n';
-    
+
     textFiles.forEach((file, index) => {
       documentContext += `══════════════════════════════════════════════════════════════\n`;
       documentContext += `📄 DOCUMENTO ${index + 1}: ${file.name}\n`;
       documentContext += `══════════════════════════════════════════════════════════════\n\n`;
       documentContext += `${file.content || ''}\n\n`;
     });
-    
+
     documentContext += '=== FIN DE DOCUMENTOS DEL PROYECTO ===\n\n';
     documentContext += 'IMPORTANTE: Debes seguir las instrucciones del proyecto y USAR el contenido de los documentos proporcionados para responder las preguntas del usuario. Si el usuario pregunta sobre los documentos, resume o explica lo que contienen.\n';
-    
+
     documentsTokens = estimateTokens(documentContext);
   }
-  
+
   return {
     instructions: instructionsTokens,
     documents: documentsTokens,
@@ -6505,10 +6602,10 @@ async function getAllModelsWithContext() {
   try {
     const response = await fetch(`${API_BASE}/api/tags`);
     if (!response.ok) throw new Error('Error al cargar modelos');
-    
+
     const data = await response.json();
     const models = data?.models ?? [];
-    
+
     // Obtener información de contexto para cada modelo
     const modelsWithContext = await Promise.all(
       models.map(async (model) => {
@@ -6521,10 +6618,10 @@ async function getAllModelsWithContext() {
         };
       })
     );
-    
+
     // Ordenar por contexto de mayor a menor
     modelsWithContext.sort((a, b) => b.contextLength - a.contextLength);
-    
+
     return modelsWithContext;
   } catch (error) {
     console.warn('Error al obtener modelos:', error);
@@ -6535,23 +6632,23 @@ async function getAllModelsWithContext() {
 // Formatear nombre del modelo para mostrar
 function formatModelName(modelName) {
   if (!modelName) return 'Desconocido';
-  
+
   if (modelName.includes(':')) {
     const parts = modelName.split(':');
     const baseName = parts[0];
     const tag = parts[1] || '';
-    
+
     const formattedBase = baseName.charAt(0).toUpperCase() + baseName.slice(1);
-    
+
     if (tag.includes('-')) {
       const tagParts = tag.split('-');
       const size = tagParts[0];
       return `${formattedBase} ${size.toUpperCase()}`;
     }
-    
+
     return `${formattedBase} ${tag.toUpperCase()}`;
   }
-  
+
   return modelName.charAt(0).toUpperCase() + modelName.slice(1);
 }
 
@@ -6572,13 +6669,13 @@ async function updateProjectContextInfo() {
   const suggestedModelsEl = document.getElementById('suggested-models');
   const refreshBtn = document.getElementById('context-refresh-btn');
   const contextInfoCard = document.getElementById('project-context-info');
-  
+
   if (!modelNameEl || !contextInfoCard) return;
-  
+
   // Añadir clase de loading
   refreshBtn?.classList.add('loading');
   contextInfoCard.classList.add('loading');
-  
+
   try {
     // Obtener modelo actual
     const currentModel = state.currentModel;
@@ -6587,32 +6684,32 @@ async function updateProjectContextInfo() {
       modelCapacityEl.textContent = 'Selecciona un modelo';
       return;
     }
-    
+
     // Obtener información del modelo
     const modelInfo = await getModelContextInfo(currentModel);
     const contextLength = modelInfo?.contextLength || MODEL_CONTEXT_DEFAULTS.default;
-    
+
     // Actualizar nombre y capacidad del modelo
     modelNameEl.textContent = formatModelName(currentModel);
     modelCapacityEl.textContent = `${formatTokens(contextLength)} tokens de contexto`;
-    
+
     // Obtener contenido actual del proyecto
     const instructionsInput = document.getElementById('project-instructions-input');
     const instructions = instructionsInput?.value || '';
     const files = projectsState.tempProjectFiles || [];
-    
+
     // Calcular tokens
     const tokenUsage = calculateProjectTokens(instructions, files);
     const chatReserve = 2000; // Reservar tokens para la conversación
     const totalUsed = tokenUsage.total;
     const totalWithReserve = totalUsed + chatReserve;
     const usagePercent = Math.min(100, Math.round((totalWithReserve / contextLength) * 100));
-    
+
     // Actualizar barra de uso
     usageBarFillEl.style.width = `${usagePercent}%`;
     usageUsedEl.textContent = `${formatTokens(totalUsed)} tokens usados`;
     usagePercentEl.textContent = `${usagePercent}%`;
-    
+
     // Cambiar color según el uso
     usageBarFillEl.classList.remove('warning', 'danger', 'critical');
     if (usagePercent >= 100) {
@@ -6622,23 +6719,23 @@ async function updateProjectContextInfo() {
     } else if (usagePercent >= 70) {
       usageBarFillEl.classList.add('warning');
     }
-    
+
     // Actualizar desglose
     breakdownInstructionsEl.textContent = `${formatTokens(tokenUsage.instructions)} tokens`;
     breakdownDocumentsEl.textContent = `${formatTokens(tokenUsage.documents)} tokens`;
     breakdownChatEl.textContent = `~${formatTokens(chatReserve)} tokens`;
-    
+
     // Mostrar/ocultar advertencia
     if (totalWithReserve > contextLength) {
       warningEl.style.display = 'flex';
       const excesoTokens = totalWithReserve - contextLength;
       warningTitleEl.textContent = '⚠️ Contexto excedido';
       warningMessageEl.textContent = `El contenido supera la capacidad del modelo por ${formatTokens(excesoTokens)} tokens. El modelo podría perder información o dar respuestas incompletas. Considera reducir el contenido o usar un modelo con más contexto.`;
-      
+
       // Buscar modelos alternativos
       const allModels = await getAllModelsWithContext();
       const compatibleModels = allModels.filter(m => m.contextLength >= totalWithReserve && m.name !== currentModel);
-      
+
       if (compatibleModels.length > 0) {
         suggestionEl.style.display = 'flex';
         suggestedModelsEl.innerHTML = compatibleModels.slice(0, 3).map(m => `
@@ -6647,7 +6744,7 @@ async function updateProjectContextInfo() {
             <span class="model-ctx">${formatTokens(m.contextLength)}</span>
           </button>
         `).join('');
-        
+
         // Añadir event listeners para cambiar de modelo
         suggestedModelsEl.querySelectorAll('.suggested-model-btn').forEach(btn => {
           btn.addEventListener('click', () => {
@@ -6669,7 +6766,7 @@ async function updateProjectContextInfo() {
       warningEl.style.display = 'none';
       suggestionEl.style.display = 'none';
     }
-    
+
   } catch (error) {
     console.error('Error al actualizar info de contexto:', error);
   } finally {
@@ -6681,7 +6778,7 @@ async function updateProjectContextInfo() {
 // Cambiar al modelo sugerido
 async function switchToModel(modelName) {
   state.currentModel = modelName;
-  
+
   // Actualizar selectores de modelo
   const selects = [modelSelect, modelSelectInline].filter(Boolean);
   selects.forEach(select => {
@@ -6689,9 +6786,9 @@ async function switchToModel(modelName) {
       select.value = modelName;
     }
   });
-  
+
   persistState();
-  
+
   // Actualizar info de contexto
   await updateProjectContextInfo();
 }
@@ -6703,18 +6800,18 @@ function initProjectContextInfo() {
   refreshBtn?.addEventListener('click', () => {
     updateProjectContextInfo();
   });
-  
+
   // Escuchar cambios en las instrucciones
   const instructionsInput = document.getElementById('project-instructions-input');
   let debounceTimer = null;
-  
+
   instructionsInput?.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       updateProjectContextInfo();
     }, 500);
   });
-  
+
   // Escuchar cambios en el modelo
   [modelSelect, modelSelectInline].filter(Boolean).forEach(select => {
     select?.addEventListener('change', () => {
@@ -6768,15 +6865,15 @@ function cancelDeepResearch() {
     deepResearchActiveConversationId = null;
     deepResearchStartTime = null;
     deepResearchStepTimes = [];
-    
+
     // Desactivar modo si estaba activo
     if (deepResearchMode) {
       toggleDeepResearch();
     }
-    
+
     // Restablecer estado de carga
     state.loading = false;
-    
+
     // Desbloquear inputs
     unlockInputsDuringResearch();
   }
@@ -6786,7 +6883,7 @@ function cancelDeepResearch() {
 function lockInputsDuringResearch() {
   const inputs = document.querySelectorAll('#prompt-input, #prompt-input-inline');
   const sendButtons = document.querySelectorAll('.send-button');
-  
+
   inputs.forEach(input => {
     if (input) {
       input.dataset.originalPlaceholder = input.placeholder;
@@ -6795,7 +6892,7 @@ function lockInputsDuringResearch() {
       input.classList.add('research-locked');
     }
   });
-  
+
   sendButtons.forEach(btn => {
     if (btn) {
       // Guardar contenido original y convertir en botón de detener
@@ -6831,7 +6928,7 @@ function lockInputsDuringResearch() {
 function unlockInputsDuringResearch() {
   const inputs = document.querySelectorAll('#prompt-input, #prompt-input-inline');
   const sendButtons = document.querySelectorAll('.send-button');
-  
+
   inputs.forEach(input => {
     if (input) {
       input.placeholder = input.dataset.originalPlaceholder || 'Escribe un mensaje...';
@@ -6839,7 +6936,7 @@ function unlockInputsDuringResearch() {
       input.classList.remove('research-locked');
     }
   });
-  
+
   sendButtons.forEach(btn => {
     if (btn) {
       // Restaurar contenido original del botón
@@ -6867,7 +6964,7 @@ function unlockInputsDuringResearch() {
 
 function toggleDeepResearch(button) {
   deepResearchMode = !deepResearchMode;
-  
+
   // Actualizar los toggles de modo de chat
   const toggles = document.querySelectorAll('.chat-mode-toggle');
   toggles.forEach(toggle => {
@@ -6885,6 +6982,8 @@ function toggleDeepResearch(button) {
       });
     }
   });
+
+  console.log(`🔬 Deep Research: ${deepResearchMode ? 'activado' : 'desactivado'}`);
   
   console.log(`🧠 Deep Think: ${deepResearchMode ? 'activado' : 'desactivado'}`);
 }
@@ -7285,6 +7384,7 @@ function setChatMode(mode) {
   // Actualizar estados globales
   deepResearchMode = mode === 'deep';
   studyMode = mode === 'study';
+
   webSearchMode = mode === 'web';
   
   // Actualizar todos los toggles
@@ -7306,7 +7406,7 @@ function setChatMode(mode) {
     });
     updateSliderPosition(toggle, visibleModesList);
   });
-  
+
   // Log para debugging
   const modeNames = {
     'normal': '💬 Normal',
@@ -7320,11 +7420,11 @@ function setChatMode(mode) {
 function initDeepResearch() {
   // Inicializar los toggles de modo de chat
   const toggles = document.querySelectorAll('.chat-mode-toggle');
-  
+
   toggles.forEach(toggle => {
     // Establecer modo inicial
     toggle.setAttribute('data-active-mode', 'normal');
-    
+
     // Agregar eventos a cada opción
     toggle.querySelectorAll('.chat-mode-option').forEach(option => {
       option.addEventListener('click', (e) => {
@@ -7385,24 +7485,24 @@ function createDeepResearchProgressElement() {
 function updateDeepResearchProgress(container, progress, status) {
   // Guardar estado para poder mostrar en la lista de conversaciones
   deepResearchProgressState = { progress: Math.round(progress), status };
-  
+
   // Actualizar indicador en la lista de conversaciones
   updateResearchIndicatorInList();
-  
+
   // Actualizar banner si existe (estamos en otro chat)
   updateResearchBannerProgress();
-  
+
   // Usar el contenedor pasado o el global como fallback
   let activeContainer = container || deepResearchCurrentContainer;
   if (!activeContainer) return;
-  
+
   // Si usamos el global, verificar que esté en el DOM
   if (activeContainer === deepResearchCurrentContainer && !document.body.contains(activeContainer)) return;
-  
+
   const progressFill = activeContainer.querySelector('.deep-research-progress-fill');
   const statusElement = activeContainer.querySelector('.deep-research-status');
   const percentElement = activeContainer.querySelector('.deep-research-progress-percent');
-  
+
   if (progressFill) {
     progressFill.style.width = `${progress}%`;
   }
@@ -7428,12 +7528,12 @@ function updateResearchBannerProgress() {
 // Actualizar indicador de investigación en la lista de conversaciones
 function updateResearchIndicatorInList() {
   if (!deepResearchActiveConversationId) return;
-  
+
   const conversationItem = document.querySelector(`.conversation-item[data-id="${deepResearchActiveConversationId}"]`);
   if (!conversationItem) return;
-  
+
   let indicator = conversationItem.querySelector('.research-indicator');
-  
+
   if (deepResearchProgressState) {
     if (!indicator) {
       indicator = document.createElement('span');
@@ -7453,15 +7553,15 @@ function updateResearchIndicatorInList() {
 // Mostrar banner cuando estás en otro chat y hay investigación en progreso
 function updateResearchBanner(currentConversationId) {
   const existingBanner = document.getElementById('research-progress-banner');
-  
+
   // Si hay una investigación en progreso en OTRO chat, mostrar banner
-  if (deepResearchActiveConversationId && 
-      deepResearchActiveConversationId !== currentConversationId && 
-      deepResearchProgressState) {
-    
+  if (deepResearchActiveConversationId &&
+    deepResearchActiveConversationId !== currentConversationId &&
+    deepResearchProgressState) {
+
     const researchConversation = state.conversations[deepResearchActiveConversationId];
     const title = researchConversation?.title || 'Investigación';
-    
+
     if (!existingBanner) {
       const banner = document.createElement('div');
       banner.id = 'research-progress-banner';
@@ -7482,11 +7582,11 @@ function updateResearchBanner(currentConversationId) {
           Ver progreso →
         </button>
       `;
-      
+
       banner.querySelector('.research-banner-goto').addEventListener('click', () => {
         setActiveConversation(deepResearchActiveConversationId);
       });
-      
+
       const chatMessages = document.getElementById('chat-messages') || document.getElementById('chat-messages-inline');
       if (chatMessages) {
         chatMessages.parentElement.insertBefore(banner, chatMessages);
@@ -7514,25 +7614,25 @@ function addResearchStep(container, step, isActive = false, isCompleted = false)
   } else {
     deepResearchStepsData.push(stepData);
   }
-  
+
   // Usar el contenedor pasado directamente si existe, o el global como fallback
   // Usar el contenedor pasado directamente o el global como fallback
   let activeContainer = container || deepResearchCurrentContainer;
-  
+
   // Si no hay contenedor disponible, salir
   if (!activeContainer) return;
-  
+
   // Solo verificar si está en el DOM cuando usamos el contenedor global (no se pasó container)
   // Si se pasó un container directamente, confiamos en él aunque no esté en el DOM aún
   if (!container && !document.body.contains(activeContainer)) return;
-  
+
   const stepsContainer = activeContainer.querySelector('.deep-research-steps');
   if (!stepsContainer) return;
-  
+
   // Verificar si ya existe
   const existingStep = stepsContainer.querySelector(`[data-step-id="${step.id}"]`);
   if (existingStep) return existingStep;
-  
+
   const stepElement = document.createElement('div');
   stepElement.className = `deep-research-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`;
   stepElement.dataset.stepId = step.id;
@@ -7556,17 +7656,17 @@ function updateResearchStep(container, stepId, updates) {
     if (updates.isCompleted !== undefined) deepResearchStepsData[stepIndex].isCompleted = updates.isCompleted;
     if (updates.description !== undefined) deepResearchStepsData[stepIndex].description = updates.description;
   }
-  
+
   // Usar el contenedor pasado directamente si existe, o el global como fallback
   let activeContainer = container || deepResearchCurrentContainer;
   if (!activeContainer) return;
-  
+
   // Solo verificar si está en el DOM cuando usamos el contenedor global
   if (!container && !document.body.contains(activeContainer)) return;
-  
+
   const stepElement = activeContainer.querySelector(`[data-step-id="${stepId}"]`);
   if (!stepElement) return;
-  
+
   if (updates.isActive !== undefined) {
     stepElement.classList.toggle('active', updates.isActive);
   }
@@ -7594,17 +7694,17 @@ function addFinding(container, finding) {
   if (!deepResearchFindingsData.includes(finding)) {
     deepResearchFindingsData.push(finding);
   }
-  
+
   // Usar el contenedor pasado directamente si existe, o el global como fallback
   let activeContainer = container || deepResearchCurrentContainer;
   if (!activeContainer) return;
-  
+
   // Solo verificar si está en el DOM cuando usamos el contenedor global
   if (!container && !document.body.contains(activeContainer)) return;
-  
+
   const findingsContainer = activeContainer.querySelector('.deep-research-findings');
   const findingsList = activeContainer.querySelector('.deep-research-findings-list');
-  
+
   if (findingsContainer && findingsList) {
     findingsContainer.style.display = 'block';
     const findingElement = document.createElement('div');
@@ -7620,7 +7720,7 @@ function addFinding(container, finding) {
 // Generar plan de investigación usando el modelo
 async function generateResearchPlan(userQuery, signal = null) {
   console.log('🔬 Generando plan de investigación para:', userQuery);
-  
+
   const planPrompt = `Eres un asistente de investigación experto. El usuario quiere investigar: "${userQuery}"
 
 Tu tarea es crear un plan de investigación estructurado. Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicaciones) con esta estructura exacta:
@@ -7662,10 +7762,10 @@ Genera exactamente 3 sub-preguntas que cubran los aspectos más importantes del 
     });
 
     if (!response.ok) throw new Error('Error al generar plan');
-    
+
     const data = await response.json();
     const content = data.message?.content || '';
-    
+
     // Extraer JSON del contenido
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -7673,7 +7773,7 @@ Genera exactamente 3 sub-preguntas que cubran los aspectos más importantes del 
       console.log('📋 Plan de investigación generado:', plan);
       return plan;
     }
-    
+
     throw new Error('No se pudo parsear el plan');
   } catch (error) {
     console.error('Error generando plan:', error);
@@ -7693,12 +7793,12 @@ Genera exactamente 3 sub-preguntas que cubran los aspectos más importantes del 
 // Investigar una sub-pregunta
 async function investigateSubQuestion(question, previousFindings = [], signal = null) {
   console.log('🔍 Investigando:', question);
-  
+
   let contextFromFindings = '';
   if (previousFindings.length > 0) {
     contextFromFindings = `\n\nContexto de hallazgos previos:\n${previousFindings.map((f, i) => `${i + 1}. ${f}`).join('\n')}`;
   }
-  
+
   const investigatePrompt = `Investiga la siguiente pregunta de forma detallada y estructurada:
 
 "${question}"${contextFromFindings}
@@ -7724,10 +7824,10 @@ Responde de forma directa y útil.`;
     });
 
     if (!response.ok) throw new Error('Error en investigación');
-    
+
     const data = await response.json();
     const content = data.message?.content || '';
-    
+
     return {
       question: question,
       answer: content,
@@ -7750,13 +7850,13 @@ Responde de forma directa y útil.`;
 // Extraer puntos clave de una respuesta
 function extractKeyPoints(text) {
   const points = [];
-  
+
   // Buscar puntos numerados o con viñetas
   const patterns = [
     /(?:^|\n)\s*(?:\d+[\.\)]\s*|\-\s*|\•\s*|\*\s*)([^\n]+)/g,
     /(?:^|\n)\s*(?:Punto clave|Key point|Importante|Nota):\s*([^\n]+)/gi
   ];
-  
+
   patterns.forEach(pattern => {
     let match;
     while ((match = pattern.exec(text)) !== null && points.length < 5) {
@@ -7766,22 +7866,22 @@ function extractKeyPoints(text) {
       }
     }
   });
-  
+
   // Si no encontramos puntos estructurados, extraer oraciones importantes
   if (points.length === 0) {
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 30);
     points.push(...sentences.slice(0, 3).map(s => s.trim()));
   }
-  
+
   return points.slice(0, 5);
 }
 
 // Generar preguntas de seguimiento
 async function generateFollowUpQuestions(findings, originalQuery, signal = null) {
   console.log('🔄 Generando preguntas de seguimiento...');
-  
+
   const summaryOfFindings = findings.map(f => `- ${f.question}: ${f.keyPoints.join('; ')}`).join('\n');
-  
+
   const followUpPrompt = `Basándote en la investigación realizada sobre "${originalQuery}":
 
 Hallazgos hasta ahora:
@@ -7812,15 +7912,15 @@ Si ya se ha cubierto suficiente, pon shouldContinue: false.`;
     });
 
     if (!response.ok) return { followUpQuestions: [], shouldContinue: false };
-    
+
     const data = await response.json();
     const content = data.message?.content || '';
-    
+
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
-    
+
     return { followUpQuestions: [], shouldContinue: false };
   } catch (error) {
     // Re-lanzar errores de cancelación
@@ -7835,11 +7935,11 @@ Si ya se ha cubierto suficiente, pon shouldContinue: false.`;
 // Sintetizar todos los hallazgos en un informe final
 async function synthesizeFindings(originalQuery, findings, signal = null) {
   console.log('📝 Sintetizando informe final...');
-  
-  const findingsSummary = findings.map((f, i) => 
+
+  const findingsSummary = findings.map((f, i) =>
     `## Investigación ${i + 1}: ${f.question}\n\n${f.answer}`
   ).join('\n\n---\n\n');
-  
+
   const synthesisPrompt = `Eres un experto sintetizando investigaciones. Se realizó una investigación profunda sobre: "${originalQuery}"
 
 Hallazgos de la investigación:
@@ -7868,7 +7968,7 @@ El informe debe ser comprensivo pero conciso.`;
     });
 
     if (!response.ok) throw new Error('Error en síntesis');
-    
+
     const data = await response.json();
     return data.message?.content || 'No se pudo generar el informe final.';
   } catch (error) {
@@ -7877,9 +7977,9 @@ El informe debe ser comprensivo pero conciso.`;
       throw error;
     }
     console.error('Error sintetizando:', error);
-    
+
     // Generar un informe básico con los hallazgos
-    return `# Informe de Investigación: ${originalQuery}\n\n${findings.map(f => 
+    return `# Informe de Investigación: ${originalQuery}\n\n${findings.map(f =>
       `## ${f.question}\n\n${f.answer}`
     ).join('\n\n---\n\n')}\n\n## Conclusión\n\nEsta investigación exploró múltiples aspectos del tema.`;
   }
@@ -7887,6 +7987,8 @@ El informe debe ser comprensivo pero conciso.`;
 
 // Función principal de Deep Think
 async function executeDeepResearch(userQuery, conversation) {
+  console.log('🔬 Iniciando Deep Research:', userQuery);
+
   console.log('🧠 Iniciando Deep Think:', userQuery);
   
   // Configurar control de cancelación y tiempo
@@ -7897,68 +7999,68 @@ async function executeDeepResearch(userQuery, conversation) {
   deepResearchStepsData = []; // Resetear pasos
   deepResearchFindingsData = []; // Resetear hallazgos
   const signal = deepResearchAbortController.signal;
-  
+
   // Bloquear inputs mientras investiga
   lockInputsDuringResearch();
-  
+
   // Helper para verificar si fue cancelado
   const checkCancelled = () => {
     if (signal.aborted) {
       throw new DOMException('Deep Research cancelado', 'AbortError');
     }
   };
-  
+
   // Crear mensaje del usuario
   const userMessage = createMessage('user', `Investigación profunda: ${userQuery}`);
   conversation.messages.push(userMessage);
   touchConversation(conversation.id);
-  
+
   showChatState();
   appendMessageElement(userMessage);
   updateConversationTitleFromContent(conversation);
-  
+
   // Crear mensaje del asistente con el contenedor de progreso
   const assistantMessage = createMessage('assistant', '');
   assistantMessage.isDeepResearchInProgress = true; // Marcar como Deep Research activo
   conversation.messages.push(assistantMessage);
-  
+
   // Guardar el ID del mensaje para poder restaurar el UI
   deepResearchMessageId = assistantMessage.id;
-  
+
   const { bubble } = appendMessageElement(assistantMessage);
-  
+
   // Crear y agregar el contenedor de progreso
   const progressContainer = createDeepResearchProgressElement();
   bubble.innerHTML = '';
   bubble.appendChild(progressContainer);
-  
+
   // Guardar referencia al contenedor actual
   deepResearchCurrentContainer = progressContainer;
-  
+
   // Guardar referencia para actualizar desde cualquier lugar
   const conversationId = conversation.id;
-  
+
   const findings = [];
   let iteration = 0;
   let stepsCompleted = 0;
   let totalExpectedSteps = 3; // Empezamos con 3 sub-preguntas + posibles follow-ups
-  
+
   try {
     checkCancelled();
     // Fase 1: Generar plan de investigación
     updateDeepResearchProgress(progressContainer, 5, 'Generando plan de investigación...');
     const plan = await generateResearchPlan(userQuery, signal);
-    
+
     checkCancelled(); // Verificar después del plan
-    
+
     // Actualizar total de pasos esperados
     totalExpectedSteps = plan.subQuestions.length + 2; // +2 para follow-ups y síntesis
-    
+
     // Mostrar pasos del plan
     updateDeepResearchProgress(progressContainer, 10, `Investigando: ${plan.mainQuestion}`);
-    
+
     const totalSteps = plan.subQuestions.length;
-    
+
     // Agregar pasos iniciales
     plan.subQuestions.forEach((q, i) => {
       addResearchStep(progressContainer, {
@@ -7968,133 +8070,133 @@ async function executeDeepResearch(userQuery, conversation) {
         description: q.purpose
       }, i === 0, false);
     });
-    
+
     // Fase 2: Investigar cada sub-pregunta
     for (let i = 0; i < plan.subQuestions.length && iteration < MAX_RESEARCH_ITERATIONS; i++) {
       checkCancelled(); // Verificar si fue cancelado
-      
+
       const subQ = plan.subQuestions[i];
       const stepStartTime = Date.now();
-      
+
       updateResearchStep(progressContainer, subQ.id, { isActive: true });
       const currentProgress = 10 + ((i + 1) / totalSteps) * 60;
       updateDeepResearchProgress(
-        progressContainer, 
+        progressContainer,
         currentProgress,
         `Investigando: ${subQ.question.substring(0, 50)}...`
       );
-      
+
       const result = await investigateSubQuestion(
-        subQ.question, 
+        subQ.question,
         findings.map(f => f.keyPoints).flat(),
         signal
       );
-      
+
       // Registrar tiempo del paso
       deepResearchStepTimes.push(Date.now() - stepStartTime);
       stepsCompleted++;
-      
+
       checkCancelled(); // Verificar después de cada investigación
-      
+
       findings.push(result);
-      
+
       // Agregar hallazgos clave
       result.keyPoints.slice(0, 2).forEach(point => {
         addFinding(progressContainer, point);
       });
-      
-      updateResearchStep(progressContainer, subQ.id, { 
-        isActive: false, 
+
+      updateResearchStep(progressContainer, subQ.id, {
+        isActive: false,
         isCompleted: true,
         description: `${result.keyPoints.length} puntos clave encontrados`
       });
-      
+
       iteration++;
       scrollChatToBottom();
     }
-    
+
     // Fase 2.5: Preguntas de seguimiento (opcional)
     if (iteration < MAX_RESEARCH_ITERATIONS) {
       checkCancelled();
       updateDeepResearchProgress(progressContainer, 75, 'Evaluando si se necesita más investigación...');
-      
+
       const followUp = await generateFollowUpQuestions(findings, userQuery, signal);
-      
+
       checkCancelled();
-      
+
       if (followUp.shouldContinue && followUp.followUpQuestions.length > 0) {
         const additionalQuestions = followUp.followUpQuestions.slice(0, MAX_FOLLOW_UP_QUESTIONS);
         totalExpectedSteps += additionalQuestions.length; // Actualizar total
-        
+
         for (let i = 0; i < additionalQuestions.length && iteration < MAX_RESEARCH_ITERATIONS; i++) {
           checkCancelled(); // Verificar si fue cancelado
-          
+
           const fq = additionalQuestions[i];
           const stepStartTime = Date.now();
-          
+
           addResearchStep(progressContainer, {
             id: fq.id,
             number: findings.length + 1,
             title: fq.question,
             description: 'Pregunta de seguimiento'
           }, true, false);
-          
+
           const currentProgress = 75 + ((i + 1) / additionalQuestions.length) * 15;
           updateDeepResearchProgress(
-            progressContainer, 
+            progressContainer,
             currentProgress,
             `Profundizando: ${fq.question.substring(0, 40)}...`
           );
-          
+
           const result = await investigateSubQuestion(
             fq.question,
             findings.map(f => f.keyPoints).flat(),
             signal
           );
-          
+
           // Registrar tiempo del paso
           deepResearchStepTimes.push(Date.now() - stepStartTime);
           stepsCompleted++;
-          
+
           checkCancelled(); // Verificar después de cada investigación
-          
+
           findings.push(result);
-          
+
           result.keyPoints.slice(0, 2).forEach(point => {
             addFinding(progressContainer, point);
           });
-          
-          updateResearchStep(progressContainer, fq.id, { 
-            isActive: false, 
-            isCompleted: true 
+
+          updateResearchStep(progressContainer, fq.id, {
+            isActive: false,
+            isCompleted: true
           });
-          
+
           iteration++;
           scrollChatToBottom();
         }
       }
     }
-    
+
     // Fase 3: Sintetizar resultados
     checkCancelled();
     updateDeepResearchProgress(progressContainer, 90, 'Generando informe final...');
-    
+
     const finalReport = await synthesizeFindings(userQuery, findings, signal);
-    
+
     checkCancelled();
-    
+
     // Calcular tiempo total
     const totalTime = Date.now() - deepResearchStartTime;
     const totalMinutes = Math.floor(totalTime / 60000);
     const totalSeconds = Math.floor((totalTime % 60000) / 1000);
     const timeString = totalMinutes > 0 ? `${totalMinutes}m ${totalSeconds}s` : `${totalSeconds}s`;
-    
+
     // Actualizar el mensaje con el informe final
     updateDeepResearchProgress(progressContainer, 100, `✅ Completado en ${timeString}`);
-    
+
     // Guardar el ID de la conversación actual para verificar después
     const currentConversationId = conversation.id;
-    
+
     // IMPORTANTE: Guardar los datos del mensaje INMEDIATAMENTE (antes de limpiar variables globales)
     // Quitar el flag de investigación en progreso
     assistantMessage.isDeepResearchInProgress = false;
@@ -8106,7 +8208,7 @@ async function executeDeepResearch(userQuery, conversation) {
     };
     conversation.updatedAt = Date.now();
     persistState();
-    
+
     // Función para renderizar el informe final en el bubble
     const renderFinalReport = () => {
       // Si el usuario cambió de chat, re-renderizar se hará cuando vuelva (por appendMessageElement)
@@ -8115,14 +8217,14 @@ async function executeDeepResearch(userQuery, conversation) {
         renderConversationList();
         return;
       }
-      
+
       // Si el bubble ya no existe en el DOM, re-renderizar la conversación completa
       if (!bubble || !document.body.contains(bubble)) {
         console.log('🔬 Re-renderizando conversación con informe completado');
         renderActiveConversation();
         return;
       }
-      
+
       // El usuario sigue en el chat y el bubble existe, actualizar directamente
       bubble.innerHTML = `
         <div class="deep-research-report">
@@ -8137,11 +8239,11 @@ async function executeDeepResearch(userQuery, conversation) {
         </div>
         ${parseMarkdown(finalReport)}
       `;
-      
+
       // Agregar contenedor de copiar
       const copyContainer = document.createElement('div');
       copyContainer.className = 'copy-message-container';
-      
+
       const copyButton = document.createElement('button');
       copyButton.className = 'copy-message-btn';
       copyButton.title = 'Copiar informe';
@@ -8149,37 +8251,37 @@ async function executeDeepResearch(userQuery, conversation) {
       copyButton.addEventListener('click', async () => {
         await copyToClipboard(finalReport, copyButton);
       });
-      
+
       const timeElement = document.createElement('span');
       timeElement.className = 'message-time';
       timeElement.textContent = formatTime(Date.now());
-      
+
       copyContainer.appendChild(copyButton);
       copyContainer.appendChild(timeElement);
       bubble.appendChild(copyContainer);
-      
+
       // Renderizar matemáticas
       if (typeof renderMathInElement !== 'undefined') {
         renderMathInElement(bubble, {
           delimiters: [
-            {left: '$$', right: '$$', display: true},
-            {left: '$', right: '$', display: false}
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false }
           ],
           throwOnError: false
         });
       }
-      
+
       renderConversationList();
       scrollChatToBottom();
     };
-    
+
     // Mostrar el informe después de un breve momento para que el usuario vea "Completado"
     setTimeout(renderFinalReport, 1500);
-    
+
   } catch (error) {
     // Quitar el flag de investigación en progreso
     assistantMessage.isDeepResearchInProgress = false;
-    
+
     // Manejar cancelación de forma silenciosa
     if (error.name === 'AbortError') {
       console.log('🛑 Deep Research cancelado por el usuario');
@@ -8208,18 +8310,18 @@ async function executeDeepResearch(userQuery, conversation) {
     deepResearchStepsData = [];
     deepResearchFindingsData = [];
     unlockInputsDuringResearch();
-    
+
     // Limpiar indicadores visuales
     document.querySelectorAll('.research-indicator').forEach(el => el.remove());
     const banner = document.getElementById('research-progress-banner');
     if (banner) banner.remove();
   }
-  
+
   // Desactivar modo Deep Research después de completar
   if (deepResearchMode) {
     toggleDeepResearch();
   }
-  
+
   return findings;
 }
 
@@ -8235,16 +8337,16 @@ async function handleSubmitWithDeepResearch(event) {
     const isEmptyState = emptyState?.style.display !== 'none';
     const activeInput = isEmptyState ? promptInput : promptInputInline;
     const prompt = activeInput?.value.trim();
-    
+
     if (!prompt) return;
-    
+
     const conversation = state.conversations[state.activeId];
     if (!conversation) return;
-    
+
     state.loading = true;
     activeInput.value = '';
     autoResizeTextarea(activeInput);
-    
+
     try {
       await executeDeepResearch(prompt, conversation);
     } catch (error) {
@@ -8252,9 +8354,10 @@ async function handleSubmitWithDeepResearch(event) {
     } finally {
       state.loading = false;
     }
-    
+
     return;
   }
+
   
   // Si el modo web está activo, buscar en internet primero con UI visual
   if (webSearchMode) {
@@ -8389,7 +8492,7 @@ async function handleSubmitWithDeepResearch(event) {
   } else {
     window._studyModeActive = false;
   }
-  
+
   // Si no, usar el flujo normal
   return originalHandleSubmit.call(this, event);
 }
@@ -8735,7 +8838,7 @@ function initScreenOverlay() {
   // Toggle buttons
   screenOverlayToggle?.addEventListener('click', toggleScreenOverlay);
   screenOverlayToggleEmpty?.addEventListener('click', toggleScreenOverlay);
-  
+
   // Panel buttons
   screenOverlayCaptureBtn?.addEventListener('click', captureScreen);
   screenOverlayMinimizeBtn?.addEventListener('click', minimizeScreenOverlay);
@@ -8743,10 +8846,10 @@ function initScreenOverlay() {
   screenOverlayRestoreBtn?.addEventListener('click', restoreScreenOverlay);
   screenOverlayClearCaptureBtn?.addEventListener('click', clearScreenCapture);
   screenOverlayPopoutBtn?.addEventListener('click', popoutScreenOverlay);
-  
+
   // Send button
   screenOverlaySendBtn?.addEventListener('click', sendScreenOverlayMessage);
-  
+
   // Input handling
   screenOverlayInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -8754,11 +8857,11 @@ function initScreenOverlay() {
       sendScreenOverlayMessage();
     }
   });
-  
+
   screenOverlayInput?.addEventListener('input', () => {
     autoResizeOverlayTextarea();
   });
-  
+
   // Dragging functionality
   const header = document.querySelector('.screen-overlay-header');
   if (header && screenOverlayPanel) {
@@ -8766,7 +8869,7 @@ function initScreenOverlay() {
     document.addEventListener('mousemove', handleDragging);
     document.addEventListener('mouseup', stopDragging);
   }
-  
+
   // Keyboard shortcut for capture
   document.addEventListener('keydown', (e) => {
     // Ctrl+Shift+S para capturar cuando el overlay está activo
@@ -8779,7 +8882,7 @@ function initScreenOverlay() {
       closeScreenOverlay();
     }
   });
-  
+
   // Sync models
   syncOverlayModels();
 }
@@ -8787,11 +8890,11 @@ function initScreenOverlay() {
 // Sincronizar modelos con el selector principal
 function syncOverlayModels() {
   if (!screenOverlayModelSelect || !modelSelect) return;
-  
+
   // Copiar opciones del selector principal
   screenOverlayModelSelect.innerHTML = modelSelect.innerHTML;
   screenOverlayModelSelect.value = modelSelect.value;
-  
+
   // Mantener sincronizado
   screenOverlayModelSelect.addEventListener('change', (e) => {
     state.currentModel = e.target.value;
@@ -8813,10 +8916,10 @@ function toggleScreenOverlay() {
 // Abrir Screen Overlay
 async function openScreenOverlay() {
   screenOverlayActive = true;
-  
+
   // Sincronizar modelos antes de mostrar
   syncOverlayModels();
-  
+
   // Mostrar el overlay
   if (screenOverlayContainer) {
     screenOverlayContainer.style.display = 'block';
@@ -8827,21 +8930,21 @@ async function openScreenOverlay() {
   if (screenOverlayMinimized) {
     screenOverlayMinimized.style.display = 'none';
   }
-  
+
   // Actualizar botones
   [screenOverlayToggle, screenOverlayToggleEmpty].forEach(btn => {
     if (btn) btn.classList.add('active');
   });
-  
+
   // Limpiar mensajes anteriores
   screenOverlayMessages = [];
   renderOverlayMessages();
-  
+
   // Enfocar input
   setTimeout(() => {
     screenOverlayInput?.focus();
   }, 100);
-  
+
   // Mostrar notificación de instrucciones
   showScreenCaptureNotification('Modo Overlay activado - Captura tu pantalla para empezar');
 }
@@ -8849,21 +8952,21 @@ async function openScreenOverlay() {
 // Cerrar Screen Overlay
 function closeScreenOverlay() {
   screenOverlayActive = false;
-  
+
   // Detener cualquier stream de pantalla
   if (screenOverlayStream) {
     screenOverlayStream.getTracks().forEach(track => track.stop());
     screenOverlayStream = null;
   }
-  
+
   // Ocultar overlay
   if (screenOverlayContainer) {
     screenOverlayContainer.style.display = 'none';
   }
-  
+
   // Limpiar captura
   clearScreenCapture();
-  
+
   // Actualizar botones
   [screenOverlayToggle, screenOverlayToggleEmpty].forEach(btn => {
     if (btn) btn.classList.remove('active');
@@ -8877,13 +8980,13 @@ function popoutScreenOverlay() {
     screenOverlayPopupWindow.focus();
     return;
   }
-  
+
   // Calcular tamaño y posición de la ventana
   const width = 400;
   const height = 550;
   const left = window.screen.width - width - 50;
   const top = 100;
-  
+
   // Características de la ventana
   const features = [
     `width=${width}`,
@@ -8897,24 +9000,24 @@ function popoutScreenOverlay() {
     'toolbar=no',
     'location=no'
   ].join(',');
-  
+
   // Abrir la ventana popup
   screenOverlayPopupWindow = window.open('overlay-popup.html', 'OllamaOverlay', features);
-  
+
   if (screenOverlayPopupWindow) {
     // Cerrar el overlay dentro de la app principal
     closeScreenOverlay();
-    
+
     // Escuchar mensajes de la ventana popup
     window.addEventListener('message', handlePopupMessage);
-    
+
     // Enviar el modelo actual cuando la ventana esté lista
     screenOverlayPopupWindow.addEventListener('load', () => {
       if (state.currentModel) {
         screenOverlayPopupWindow.postMessage({ type: 'setModel', model: state.currentModel }, '*');
       }
     });
-    
+
     // Monitorear si la ventana se cierra
     const checkPopup = setInterval(() => {
       if (screenOverlayPopupWindow && screenOverlayPopupWindow.closed) {
@@ -8923,7 +9026,7 @@ function popoutScreenOverlay() {
         window.removeEventListener('message', handlePopupMessage);
       }
     }, 500);
-    
+
     // Notificación
     showScreenCaptureNotification('Chat abierto en ventana flotante - Siempre visible');
   } else {
@@ -8935,7 +9038,7 @@ function popoutScreenOverlay() {
 // Manejar mensajes del popup
 function handlePopupMessage(event) {
   const data = event.data;
-  
+
   if (data.type === 'getModel') {
     // El popup solicita el modelo actual
     if (screenOverlayPopupWindow && !screenOverlayPopupWindow.closed && state.currentModel) {
@@ -8971,7 +9074,7 @@ function restoreScreenOverlay() {
   if (screenOverlayMinimized) {
     screenOverlayMinimized.style.display = 'none';
   }
-  
+
   // Enfocar input
   setTimeout(() => {
     screenOverlayInput?.focus();
@@ -8985,18 +9088,18 @@ async function captureScreen() {
     if (screenOverlayCaptureBtn) {
       screenOverlayCaptureBtn.classList.add('capturing');
     }
-    
+
     // OCULTAR COMPLETAMENTE el panel antes de capturar
     const panelOriginalDisplay = screenOverlayPanel?.style.display;
     const containerOriginalDisplay = screenOverlayContainer?.style.display;
-    
+
     if (screenOverlayPanel) {
       screenOverlayPanel.style.display = 'none';
     }
-    
+
     // Pequeña espera para asegurar que el panel esté oculto
     await new Promise(resolve => setTimeout(resolve, 50));
-    
+
     // Crear un indicador visual de que estamos en modo captura
     const captureIndicator = document.createElement('div');
     captureIndicator.className = 'capture-mode-indicator';
@@ -9010,7 +9113,7 @@ async function captureScreen() {
       </div>
     `;
     document.body.appendChild(captureIndicator);
-    
+
     try {
       // Solicitar captura de pantalla - el usuario selecciona qué capturar
       const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -9023,62 +9126,62 @@ async function captureScreen() {
         selfBrowserSurface: 'exclude', // Excluir la pestaña actual si es posible
         systemAudio: 'exclude'
       });
-      
+
       // Quitar indicador
       captureIndicator.remove();
-      
+
       // Capturar un frame INSTANTÁNEAMENTE
       const track = stream.getVideoTracks()[0];
       const imageCapture = new ImageCapture(track);
       const bitmap = await imageCapture.grabFrame();
-      
+
       // DETENER INMEDIATAMENTE - no seguir grabando
       stream.getTracks().forEach(track => track.stop());
-      
+
       // Convertir a canvas
       const canvas = document.createElement('canvas');
       canvas.width = bitmap.width;
       canvas.height = bitmap.height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(bitmap, 0, 0);
-      
+
       // Convertir a base64
       screenOverlayCapture = canvas.toDataURL('image/png');
-      
+
       // Restaurar panel
       if (screenOverlayPanel) {
         screenOverlayPanel.style.display = 'flex';
       }
-      
+
       // Mostrar preview
       if (screenOverlayPreview && screenOverlayPreviewImg) {
         screenOverlayPreviewImg.src = screenOverlayCapture;
         screenOverlayPreview.style.display = 'block';
       }
-      
+
       // Efecto flash
       showCaptureFlash();
-      
+
       // Notificación
       showScreenCaptureNotification('📸 ¡Captura lista! Escribe tu pregunta');
-      
+
       // Enfocar input
       screenOverlayInput?.focus();
-      
+
     } catch (innerError) {
       // El usuario canceló o hubo error - quitar indicador y restaurar
       captureIndicator.remove();
       throw innerError;
     }
-    
+
   } catch (error) {
     console.error('Error al capturar pantalla:', error);
-    
+
     // Restaurar panel
     if (screenOverlayPanel) {
       screenOverlayPanel.style.display = 'flex';
     }
-    
+
     if (error.name !== 'NotAllowedError') {
       showScreenCaptureNotification('Error al capturar - Inténtalo de nuevo');
     }
@@ -9106,7 +9209,7 @@ function showCaptureFlash() {
   const flash = document.createElement('div');
   flash.className = 'screen-capture-flash';
   document.body.appendChild(flash);
-  
+
   setTimeout(() => {
     flash.remove();
   }, 300);
@@ -9117,7 +9220,7 @@ function showScreenCaptureNotification(message) {
   // Remover notificación existente
   const existing = document.querySelector('.screen-capture-notification');
   if (existing) existing.remove();
-  
+
   const notification = document.createElement('div');
   notification.className = 'screen-capture-notification';
   notification.innerHTML = `
@@ -9127,9 +9230,9 @@ function showScreenCaptureNotification(message) {
     </svg>
     <span>${escapeHtml(message)}</span>
   `;
-  
+
   document.body.appendChild(notification);
-  
+
   setTimeout(() => {
     notification.style.opacity = '0';
     notification.style.transform = 'translateX(-50%) translateY(20px)';
@@ -9141,13 +9244,13 @@ function showScreenCaptureNotification(message) {
 async function sendScreenOverlayMessage() {
   const prompt = screenOverlayInput?.value.trim();
   if (!prompt && !screenOverlayCapture) return;
-  
+
   // Verificar que hay un modelo seleccionado
   if (!state.currentModel) {
     showScreenCaptureNotification('Selecciona un modelo primero');
     return;
   }
-  
+
   // Añadir mensaje del usuario
   const userMessage = {
     role: 'user',
@@ -9156,44 +9259,44 @@ async function sendScreenOverlayMessage() {
     timestamp: Date.now()
   };
   screenOverlayMessages.push(userMessage);
-  
+
   // Limpiar input
   if (screenOverlayInput) {
     screenOverlayInput.value = '';
     autoResizeOverlayTextarea();
   }
-  
+
   // Guardar la captura y limpiarla de la preview
   const capturedImage = screenOverlayCapture;
   clearScreenCapture();
-  
+
   // Renderizar mensajes
   renderOverlayMessages();
   scrollOverlayToBottom();
-  
+
   // Mostrar loading
   showOverlayLoading();
-  
+
   // Deshabilitar envío mientras procesa
   if (screenOverlaySendBtn) screenOverlaySendBtn.disabled = true;
-  
+
   try {
     // Preparar mensajes para la API
     const apiMessages = [];
-    
+
     // Añadir contexto del sistema
     apiMessages.push({
       role: 'system',
       content: 'Eres un asistente visual experto. El usuario te enviará capturas de pantalla y preguntas sobre lo que ve. Responde de manera concisa pero completa, describiendo y analizando lo que se muestra en las imágenes.'
     });
-    
+
     // Construir historial de mensajes
     screenOverlayMessages.forEach(msg => {
       const apiMsg = {
         role: msg.role,
         content: msg.content
       };
-      
+
       // Si hay imagen, añadirla
       if (msg.image && msg.role === 'user') {
         // Extraer solo la parte base64
@@ -9202,10 +9305,10 @@ async function sendScreenOverlayMessage() {
           apiMsg.images = [base64Part];
         }
       }
-      
+
       apiMessages.push(apiMsg);
     });
-    
+
     // Hacer la petición
     const response = await fetch(`${API_BASE}/api/chat`, {
       method: 'POST',
@@ -9219,17 +9322,17 @@ async function sendScreenOverlayMessage() {
         }
       })
     });
-    
+
     if (!response.ok) {
       throw new Error(`Error: ${response.statusText}`);
     }
-    
+
     // Procesar stream
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
     let assistantContent = '';
-    
+
     // Añadir mensaje del asistente vacío
     const assistantMessage = {
       role: 'assistant',
@@ -9237,31 +9340,31 @@ async function sendScreenOverlayMessage() {
       timestamp: Date.now()
     };
     screenOverlayMessages.push(assistantMessage);
-    
+
     // Ocultar loading
     hideOverlayLoading();
-    
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      
+
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop() ?? '';
-      
+
       for (const line of lines) {
         if (!line.trim()) continue;
-        
+
         try {
           const parsed = JSON.parse(line);
-          
+
           if (parsed.message?.content) {
             assistantContent += parsed.message.content;
             assistantMessage.content = assistantContent;
             renderOverlayMessages();
             scrollOverlayToBottom();
           }
-          
+
           if (parsed.done) {
             break;
           }
@@ -9270,21 +9373,21 @@ async function sendScreenOverlayMessage() {
         }
       }
     }
-    
+
     // Actualizar estadísticas
     trackModelUsage(state.currentModel);
     trackDailyMessage();
-    
+
   } catch (error) {
     console.error('Error en overlay chat:', error);
-    
+
     // Añadir mensaje de error
     screenOverlayMessages.push({
       role: 'assistant',
       content: `⚠️ Error: ${error.message}`,
       timestamp: Date.now()
     });
-    
+
     hideOverlayLoading();
     renderOverlayMessages();
   } finally {
@@ -9296,7 +9399,7 @@ async function sendScreenOverlayMessage() {
 // Renderizar mensajes del overlay
 function renderOverlayMessages() {
   if (!screenOverlayMessagesContainer) return;
-  
+
   if (screenOverlayMessages.length === 0) {
     screenOverlayMessagesContainer.innerHTML = `
       <div class="screen-overlay-empty">
@@ -9311,38 +9414,38 @@ function renderOverlayMessages() {
     `;
     return;
   }
-  
+
   let html = '';
-  
+
   screenOverlayMessages.forEach(msg => {
     const time = formatTime(msg.timestamp);
     const isUser = msg.role === 'user';
-    
+
     html += `<div class="screen-overlay-message ${msg.role}">`;
-    
+
     // Si es mensaje del usuario con imagen
     if (isUser && msg.image) {
       html += `<img class="screen-overlay-message-image" src="${msg.image}" alt="Captura"/>`;
     }
-    
+
     // Contenido del mensaje
     const content = isUser ? escapeHtml(msg.content) : parseMarkdown(msg.content);
     html += `<div class="screen-overlay-message-content">${content}</div>`;
-    
+
     // Hora
     html += `<span class="screen-overlay-message-time">${time}</span>`;
-    
+
     html += '</div>';
   });
-  
+
   screenOverlayMessagesContainer.innerHTML = html;
-  
+
   // Renderizar matemáticas
   if (typeof renderMathInElement !== 'undefined') {
     renderMathInElement(screenOverlayMessagesContainer, {
       delimiters: [
-        {left: '$$', right: '$$', display: true},
-        {left: '$', right: '$', display: false}
+        { left: '$$', right: '$$', display: true },
+        { left: '$', right: '$', display: false }
       ],
       throwOnError: false
     });
@@ -9389,28 +9492,28 @@ function autoResizeOverlayTextarea() {
 // Dragging del panel
 function startDragging(e) {
   if (e.target.closest('.screen-overlay-btn')) return;
-  
+
   screenOverlayDragging = true;
   const rect = screenOverlayPanel.getBoundingClientRect();
   screenOverlayDragOffset = {
     x: e.clientX - rect.left,
     y: e.clientY - rect.top
   };
-  
+
   screenOverlayPanel.style.cursor = 'grabbing';
   e.preventDefault();
 }
 
 function handleDragging(e) {
   if (!screenOverlayDragging || !screenOverlayPanel) return;
-  
+
   const x = e.clientX - screenOverlayDragOffset.x;
   const y = e.clientY - screenOverlayDragOffset.y;
-  
+
   // Limitar a la ventana
   const maxX = window.innerWidth - screenOverlayPanel.offsetWidth;
   const maxY = window.innerHeight - screenOverlayPanel.offsetHeight;
-  
+
   screenOverlayPanel.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
   screenOverlayPanel.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
   screenOverlayPanel.style.right = 'auto';
@@ -9426,9 +9529,87 @@ function stopDragging() {
 
 // También inicializar después de cargar modelos
 const originalLoadModels = loadModels;
-loadModels = async function() {
+loadModels = async function () {
   await originalLoadModels.call(this);
   syncOverlayModels();
 };
 
 
+
+// Initialize translation system
+async function initTranslationSystem() {
+  if (window.translationManager) {
+    await window.translationManager.init();
+    initializeLanguageSelector();
+
+    // Subscribe to language changes
+    window.translationManager.subscribe(lang => {
+      updateDynamicContent(lang);
+    });
+
+    // Force initial update of dynamic content (greeting, conversation list)
+    // This ensures they match the loaded language, not just the default 'es'
+    updateDynamicContent(window.translationManager.currentLang);
+  }
+}
+
+// Initialize language selector UI
+function initializeLanguageSelector() {
+  const languageButtons = document.querySelectorAll('.language-button');
+  const languageOptions = document.querySelectorAll('.language-option');
+
+  // Toggle menu
+  languageButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = btn.nextElementSibling;
+      const isVisible = menu.style.display === 'flex';
+
+      // Close all menus first
+      document.querySelectorAll('.language-menu').forEach(m => m.style.display = 'none');
+
+      if (!isVisible) {
+        menu.style.display = 'flex';
+      }
+    });
+  });
+
+  // Close on click outside
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.language-menu').forEach(m => m.style.display = 'none');
+  });
+
+  // Select language
+  languageOptions.forEach(option => {
+    option.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const lang = option.getAttribute('data-lang');
+      // Close menus immediately
+      document.querySelectorAll('.language-menu').forEach(m => m.style.display = 'none');
+
+      if (window.translationManager) {
+        await window.translationManager.setLanguage(lang);
+      }
+    });
+  });
+}
+
+// Update dynamic content on language change
+function updateDynamicContent(lang) {
+  // Forzar re-renderizado para aplicar el nuevo idioma a los títulos predeterminados
+  // renderActiveConversation maneja la lógica de traducción
+  if (state.activeId) {
+    renderActiveConversation();
+  }
+
+  // Re-render conversation list to update relative times
+  renderConversationList();
+
+  // Update greeting with new language
+  updateUserNameDisplay();
+
+  // Update projects list (empty state text)
+  if (typeof renderProjectsList === 'function') {
+    renderProjectsList();
+  }
+}
