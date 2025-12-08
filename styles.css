@@ -1849,6 +1849,133 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   font-weight: 500;
 }
 
+.native-model-select-hidden {
+  position: absolute;
+  left: -9999px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.model-select-display {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.05); /* similar transparencia que chat-mode-toggle */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  position: relative;
+  z-index: 2;
+}
+
+.model-select-display:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
+}
+
+.model-select-display:focus-visible {
+  outline: 2px solid var(--theme-primary-alpha-30);
+  outline-offset: 2px;
+}
+
+.model-select-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-select-arrow {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.model-select-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 220px;
+  width: max-content;
+  /* Fondo claro translúcido para evitar el negro */
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 6px;
+  display: none;
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 110;
+}
+
+.model-select-dropdown.open {
+  display: block;
+  animation: fadeIn 0.12s ease;
+}
+
+.model-select-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-select-item:not(:last-child) {
+  margin-bottom: 2px;
+}
+
+.model-select-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.model-select-item.active {
+  background: rgba(var(--theme-primary-rgb, 217, 119, 87), 0.12);
+  border: 1px solid rgba(var(--theme-primary-rgb, 217, 119, 87), 0.35);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(var(--theme-primary-rgb, 217, 119, 87), 0.25);
+}
+
+.model-select-dropdown::-webkit-scrollbar {
+  width: 8px;
+}
+.model-select-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+.model-select-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+.model-select-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 /* Mejorar la apariencia del dropdown en diferentes navegadores */
 .model-select::-ms-expand {
   display: none;
@@ -7098,4 +7225,245 @@ button.research-active-btn svg {
 /* Hacer el contenedor de botones relativo para el popup */
 .copy-message-container {
   position: relative;
+}
+
+/* ===========================
+   Canvas Mode - Estilo Claude
+   =========================== */
+body.canvas-visible .main-column {
+  display: grid;
+  grid-template-columns: 1fr 550px;
+  gap: 16px;
+  padding-right: 12px;
+}
+
+body.canvas-visible #canvas-panel {
+  display: flex;
+}
+
+body.canvas-visible #chat-state {
+  display: flex;
+}
+
+body.canvas-visible #empty-state {
+  grid-column: 1 / -1;
+}
+
+#canvas-panel {
+  display: none;
+  flex-direction: column;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0;
+  height: fit-content;
+  max-height: calc(100vh - 40px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  position: sticky;
+  top: 20px;
+  overflow: hidden;
+}
+
+.canvas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px 12px 0 0;
+}
+
+.canvas-title-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #f5f5f5;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 4px 0;
+  outline: none;
+}
+
+.canvas-title-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.canvas-close-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.canvas-close-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.canvas-editor {
+  background: #1a1a1a;
+  border: none;
+  min-height: 400px;
+  max-height: calc(85vh - 80px);
+  padding: 24px;
+  color: #f5f5f5;
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.6;
+  outline: none;
+  border-radius: 0 0 12px 12px;
+}
+
+.canvas-editor::-webkit-scrollbar {
+  width: 8px;
+}
+
+.canvas-editor::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.canvas-editor::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.canvas-editor::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Estilos para el contenido del editor */
+.canvas-editor h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 24px 0 16px;
+  color: #fff;
+}
+
+.canvas-editor h2 {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 20px 0 12px;
+  color: #fff;
+}
+
+.canvas-editor h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 16px 0 10px;
+  color: #f5f5f5;
+}
+
+.canvas-editor p {
+  margin: 12px 0;
+}
+
+.canvas-editor ul, .canvas-editor ol {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.canvas-editor li {
+  margin: 6px 0;
+}
+
+.canvas-editor code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+}
+
+.canvas-editor pre {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 16px 0;
+}
+
+.canvas-editor pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* Tarjeta de artifact en el chat */
+.artifact-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 16px;
+  margin: 12px 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.artifact-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.artifact-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.artifact-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--theme-primary);
+  flex-shrink: 0;
+}
+
+.artifact-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  flex: 1;
+}
+
+.artifact-preview {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  line-height: 1.5;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.artifact-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--theme-primary);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 10px;
+}
+
+.artifact-action svg {
+  width: 16px;
+  height: 16px;
+}
+
+
+.canvas-card-content {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  overflow: hidden;
 }

@@ -219,6 +219,13 @@
                       <span class="chip-text">Normal</span>
                     </span>
                   </label>
+                  <label class="chat-mode-chip" data-mode="canvas">
+                    <input type="checkbox" id="mode-canvas-visible" data-mode="canvas" checked>
+                    <span class="chip-content">
+                      <span class="chip-icon">📝</span>
+                      <span class="chip-text">Canvas</span>
+                    </span>
+                  </label>
                   <label class="chat-mode-chip" data-mode="web">
                     <input type="checkbox" id="mode-web-visible" data-mode="web" checked>
                     <span class="chip-content">
@@ -765,6 +772,12 @@
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                       </svg>
                     </button>
+                      <button type="button" class="chat-mode-option" data-mode="canvas" title="Modo Canvas - Documentos">
+                      <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+                          <path d="M8 8h8M8 12h5M8 16h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                      </svg>
+                    </button>
                       <button type="button" class="chat-mode-option" data-mode="web" title="Modo Web - Búsqueda en internet">
                       <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
@@ -861,6 +874,9 @@
         </header>
         <main class="chat-area" aria-live="polite">
           <ul id="chat-list" class="chat-list"></ul>
+          <div id="canvas-feed" class="canvas-feed" style="display: none;">
+            <div class="canvas-feed-list" id="canvas-feed-list"></div>
+          </div>
         </main>
         <footer class="composer">
           <div id="file-drop-area-inline" class="file-drop-area">
@@ -885,6 +901,12 @@
                       <button type="button" class="chat-mode-option active" data-mode="normal" title="Modo Normal - Respuestas rápidas">
                       <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </button>
+                      <button type="button" class="chat-mode-option" data-mode="canvas" title="Modo Canvas - Documentos">
+                      <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+                          <path d="M8 8h8M8 12h5M8 16h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                       </svg>
                     </button>
                       <button type="button" class="chat-mode-option" data-mode="web" title="Modo Web - Búsqueda en internet">
@@ -924,6 +946,21 @@
             </div>
           </form>
         </footer>
+      </div>
+
+      <!-- Panel Canvas -->
+      <div id="canvas-panel" class="canvas-panel" style="display: none;">
+        <header class="canvas-header">
+          <input id="canvas-title-input" class="canvas-title-input" type="text" placeholder="Sin título" />
+          <button id="canvas-close-btn" class="canvas-close-btn" title="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </header>
+
+        <div id="canvas-editor" class="canvas-editor" aria-label="Editor de contenido" contenteditable="true"></div>
       </div>
     </div>
   </div>
@@ -1008,6 +1045,28 @@
             <circle cx="12" cy="10" r="3"/>
         </svg>
       </button>
+    </div>
+  </div>
+
+  <!-- Modal de exportación Canvas -->
+  <div id="canvas-export-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content modal-content-small">
+      <div class="modal-header">
+        <h3>Exportar documento</h3>
+        <button class="modal-close" id="close-canvas-export-modal">×</button>
+      </div>
+      <div class="modal-body">
+        <p>Selecciona el formato de exportación:</p>
+        <div class="export-buttons">
+          <button class="modal-button primary" data-export="md">Markdown</button>
+          <button class="modal-button primary" data-export="html">HTML</button>
+          <button class="modal-button primary" data-export="pdf">PDF</button>
+          <button class="modal-button primary" data-export="docx">Word (.docx)</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-button secondary" id="cancel-canvas-export">Cerrar</button>
+      </div>
     </div>
   </div>
 

@@ -3,6 +3,8 @@ const STORAGE_KEY = 'ollama-web-state-v1';
 const DEFAULT_TITLE = 'Nueva conversación';
 const BACKGROUND_STORAGE_KEY = 'ollama-web-background-date';
 const DYSLEXIC_FONT_KEY = 'ollama-web-dyslexic-font';
+const CANVAS_STORAGE_KEY = 'ollama-web-canvas-v1';
+const CANVAS_DEFAULT_TITLE = 'Nuevo documento';
 
 const chatList = document.getElementById('chat-list');
 const chatForm = document.getElementById('chat-form');
@@ -24,6 +26,10 @@ const toggleSidebarButton = document.getElementById('toggle-sidebar');
 const layout = document.getElementById('app');
 const incognitoButton = document.getElementById('incognito-toggle');
 const incognitoButtonEmpty = document.getElementById('incognito-toggle-empty');
+const canvasPanel = document.getElementById('canvas-panel');
+const canvasEditorEl = document.getElementById('canvas-editor');
+const canvasTitleInput = document.getElementById('canvas-title-input');
+const canvasCloseBtn = document.getElementById('canvas-close-btn');
 
 const state = {
   conversations: {},
@@ -32,6 +38,13 @@ const state = {
   currentModel: null,
   loading: false,
 };
+
+const canvasState = {
+  docs: {} // conversationId -> doc
+};
+
+let canvasEditor = null;
+let canvasMode = false;
 
 //Archivos adjuntos por conversación
 const attachedFiles = {};
@@ -117,6 +130,51 @@ function loadState() {
   }
 }
 
+function persistCanvasState() {
+  if (!hasLocalStorage) return;
+  try {
+    window.localStorage.setItem(CANVAS_STORAGE_KEY, JSON.stringify(canvasState));
+  } catch (error) {
+    console.warn('No se pudo guardar el estado de canvas', error);
+  }
+}
+
+function loadCanvasState() {
+  if (!hasLocalStorage) return;
+  try {
+    const raw = window.localStorage.getItem(CANVAS_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    canvasState.docs = parsed?.docs || {};
+    canvasState.cards = parsed?.cards || {};
+  } catch (error) {
+    console.warn('No se pudo restaurar el estado de canvas', error);
+  }
+}
+
+function getCanvasDoc(conversationId) {
+  if (!conversationId) return null;
+  return canvasState.docs[conversationId] || null;
+}
+
+function saveCanvasDoc(conversationId, doc) {
+  if (!conversationId || !doc) return;
+  canvasState.docs[conversationId] = doc;
+  persistCanvasState();
+}
+
+function getCanvasCards(conversationId) {
+  if (!conversationId) return [];
+  return canvasState.cards[conversationId] || [];
+}
+
+function pushCanvasCard(conversationId, card) {
+  if (!conversationId || !card) return;
+  if (!canvasState.cards[conversationId]) canvasState.cards[conversationId] = [];
+  canvasState.cards[conversationId].unshift(card);
+  persistCanvasState();
+}
+
 function autoResizeTextarea(textarea) {
   if (!textarea) return;
   textarea.style.height = 'auto';
@@ -191,6 +249,203 @@ function formatTime(timestamp) {
   if (!timestamp) return '';
   const date = new Date(timestamp);
   return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ===========================
+// Canvas helpers - Simplificado estilo Claude
+// ===========================
+
+function toggleCanvasVisibility(show) {
+  if (!canvasPanel) return;
+  canvasPanel.style.display = show ? 'flex' : 'none';
+  document.body.classList.toggle('canvas-visible', show);
+}
+
+function ensureCanvasDoc(conversationId, payload = {}) {
+  if (!conversationId) return null;
+  let doc = getCanvasDoc(conversationId);
+  if (!doc) {
+    doc = {
+      id: generateId('canvas'),
+      title: payload.title || CANVAS_DEFAULT_TITLE,
+      content: payload.content || '',
+      contentType: payload.content_type || 'document',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    saveCanvasDoc(conversationId, doc);
+  }
+  return doc;
+}
+
+function initCanvasEditor(content = '') {
+  if (!canvasEditorEl) return;
+  canvasEditorEl.innerHTML = content || '';
+  
+  canvasEditorEl.addEventListener('input', () => {
+    const conversation = state.conversations[state.activeId];
+    if (!conversation) return;
+    const doc = getCanvasDoc(conversation.id);
+    if (!doc) return;
+    doc.content = canvasEditorEl.innerHTML;
+    doc.updatedAt = Date.now();
+    saveCanvasDoc(conversation.id, doc);
+  });
+}
+
+function getCanvasContent() {
+  return canvasEditorEl?.innerHTML || '';
+}
+
+function renderCanvasPanel(conversationId) {
+  const doc = getCanvasDoc(conversationId);
+  if (!doc) {
+    toggleCanvasVisibility(false);
+    return;
+  }
+  toggleCanvasVisibility(true);
+  if (canvasTitleInput) {
+    canvasTitleInput.value = doc.title || CANVAS_DEFAULT_TITLE;
+    canvasTitleInput.addEventListener('input', () => {
+      doc.title = canvasTitleInput.value;
+      doc.updatedAt = Date.now();
+      saveCanvasDoc(conversationId, doc);
+    });
+  }
+  initCanvasEditor(doc.content || '');
+}
+
+function parseCanvasPayload(content) {
+  if (!content) return null;
+  let candidate = content.trim();
+  candidate = candidate.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const jsonMatch = candidate.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    candidate = jsonMatch[0];
+  }
+  
+  try {
+    const parsed = JSON.parse(candidate);
+    if (parsed.type === 'canvas') return parsed;
+  } catch (_) {
+    const typeMatch = candidate.match(/"type"\s*:\s*"([^"]+)"/);
+    const ctypeMatch = candidate.match(/"content_type"\s*:\s*"([^"]+)"/);
+    const titleMatch = candidate.match(/"title"\s*:\s*"([^"]*)"/);
+    const contentMatch = candidate.match(/"content"\s*:\s*"([\s\S]*?)"\s*(,\s*"actions"|}$)/);
+
+    if (typeMatch && typeMatch[1] === 'canvas' && contentMatch) {
+      return {
+        type: 'canvas',
+        content_type: ctypeMatch ? ctypeMatch[1] : 'document',
+        title: titleMatch ? titleMatch[1] : CANVAS_DEFAULT_TITLE,
+        content: contentMatch[1],
+        actions: ['edit']
+      };
+    }
+  }
+  return null;
+}
+
+function detectCanvasIntent(prompt) {
+  if (!prompt) return false;
+  const keywords = ['crea un documento', 'hazme apuntes', 'redacta', 'escribe un artículo', 'apuntes', 'documento', 'tabla', 'presentación', 'slides', 'canvas', 'artifact'];
+  const lower = prompt.toLowerCase();
+  return keywords.some(k => lower.includes(k));
+}
+
+function createArtifactCard(payload) {
+  const preview = stripHtml(payload.content).slice(0, 150) + '...';
+  
+  return `
+    <div class="artifact-card" data-canvas-id="${payload.canvasId || ''}">
+      <div class="artifact-card-header">
+        <svg class="artifact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6"/>
+          <path d="M16 13H8"/>
+          <path d="M16 17H8"/>
+          <path d="M10 9H8"/>
+        </svg>
+        <span class="artifact-title">${escapeHtml(payload.title || 'Documento')}</span>
+      </div>
+      <div class="artifact-preview">${escapeHtml(preview)}</div>
+      <div class="artifact-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        Abrir documento
+      </div>
+    </div>
+  `;
+}
+
+function applyCanvasPayload(conversation, payload) {
+  const doc = ensureCanvasDoc(conversation.id, payload);
+  let content = payload.content || '';
+  
+  if (typeof marked !== 'undefined') {
+    try {
+      content = marked.parse(content);
+    } catch (e) {
+      // dejar contenido tal cual si falla
+    }
+  }
+  
+  doc.title = payload.title || CANVAS_DEFAULT_TITLE;
+  doc.contentType = payload.content_type || 'document';
+  doc.content = content;
+  doc.updatedAt = Date.now();
+  saveCanvasDoc(conversation.id, doc);
+  renderCanvasPanel(conversation.id);
+  
+  return doc.id;
+}
+
+// Procesar respuesta con canvas estilo Claude
+function processCanvasResponse(conversation, assistantMessage) {
+  if (!conversation || !assistantMessage?.content) return false;
+  
+  const payload = parseCanvasPayload(assistantMessage.content);
+  if (!payload) return false;
+  
+  // Aplicar el canvas y obtener su ID
+  const canvasId = applyCanvasPayload(conversation, payload);
+  
+  // Modificar el mensaje para incluir la tarjeta
+  // Formato: "Texto inicial [CANVAS_ARTIFACT] Texto final"
+  assistantMessage.content = `He creado un documento para ti.\n\n[CANVAS_ARTIFACT]\n\nPuedes ver y editar el documento en el panel de la derecha.`;
+  assistantMessage.canvasId = canvasId;
+  
+  return true;
+}
+
+// Construir instrucción para el modelo cuando se trabaja con canvas
+function buildCanvasInstruction(doc, userPrompt) {
+  let docContext = '';
+  if (doc?.content) {
+    const plainText = stripHtml(doc.content).slice(0, 2000); // Limitar contexto
+    docContext = `\n\nDocumento actual:\n${plainText}`;
+  }
+  
+  return `Cuando el usuario pida crear, redactar o modificar un documento, responde con JSON válido en este formato:
+
+{
+  "type": "canvas",
+  "content_type": "document",
+  "title": "Título descriptivo del documento",
+  "content": "Contenido en formato Markdown",
+  "actions": ["edit"]
+}
+
+El contenido debe estar en Markdown. No agregues texto adicional fuera del JSON.${docContext}`;
+}
+
+function stripHtml(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html || '';
+  return (tmp.textContent || '').trim();
 }
 
 function parseMarkdown(text) {
@@ -491,7 +746,43 @@ function appendMessageElement(message) {
     content += '<div class="web-response-content">' + parseMarkdown(message.content) + '</div>';
     content += '</div>';
   } else if (message.content) {
-    content += parseMarkdown(message.content);
+    // Comprobar si hay un canvas asociado a esta conversación
+    const conversation = state.conversations[state.activeId];
+    const canvasDoc = conversation ? getCanvasDoc(conversation.id) : null;
+    
+    // Si hay canvas y el mensaje tiene indicadores de canvas creado
+    if (canvasDoc && message.role === 'assistant' && message.canvasId === canvasDoc.id) {
+      // Dividir el contenido en texto antes del canvas, tarjeta canvas, y texto después
+      const parts = message.content.split('[CANVAS_ARTIFACT]');
+      
+      if (parts.length > 1) {
+        // Hay marcador de artifact
+        if (parts[0]) {
+          content += parseMarkdown(parts[0]);
+        }
+        
+        // Insertar tarjeta de artifact
+        content += createArtifactCard({
+          title: canvasDoc.title,
+          content: canvasDoc.content,
+          canvasId: canvasDoc.id
+        });
+        
+        if (parts[1]) {
+          content += parseMarkdown(parts[1]);
+        }
+      } else {
+        // No hay marcador pero hay canvas, agregar al final
+        content += parseMarkdown(message.content);
+        content += createArtifactCard({
+          title: canvasDoc.title,
+          content: canvasDoc.content,
+          canvasId: canvasDoc.id
+        });
+      }
+    } else {
+      content += parseMarkdown(message.content);
+    }
   }
 
   // Crear contenedor para botón de copiar y hora
@@ -651,6 +942,14 @@ function renderActiveConversation() {
   } else {
     showChatState();
     conversation.messages.forEach((message) => appendMessageElement(message));
+  }
+
+  // Mostrar canvas si existe
+  const hasCanvasDoc = !!getCanvasDoc(conversation.id);
+  if (hasCanvasDoc) {
+    renderCanvasPanel(conversation.id);
+  } else {
+    toggleCanvasVisibility(false);
   }
 
   // Traducir títulos predeterminados dinámicamente según el idioma actual
@@ -832,6 +1131,9 @@ function setActiveConversation(id) {
   renderConversationList();
   renderActiveConversation();
   renderAttachedFiles();
+  renderCanvasPanel(id);
+  const doc = getCanvasDoc(id);
+  toggleCanvasVisibility(!!doc || canvasMode);
   persistState();
 }
 
@@ -1350,7 +1652,99 @@ async function loadModels() {
     selects.forEach(select => {
       select.disabled = false;
     });
+
+    // Refrescar el selector custom tras cargar modelos
+    enhanceAllModelSelects(selects);
   }
+}
+
+// Mejora visual del selector de modelos para que coincida con la estética del sitio
+function enhanceAllModelSelects(selects = []) {
+  const list = selects.length ? selects : [modelSelect, modelSelectInline].filter(Boolean);
+  list.forEach(enhanceModelSelect);
+}
+
+function enhanceModelSelect(select) {
+  if (!select) return;
+  const wrapper = select.closest('.model-select-wrapper') || select.parentElement;
+  if (!wrapper) return;
+
+  // Ocultar nativo pero mantenerlo en el DOM para formularios
+  select.classList.add('native-model-select-hidden');
+
+  // Crear contenedores si no existen
+  let display = wrapper.querySelector('.model-select-display');
+  let dropdown = wrapper.querySelector('.model-select-dropdown');
+
+  if (!display) {
+    display = document.createElement('button');
+    display.type = 'button';
+    display.className = 'model-select-display';
+    display.innerHTML = '<span class=\"model-select-label\"></span><span class=\"model-select-arrow\">▾</span>';
+
+    dropdown = document.createElement('div');
+    dropdown.className = 'model-select-dropdown';
+
+    wrapper.appendChild(display);
+    wrapper.appendChild(dropdown);
+  } else if (dropdown) {
+    dropdown.innerHTML = '';
+  }
+
+  const label = display.querySelector('.model-select-label');
+
+  const closeDropdown = () => {
+    dropdown?.classList.remove('open');
+  };
+
+  const openDropdown = () => {
+    dropdown?.classList.add('open');
+  };
+
+  const rebuildItems = () => {
+    if (!dropdown) return;
+    dropdown.innerHTML = '';
+
+    select.querySelectorAll('option').forEach(opt => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'model-select-item';
+      item.textContent = opt.textContent;
+      if (opt.value === select.value) {
+        item.classList.add('active');
+      }
+
+      item.addEventListener('click', () => {
+        select.value = opt.value;
+        // Disparar change para lógica existente
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        if (label) label.textContent = opt.textContent;
+        dropdown.querySelectorAll('.model-select-item').forEach(btn => btn.classList.remove('active'));
+        item.classList.add('active');
+        closeDropdown();
+      });
+
+      dropdown.appendChild(item);
+    });
+  };
+
+  // Construir contenido inicial
+  if (label) {
+    const selected = select.selectedOptions[0];
+    label.textContent = selected ? selected.textContent : select.value;
+  }
+  rebuildItems();
+
+  // Toggle
+  display.onclick = (e) => {
+    e.stopPropagation();
+    const isOpen = dropdown?.classList.contains('open');
+    document.querySelectorAll('.model-select-dropdown.open').forEach(dd => dd.classList.remove('open'));
+    if (!isOpen) openDropdown();
+  };
+
+  // Cerrar al hacer clic fuera
+  document.addEventListener('click', closeDropdown);
 }
 
 async function streamAssistantResponse(conversation, payloadMessages) {
@@ -1438,6 +1832,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
   let thinkingComplete = false;
   let isThinkingStreaming = false;
   wasCancelled = false; // Resetear el flag de cancelación
+  let canvasProcessed = false;
 
   // Sistema de batching para actualizaciones suaves
   let pendingUpdate = false;
@@ -1610,6 +2005,45 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             trackDailyMessage();
             trackResponseTime(responseTime);
 
+            if (!canvasProcessed) {
+              canvasProcessed = processCanvasResponse(conversation, assistantMessage);
+              if (canvasProcessed) {
+                // Re-renderizar el mensaje completo para mostrar la tarjeta
+                bubble.innerHTML = '';
+                
+                // Agregar pensamiento si existe
+                if (thinkingData && thinkingData.thinking) {
+                  bubble.innerHTML += createThinkingBlock(thinkingData.thinking, thinkingData.duration, false);
+                }
+                
+                // Agregar contenido con la tarjeta
+                bubble.innerHTML += parseMarkdown(assistantMessage.content);
+                
+                // Volver a agregar los botones de acción
+                const copyContainer = bubble.querySelector('.copy-message-container');
+                if (!copyContainer) {
+                  const newCopyContainer = document.createElement('div');
+                  newCopyContainer.className = 'copy-message-container';
+                  
+                  const copyButton = document.createElement('button');
+                  copyButton.className = 'copy-message-btn';
+                  copyButton.title = 'Copiar mensaje';
+                  copyButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+                  
+                  const timeElement = document.createElement('span');
+                  timeElement.className = 'message-time';
+                  timeElement.textContent = formatTime(assistantMessage.timestamp || Date.now());
+                  
+                  newCopyContainer.appendChild(copyButton);
+                  newCopyContainer.appendChild(timeElement);
+                  bubble.appendChild(newCopyContainer);
+                }
+                
+                // Renderizar las tarjetas si existen
+                renderCanvasPanel(conversation.id);
+              }
+            }
+
             // Extraer información importante automáticamente
             const lastUserMessage = conversation.messages.filter(m => m.role === 'user').pop();
             if (lastUserMessage && assistantMessage.content) {
@@ -1665,6 +2099,45 @@ async function streamAssistantResponse(conversation, payloadMessages) {
       trackModelUsage(state.currentModel);
       trackDailyMessage();
       trackResponseTime(responseTime);
+
+      if (!canvasProcessed) {
+        canvasProcessed = processCanvasResponse(conversation, assistantMessage);
+        if (canvasProcessed) {
+          // Re-renderizar el mensaje completo para mostrar la tarjeta
+          bubble.innerHTML = '';
+          
+          // Agregar pensamiento si existe
+          if (thinkingData && thinkingData.thinking) {
+            bubble.innerHTML += createThinkingBlock(thinkingData.thinking, thinkingData.duration, false);
+          }
+          
+          // Agregar contenido con la tarjeta
+          bubble.innerHTML += parseMarkdown(assistantMessage.content);
+          
+          // Volver a agregar los botones de acción
+          const copyContainer = bubble.querySelector('.copy-message-container');
+          if (!copyContainer) {
+            const newCopyContainer = document.createElement('div');
+            newCopyContainer.className = 'copy-message-container';
+            
+            const copyButton = document.createElement('button');
+            copyButton.className = 'copy-message-btn';
+            copyButton.title = 'Copiar mensaje';
+            copyButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+            
+            const timeElement = document.createElement('span');
+            timeElement.className = 'message-time';
+            timeElement.textContent = formatTime(assistantMessage.timestamp || Date.now());
+            
+            newCopyContainer.appendChild(copyButton);
+            newCopyContainer.appendChild(timeElement);
+            bubble.appendChild(newCopyContainer);
+          }
+          
+          // Renderizar las tarjetas si existen
+          renderCanvasPanel(conversation.id);
+        }
+      }
 
       // Extraer información importante automáticamente al finalizar
       const lastUserMessage = conversation.messages.filter(m => m.role === 'user').pop();
@@ -2180,6 +2653,11 @@ async function handleSubmit(event) {
 
   const conversation = state.conversations[state.activeId];
   if (!conversation) return;
+  const wantsCanvas = canvasMode || detectCanvasIntent(prompt);
+  let activeCanvasDoc = getCanvasDoc(conversation.id);
+  if (wantsCanvas && !activeCanvasDoc) {
+    activeCanvasDoc = ensureCanvasDoc(conversation.id);
+  }
 
   state.loading = true;
   activeInput.value = '';
@@ -2394,6 +2872,14 @@ INSTRUCCIONES:
         finalContent += instructions;
       }
 
+      if (wantsCanvas) {
+        const canvasMsg = buildCanvasInstruction(activeCanvasDoc, prompt);
+        if (canvasMsg) {
+          if (finalContent) finalContent += '\n\n';
+          finalContent += canvasMsg;
+        }
+      }
+
       if (finalContent.trim()) {
         payloadMessages.push({
           role: 'system',
@@ -2468,6 +2954,16 @@ INSTRUCCIONES:
 
     payloadMessages.push(payloadMessage);
   });
+
+  if (wantsCanvas) {
+    const alreadyHasCanvasInstruction = payloadMessages.some(m => m.role === 'system' && m.content?.includes('"type": "canvas"'));
+    if (!alreadyHasCanvasInstruction) {
+      payloadMessages.unshift({
+        role: 'system',
+        content: buildCanvasInstruction(activeCanvasDoc, prompt)
+      });
+    }
+  }
 
   try {
     await streamAssistantResponse(conversation, payloadMessages);
@@ -3154,6 +3650,7 @@ function init() {
 
   loadState();
   loadSidebarState();
+  loadCanvasState();
 
   // Cargar preferencia de fuente disléxica al iniciar
   const dyslexicFontEnabled = getDyslexicFontEnabled();
@@ -3250,6 +3747,10 @@ function init() {
 
   // Event listeners para modales de conversación
   setupConversationModals();
+
+  // Eventos para canvas
+  setupCanvasEvents();
+  renderCanvasPanel(state.activeId);
 }
 
 // Configurar modales de renombrar, eliminar y eliminar todos
@@ -3332,6 +3833,37 @@ function setupConversationModals() {
 
   editMessageModal?.addEventListener('click', (e) => {
     if (e.target === editMessageModal) closeEditMessageModal();
+  });
+}
+
+function setupCanvasEvents() {
+  if (canvasCloseBtn) {
+    canvasCloseBtn.addEventListener('click', () => {
+      toggleCanvasVisibility(false);
+    });
+  }
+
+  // Delegar eventos de clic para las tarjetas de artifact
+  document.addEventListener('click', (e) => {
+    const artifactCard = e.target.closest('.artifact-card');
+    if (artifactCard) {
+      const canvasId = artifactCard.dataset.canvasId;
+      if (canvasId) {
+        // Buscar el documento canvas en todas las conversaciones
+        Object.keys(state.conversations).forEach(convId => {
+          const doc = getCanvasDoc(convId);
+          if (doc && doc.id === canvasId) {
+            // Cambiar a la conversación si no es la activa
+            if (state.activeId !== convId) {
+              switchConversation(convId);
+            }
+            // Mostrar el canvas
+            renderCanvasPanel(convId);
+            scrollChatToBottom();
+          }
+        });
+      }
+    }
   });
 }
 
@@ -3774,7 +4306,7 @@ function getStyleInstructions(style) {
 // Sistema de Modos de Chat Visibles
 // ========================================
 const VISIBLE_CHAT_MODES_KEY = 'ollama-web-visible-chat-modes';
-const DEFAULT_VISIBLE_MODES = ['normal', 'web', 'deep', 'study'];
+const DEFAULT_VISIBLE_MODES = ['normal', 'canvas', 'web', 'deep', 'study'];
 
 function getVisibleChatModes() {
   if (!hasLocalStorage) return DEFAULT_VISIBLE_MODES;
@@ -7397,6 +7929,8 @@ function setChatMode(mode) {
   studyMode = mode === 'study';
 
   webSearchMode = mode === 'web';
+  canvasMode = mode === 'canvas';
+  window._canvasModeActive = canvasMode;
   
   // Actualizar todos los toggles
   const toggles = document.querySelectorAll('.chat-mode-toggle');
@@ -7423,9 +7957,19 @@ function setChatMode(mode) {
     'normal': '💬 Normal',
     'deep': '🧠 Deep Think',
     'study': '📚 Modo Estudio',
-    'web': '🌐 Búsqueda Web'
+    'web': '🌐 Búsqueda Web',
+    'canvas': '📝 Canvas'
   };
   console.log(`Modo de chat: ${modeNames[mode]}`);
+
+  const conversation = state.conversations[state.activeId];
+  if (canvasMode && conversation) {
+    ensureCanvasDoc(conversation.id);
+    renderCanvasPanel(conversation.id);
+  } else {
+    const doc = conversation ? getCanvasDoc(conversation.id) : null;
+    toggleCanvasVisibility(!!doc);
+  }
 }
 
 function initDeepResearch() {
