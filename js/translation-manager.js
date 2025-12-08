@@ -14,6 +14,7 @@ class TranslationManager {
                 "sidebar.memory": "Memoria",
                 "sidebar.dashboard": "Dashboard de uso",
                 "sidebar.backgroundPersonalization": "Personalizar fondo",
+                "sidebar.language": "Idioma",
                 "sidebar.themes": "Temas:",
                 "sidebar.font": "Fuente:",
                 "sidebar.fontNormal": "Normal",

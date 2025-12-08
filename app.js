@@ -4413,6 +4413,17 @@ function initUserMenu() {
     });
   }
 
+  // Manejar selector de idioma en el menú de settings
+  const languageBtnMenu = document.getElementById('language-btn-menu');
+  const languageSubmenu = document.getElementById('language-submenu');
+  if (languageBtnMenu && languageSubmenu) {
+    languageBtnMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = languageSubmenu.style.display !== 'none';
+      languageSubmenu.style.display = isOpen ? 'none' : 'block';
+    });
+  }
+
   // Abrir modal de cambio de nombre desde el submenú
   if (changeNameBtnMenu) {
     changeNameBtnMenu.addEventListener('click', (e) => {
@@ -9586,6 +9597,7 @@ function initializeLanguageSelector() {
       const lang = option.getAttribute('data-lang');
       // Close menus immediately
       document.querySelectorAll('.language-menu').forEach(m => m.style.display = 'none');
+      document.querySelectorAll('.settings-submenu').forEach(m => m.style.display = 'none');
 
       if (window.translationManager) {
         await window.translationManager.setLanguage(lang);

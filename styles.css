@@ -756,6 +756,41 @@ body {
   letter-spacing: 0.3px;
 }
 
+.menu-arrow {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 18px;
+}
+
+/* Submenú de idiomas */
+.settings-submenu {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  padding: 4px;
+  margin-top: 4px;
+  margin-left: 32px;
+  margin-right: 0;
+  animation: slideDown 0.2s ease;
+}
+
+.settings-submenu .language-option {
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.settings-submenu .language-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
 .font-option.active .font-name {
   color: var(--theme-primary);
 }
@@ -5509,6 +5544,8 @@ button.research-active-btn svg {
     0 0 0 1px rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
+}
+
 .web-search-container.minimized .web-search-content {
   max-height: 0;
   opacity: 0;
@@ -5538,6 +5575,8 @@ button.research-active-btn svg {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   cursor: move;
   user-select: none;
+}
+
 .web-search-content {
   max-height: 2000px;
   opacity: 1;
@@ -5623,6 +5662,8 @@ button.research-active-btn svg {
   50% {
     box-shadow: 0 0 0 8px rgba(96, 165, 250, 0);
   }
+}
+
 @keyframes webSearchSpin {
   0%, 100% { transform: rotate(0deg); }
   50% { transform: rotate(180deg); }
@@ -6799,6 +6840,8 @@ button.research-active-btn svg {
 .language-option:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
+}
+
 /* ========================================
    Web Thinking Block - Razonamiento en vivo
    ======================================== */
