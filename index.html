@@ -952,15 +952,41 @@
       <div id="canvas-panel" class="canvas-panel" style="display: none;">
         <header class="canvas-header">
           <input id="canvas-title-input" class="canvas-title-input" type="text" placeholder="Sin título" />
-          <button id="canvas-close-btn" class="canvas-close-btn" title="Cerrar">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+          <div class="canvas-header-actions">
+            <button id="canvas-view-toggle" class="canvas-view-btn" title="Cambiar vista">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </button>
+            <button id="canvas-close-btn" class="canvas-close-btn" title="Cerrar">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
         </header>
 
-        <div id="canvas-editor" class="canvas-editor" aria-label="Editor de contenido" contenteditable="true"></div>
+        <div class="canvas-content" data-view-mode="split">
+          <!-- Editor de código -->
+          <div class="canvas-editor-pane">
+            <div class="canvas-pane-header">
+              <span class="canvas-pane-title">Editor</span>
+            </div>
+            <textarea id="canvas-editor" class="canvas-editor" aria-label="Editor de contenido" placeholder="Escribe aquí tu contenido en Markdown..."></textarea>
+          </div>
+
+          <!-- Vista previa -->
+          <div class="canvas-preview-pane">
+            <div class="canvas-pane-header">
+              <span class="canvas-pane-title">Vista Previa</span>
+            </div>
+            <div id="canvas-preview" class="canvas-preview"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

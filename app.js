@@ -46,6 +46,10 @@ const canvasState = {
 let canvasEditor = null;
 let canvasMode = false;
 
+// Control de scroll para burbujas (fuera del streaming principal)
+const SCROLL_UPDATE_INTERVAL = 16; // ~60fps
+let lastScrollUpdateTime = 0;
+
 //Archivos adjuntos por conversación
 const attachedFiles = {};
 
@@ -261,6 +265,60 @@ function toggleCanvasVisibility(show) {
   document.body.classList.toggle('canvas-visible', show);
 }
 
+function extractJsonFromText(text) {
+  if (!text) return null;
+  
+  // Limpiar bloques de código markdown si existen
+  let cleanText = text;
+  const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+  if (codeBlockMatch) {
+    return codeBlockMatch[1];
+  }
+
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  
+  let balance = 0;
+  let end = -1;
+  let inString = false;
+  let escape = false;
+  
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+    
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    
+    if (!inString) {
+      if (char === '{') balance++;
+      else if (char === '}') {
+        balance--;
+        if (balance === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+  }
+  
+  if (end !== -1) {
+    return text.substring(start, end + 1);
+  }
+  return null;
+}
+
 function ensureCanvasDoc(conversationId, payload = {}) {
   if (!conversationId) return null;
   let doc = getCanvasDoc(conversationId);
@@ -272,77 +330,199 @@ function ensureCanvasDoc(conversationId, payload = {}) {
       contentType: payload.content_type || 'document',
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      version: 1,
+      versions: [] // Historial de versiones
     };
     saveCanvasDoc(conversationId, doc);
   }
   return doc;
 }
 
-function initCanvasEditor(content = '') {
-  if (!canvasEditorEl) return;
-  canvasEditorEl.innerHTML = content || '';
+// Flag para evitar duplicar el listener del canvas editor
+let canvasEditorListenerAdded = false;
+
+function updateCanvasPreview(markdownContent) {
+  const previewEl = document.getElementById('canvas-preview');
+  if (!previewEl) return;
   
-  canvasEditorEl.addEventListener('input', () => {
-    const conversation = state.conversations[state.activeId];
-    if (!conversation) return;
-    const doc = getCanvasDoc(conversation.id);
-    if (!doc) return;
-    doc.content = canvasEditorEl.innerHTML;
-    doc.updatedAt = Date.now();
-    saveCanvasDoc(conversation.id, doc);
-  });
+  // Convertir markdown a HTML
+  let htmlContent = '';
+  if (typeof marked !== 'undefined') {
+    try {
+      htmlContent = marked.parse(markdownContent || '');
+    } catch (e) {
+      console.error('Error parseando markdown:', e);
+      htmlContent = markdownContent || '';
+    }
+  } else {
+    htmlContent = markdownContent || '';
+  }
+  
+  previewEl.innerHTML = htmlContent;
+  
+  // Renderizar fórmulas matemáticas si KaTeX está disponible
+  if (typeof renderMathInElement !== 'undefined') {
+    try {
+      renderMathInElement(previewEl, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false }
+        ],
+        throwOnError: false
+      });
+    } catch (e) {
+      console.error('Error renderizando matemáticas:', e);
+    }
+  }
+}
+
+function initCanvasEditor(content = '', readOnly = false) {
+  const editorEl = document.getElementById('canvas-editor');
+  if (!editorEl) return;
+  
+  // El canvas-editor es un textarea, usar value en vez de innerHTML
+  editorEl.value = content || '';
+  editorEl.readOnly = readOnly;
+  
+  // Cambiar estilo si es solo lectura
+  if (readOnly) {
+    editorEl.style.opacity = '0.7';
+    editorEl.style.cursor = 'not-allowed';
+    editorEl.placeholder = 'Versión anterior (solo lectura)';
+  } else {
+    editorEl.style.opacity = '1';
+    editorEl.style.cursor = 'text';
+    editorEl.placeholder = 'Escribe aquí tu contenido en Markdown...';
+  }
+  
+  // Actualizar la vista previa inicial
+  updateCanvasPreview(content);
+  
+  // Añadir listener solo una vez
+  if (!canvasEditorListenerAdded) {
+    editorEl.addEventListener('input', () => {
+      // No permitir edición si es solo lectura
+      if (editorEl.readOnly) return;
+      
+      const conversation = state.conversations[state.activeId];
+      if (!conversation) return;
+      const doc = getCanvasDoc(conversation.id);
+      if (!doc) return;
+      doc.content = editorEl.value;
+      doc.updatedAt = Date.now();
+      saveCanvasDoc(conversation.id, doc);
+      
+      // Actualizar vista previa en tiempo real
+      updateCanvasPreview(editorEl.value);
+    });
+    canvasEditorListenerAdded = true;
+  }
 }
 
 function getCanvasContent() {
-  return canvasEditorEl?.innerHTML || '';
+  const editorEl = document.getElementById('canvas-editor');
+  return editorEl?.value || '';
 }
 
-function renderCanvasPanel(conversationId) {
+function renderCanvasPanel(conversationId, versionNumber = null) {
   const doc = getCanvasDoc(conversationId);
   if (!doc) {
     toggleCanvasVisibility(false);
     return;
   }
+  
+  // Si se especifica una versión, cargar esa versión
+  let contentToShow = doc.content;
+  let titleToShow = doc.title;
+  let isOldVersion = false;
+  
+  if (versionNumber && versionNumber < (doc.version || 1)) {
+    // Buscar la versión en el historial
+    const versionData = doc.versions?.find(v => v.version === versionNumber);
+    if (versionData) {
+      contentToShow = versionData.content;
+      titleToShow = versionData.title;
+      isOldVersion = true;
+    }
+  }
+  
   toggleCanvasVisibility(true);
   if (canvasTitleInput) {
-    canvasTitleInput.value = doc.title || CANVAS_DEFAULT_TITLE;
-    canvasTitleInput.addEventListener('input', () => {
-      doc.title = canvasTitleInput.value;
-      doc.updatedAt = Date.now();
-      saveCanvasDoc(conversationId, doc);
-    });
+    canvasTitleInput.value = (isOldVersion ? `${titleToShow} (v${versionNumber})` : titleToShow) || CANVAS_DEFAULT_TITLE;
+    
+    if (!isOldVersion) {
+      canvasTitleInput.addEventListener('input', () => {
+        doc.title = canvasTitleInput.value;
+        doc.updatedAt = Date.now();
+        saveCanvasDoc(conversationId, doc);
+      });
+    }
   }
-  initCanvasEditor(doc.content || '');
+  
+  initCanvasEditor(contentToShow || '', isOldVersion);
+  
+  // Guardar la versión actual que se está visualizando
+  doc.currentViewVersion = versionNumber || doc.version || 1;
 }
 
 function parseCanvasPayload(content) {
   if (!content) return null;
   let candidate = content.trim();
-  candidate = candidate.replace(/```json/gi, '').replace(/```/g, '').trim();
-  const jsonMatch = candidate.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    candidate = jsonMatch[0];
+  
+  // Limpiar bloques de código markdown
+  candidate = candidate.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  
+  // Buscar JSON con type canvas - regex más flexible
+  let jsonMatch = candidate.match(/\{[^{}]*"type"\s*:\s*["']canvas["'][^{}]*\}/s);
+  if (!jsonMatch) {
+    // Intentar buscar JSON anidado más complejo
+    jsonMatch = candidate.match(/\{[\s\S]*?"type"\s*:\s*["']canvas["'][\s\S]*?\}(?=\s*[^{]|$)/);
   }
   
+  if (jsonMatch) {
+    candidate = jsonMatch[0];
+  } else {
+    // Último intento: buscar cualquier JSON
+    jsonMatch = candidate.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      candidate = jsonMatch[0];
+    }
+  }
+  
+  // Intentar parsear como JSON
   try {
     const parsed = JSON.parse(candidate);
-    if (parsed.type === 'canvas') return parsed;
-  } catch (_) {
-    const typeMatch = candidate.match(/"type"\s*:\s*"([^"]+)"/);
-    const ctypeMatch = candidate.match(/"content_type"\s*:\s*"([^"]+)"/);
-    const titleMatch = candidate.match(/"title"\s*:\s*"([^"]*)"/);
-    const contentMatch = candidate.match(/"content"\s*:\s*"([\s\S]*?)"\s*(,\s*"actions"|}$)/);
+    if (parsed.type === 'canvas') {
+      return parsed;
+    }
+  } catch (e) {
+    // Fallback con regex para extraer campos
+    const typeMatch = candidate.match(/"type"\s*:\s*["']([^"']+)["']/);
+    const ctypeMatch = candidate.match(/"content_type"\s*:\s*["']([^"']+)["']/);
+    const titleMatch = candidate.match(/"title"\s*:\s*["']([^"']*)["']/);
+    
+    // Regex mejorado para contenido - maneja escapes y multilinea
+    let contentValue = null;
+    const contentMatch = candidate.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+    if (contentMatch) {
+      contentValue = contentMatch[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+    }
 
-    if (typeMatch && typeMatch[1] === 'canvas' && contentMatch) {
+    if (typeMatch && typeMatch[1] === 'canvas' && contentValue !== null) {
       return {
         type: 'canvas',
         content_type: ctypeMatch ? ctypeMatch[1] : 'document',
         title: titleMatch ? titleMatch[1] : CANVAS_DEFAULT_TITLE,
-        content: contentMatch[1],
+        content: contentValue,
         actions: ['edit']
       };
     }
   }
+  
   return null;
 }
 
@@ -355,9 +535,10 @@ function detectCanvasIntent(prompt) {
 
 function createArtifactCard(payload) {
   const preview = stripHtml(payload.content).slice(0, 150) + '...';
+  const versionBadge = payload.version ? `<span class="artifact-version">v${payload.version}</span>` : '';
   
   return `
-    <div class="artifact-card" data-canvas-id="${payload.canvasId || ''}">
+    <div class="artifact-card" data-canvas-id="${payload.canvasId || ''}" data-canvas-version="${payload.version || 1}">
       <div class="artifact-card-header">
         <svg class="artifact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -367,6 +548,7 @@ function createArtifactCard(payload) {
           <path d="M10 9H8"/>
         </svg>
         <span class="artifact-title">${escapeHtml(payload.title || 'Documento')}</span>
+        ${versionBadge}
       </div>
       <div class="artifact-preview">${escapeHtml(preview)}</div>
       <div class="artifact-action">
@@ -375,7 +557,7 @@ function createArtifactCard(payload) {
           <polyline points="15 3 21 3 21 9"/>
           <line x1="10" y1="14" x2="21" y2="3"/>
         </svg>
-        Abrir documento
+        Ver versión v${payload.version || 1}
       </div>
     </div>
   `;
@@ -383,17 +565,25 @@ function createArtifactCard(payload) {
 
 function applyCanvasPayload(conversation, payload) {
   const doc = ensureCanvasDoc(conversation.id, payload);
+  // Guardar el contenido como markdown plano (el textarea lo mostrará directamente)
   let content = payload.content || '';
   
-  if (typeof marked !== 'undefined') {
-    try {
-      content = marked.parse(content);
-    } catch (e) {
-      // dejar contenido tal cual si falla
-    }
+  // Si el contenido es diferente, guardar versión anterior
+  if (doc.content && doc.content !== content) {
+    // Guardar versión anterior en el historial
+    if (!doc.versions) doc.versions = [];
+    doc.versions.push({
+      version: doc.version || 1,
+      title: doc.title,
+      content: doc.content,
+      timestamp: doc.updatedAt || Date.now()
+    });
+    
+    // Incrementar número de versión
+    doc.version = (doc.version || 1) + 1;
   }
   
-  doc.title = payload.title || CANVAS_DEFAULT_TITLE;
+  doc.title = payload.title || doc.title || CANVAS_DEFAULT_TITLE;
   doc.contentType = payload.content_type || 'document';
   doc.content = content;
   doc.updatedAt = Date.now();
@@ -410,13 +600,66 @@ function processCanvasResponse(conversation, assistantMessage) {
   const payload = parseCanvasPayload(assistantMessage.content);
   if (!payload) return false;
   
+  // Obtener el documento actual para ver si es una actualización
+  const existingDoc = getCanvasDoc(conversation.id);
+  const isUpdate = existingDoc && existingDoc.content && existingDoc.content !== payload.content;
+  
   // Aplicar el canvas y obtener su ID
   const canvasId = applyCanvasPayload(conversation, payload);
   
-  // Modificar el mensaje para incluir la tarjeta
-  // Formato: "Texto inicial [CANVAS_ARTIFACT] Texto final"
-  assistantMessage.content = `He creado un documento para ti.\n\n[CANVAS_ARTIFACT]\n\nPuedes ver y editar el documento en el panel de la derecha.`;
+  // Obtener la versión actualizada
+  const updatedDoc = getCanvasDoc(conversation.id);
+  const currentVersion = updatedDoc?.version || 1;
+  
+  // Añadir versión al payload para la tarjeta
+  payload.canvasId = canvasId;
+  payload.version = currentVersion;
+  
+  // Limpiar el JSON del contenido del mensaje
+  // Buscar y eliminar todo el bloque JSON (incluyendo bloques de código markdown)
+  let cleanContent = assistantMessage.content;
+  
+  // Eliminar bloques ```json ... ```
+  cleanContent = cleanContent.replace(/```json\s*\{[\s\S]*?\}\s*```/g, '');
+  
+  // Eliminar JSON sin bloques de código
+  cleanContent = cleanContent.replace(/\{[\s\S]*?"type"\s*:\s*["']canvas["'][\s\S]*?\}/g, '');
+  
+  // Limpiar espacios en blanco excesivos
+  cleanContent = cleanContent.replace(/\n{3,}/g, '\n\n').trim();
+  
+  // Si después de limpiar queda texto útil, usarlo; sino crear mensaje por defecto
+  let explanation = '';
+  if (cleanContent && cleanContent.length > 10 && !cleanContent.match(/^\s*$/)) {
+    // Hay texto explicativo del modelo, usarlo
+    // Insertar el marcador de artifact al principio si no existe
+    if (!cleanContent.includes('[CANVAS_ARTIFACT]')) {
+      explanation = `[CANVAS_ARTIFACT]\n\n${cleanContent}`;
+    } else {
+      explanation = cleanContent;
+    }
+  } else {
+    // No hay texto explicativo, crear mensaje por defecto
+    if (isUpdate) {
+      explanation = `He actualizado el documento "${payload.title}" (v${currentVersion}).\n\n[CANVAS_ARTIFACT]\n\n`;
+      explanation += `Los cambios se han aplicado al documento en el panel de la derecha. `;
+    } else {
+      explanation = `He creado el documento "${payload.title}" (v${currentVersion}).\n\n[CANVAS_ARTIFACT]\n\n`;
+      
+      // Agregar breve descripción de lo que se hizo
+      if (payload.content_type === 'code') {
+        explanation += `Este es un código que puedes revisar y editar en el panel de la derecha. `;
+      } else {
+        explanation += `Este documento está disponible en el panel de la derecha para que puedas revisarlo y editarlo. `;
+      }
+    }
+    
+    explanation += `Puedes pedirme que lo modifique o amplíe en cualquier momento.`;
+  }
+  
+  assistantMessage.content = explanation;
   assistantMessage.canvasId = canvasId;
+  assistantMessage.canvasVersion = currentVersion;
   
   return true;
 }
@@ -424,9 +667,20 @@ function processCanvasResponse(conversation, assistantMessage) {
 // Construir instrucción para el modelo cuando se trabaja con canvas
 function buildCanvasInstruction(doc, userPrompt) {
   let docContext = '';
+  let versionInfo = '';
+  
   if (doc?.content) {
     const plainText = stripHtml(doc.content).slice(0, 2000); // Limitar contexto
-    docContext = `\n\nDocumento actual:\n${plainText}`;
+    const currentVersion = doc.version || 1;
+    const viewingVersion = doc.currentViewVersion || currentVersion;
+    
+    versionInfo = `\n\nVersión actual del documento: v${currentVersion}`;
+    if (viewingVersion < currentVersion) {
+      versionInfo += `\nEl usuario está viendo la versión: v${viewingVersion} (versión anterior)`;
+      versionInfo += `\nSi el usuario pide modificaciones, se aplicarán sobre la versión más reciente (v${currentVersion}), no sobre la versión que está viendo.`;
+    }
+    
+    docContext = `${versionInfo}\n\nContenido del documento (v${viewingVersion}):\n${plainText}`;
   }
   
   return `Cuando el usuario pida crear, redactar o modificar un documento, responde con JSON válido en este formato:
@@ -439,7 +693,9 @@ function buildCanvasInstruction(doc, userPrompt) {
   "actions": ["edit"]
 }
 
-El contenido debe estar en Markdown. No agregues texto adicional fuera del JSON.${docContext}`;
+El contenido debe estar en Markdown.
+IMPORTANTE: Envía PRIMERO el JSON y DESPUÉS una explicación breve de los cambios realizados o del documento creado.
+No incluyas texto antes del JSON.${docContext}`;
 }
 
 function stripHtml(html) {
@@ -755,17 +1011,21 @@ function appendMessageElement(message) {
       // Dividir el contenido en texto antes del canvas, tarjeta canvas, y texto después
       const parts = message.content.split('[CANVAS_ARTIFACT]');
       
+      // Usar la versión del mensaje si existe, sino la actual del documento
+      const messageVersion = message.canvasVersion || canvasDoc.version || 1;
+      
       if (parts.length > 1) {
         // Hay marcador de artifact
         if (parts[0]) {
           content += parseMarkdown(parts[0]);
         }
         
-        // Insertar tarjeta de artifact
+        // Insertar tarjeta de artifact con versión
         content += createArtifactCard({
           title: canvasDoc.title,
           content: canvasDoc.content,
-          canvasId: canvasDoc.id
+          canvasId: canvasDoc.id,
+          version: messageVersion
         });
         
         if (parts[1]) {
@@ -777,7 +1037,8 @@ function appendMessageElement(message) {
         content += createArtifactCard({
           title: canvasDoc.title,
           content: canvasDoc.content,
-          canvasId: canvasDoc.id
+          canvasId: canvasDoc.id,
+          version: messageVersion
         });
       }
     } else {
@@ -1544,9 +1805,9 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
     // Scroll solo si ha pasado suficiente tiempo y no se debe saltar
     if (!skipScroll) {
       const now = Date.now();
-      if (now - lastUpdateTime >= UPDATE_INTERVAL) { // Use UPDATE_INTERVAL from streamAssistantResponse
+    if (now - lastScrollUpdateTime >= SCROLL_UPDATE_INTERVAL) {
         scrollChatToBottom();
-        lastUpdateTime = now;
+      lastScrollUpdateTime = now;
       }
     }
 
@@ -1974,6 +2235,28 @@ async function streamAssistantResponse(conversation, payloadMessages) {
               }
 
               assistantMessage.content += contentChunk;
+              
+              // Detectar si estamos recibiendo JSON de canvas para no mostrarlo
+              if (!canvasProcessed && assistantMessage.content.includes('"type"') && assistantMessage.content.includes('"canvas"')) {
+                // Verificar si es un JSON de canvas completo
+                const tempPayload = parseCanvasPayload(assistantMessage.content);
+                if (tempPayload) {
+                  // Es un canvas completo, procesarlo ahora
+                  canvasProcessed = processCanvasResponse(conversation, assistantMessage);
+                  if (canvasProcessed) {
+                    renderCanvasPanel(conversation.id);
+                    // Actualizar el bubble con el mensaje procesado (sin JSON)
+                    const thinkingData = assistantMessage.thinking ? {
+                      thinking: assistantMessage.thinking,
+                      duration: assistantMessage.thinkingDuration
+                    } : null;
+                    updateAssistantBubble(bubble, assistantMessage.content, thinkingData, false);
+                    pendingUpdate = false; // Ya actualizamos
+                    continue; // Saltar al siguiente chunk
+                  }
+                }
+              }
+              
               pendingUpdate = true;
 
               // Programar actualización de forma asíncrona
@@ -2016,8 +2299,32 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                   bubble.innerHTML += createThinkingBlock(thinkingData.thinking, thinkingData.duration, false);
                 }
                 
-                // Agregar contenido con la tarjeta
-                bubble.innerHTML += parseMarkdown(assistantMessage.content);
+                // Procesar el contenido con la tarjeta de artifact
+                const canvasDoc = getCanvasDoc(conversation.id);
+                const messageVersion = assistantMessage.canvasVersion || canvasDoc?.version || 1;
+                const parts = assistantMessage.content.split('[CANVAS_ARTIFACT]');
+                
+                if (parts.length > 1 && canvasDoc) {
+                  // Hay marcador de artifact
+                  if (parts[0]) {
+                    bubble.innerHTML += parseMarkdown(parts[0]);
+                  }
+                  
+                  // Insertar tarjeta de artifact
+                  bubble.innerHTML += createArtifactCard({
+                    title: canvasDoc.title,
+                    content: canvasDoc.content,
+                    canvasId: canvasDoc.id,
+                    version: messageVersion
+                  });
+                  
+                  if (parts[1]) {
+                    bubble.innerHTML += parseMarkdown(parts[1]);
+                  }
+                } else {
+                  // Sin marcador, solo parsear markdown
+                  bubble.innerHTML += parseMarkdown(assistantMessage.content);
+                }
                 
                 // Volver a agregar los botones de acción
                 const copyContainer = bubble.querySelector('.copy-message-container');
@@ -2642,13 +2949,26 @@ function updateStopButtonToSend() {
   });
 }
 
-async function handleSubmit(event) {
+let handleSubmit = async function handleSubmitOriginal(event) {
   event.preventDefault();
   if (state.loading) return;
 
   const isEmptyState = emptyState?.style.display !== 'none';
-  const activeInput = isEmptyState ? promptInput : promptInputInline;
-  const prompt = activeInput?.value.trim();
+  
+  // Buscar el input que tenga contenido (más robusto)
+  let activeInput = isEmptyState ? promptInput : promptInputInline;
+  let prompt = activeInput?.value.trim();
+  
+  // Si el input seleccionado está vacío, intentar con el otro
+  if (!prompt) {
+    const otherInput = isEmptyState ? promptInputInline : promptInput;
+    const otherPrompt = otherInput?.value.trim();
+    if (otherPrompt) {
+      activeInput = otherInput;
+      prompt = otherPrompt;
+    }
+  }
+  
   if (!prompt) return;
 
   const conversation = state.conversations[state.activeId];
@@ -3843,11 +4163,36 @@ function setupCanvasEvents() {
     });
   }
 
+  // Botón para cambiar vista del canvas
+  const canvasViewToggle = document.getElementById('canvas-view-toggle');
+  if (canvasViewToggle) {
+    canvasViewToggle.addEventListener('click', () => {
+      const canvasContent = document.querySelector('.canvas-content');
+      if (!canvasContent) return;
+      
+      const currentMode = canvasContent.getAttribute('data-view-mode') || 'split';
+      let nextMode = 'split';
+      
+      if (currentMode === 'split') {
+        nextMode = 'editor';
+      } else if (currentMode === 'editor') {
+        nextMode = 'preview';
+      } else {
+        nextMode = 'split';
+      }
+      
+      canvasContent.setAttribute('data-view-mode', nextMode);
+      console.log('🔄 Vista Canvas cambiada a:', nextMode);
+    });
+  }
+
   // Delegar eventos de clic para las tarjetas de artifact
   document.addEventListener('click', (e) => {
     const artifactCard = e.target.closest('.artifact-card');
     if (artifactCard) {
       const canvasId = artifactCard.dataset.canvasId;
+      const versionNumber = parseInt(artifactCard.dataset.canvasVersion) || null;
+      
       if (canvasId) {
         // Buscar el documento canvas en todas las conversaciones
         Object.keys(state.conversations).forEach(convId => {
@@ -3857,8 +4202,8 @@ function setupCanvasEvents() {
             if (state.activeId !== convId) {
               switchConversation(convId);
             }
-            // Mostrar el canvas
-            renderCanvasPanel(convId);
+            // Mostrar el canvas con la versión específica
+            renderCanvasPanel(convId, versionNumber);
             scrollChatToBottom();
           }
         });
@@ -7967,8 +8312,8 @@ function setChatMode(mode) {
     ensureCanvasDoc(conversation.id);
     renderCanvasPanel(conversation.id);
   } else {
-    const doc = conversation ? getCanvasDoc(conversation.id) : null;
-    toggleCanvasVisibility(!!doc);
+    // Cuando no está en modo canvas, ocultar el panel
+    toggleCanvasVisibility(false);
   }
 }
 
@@ -8913,6 +9258,10 @@ async function handleSubmitWithDeepResearch(event) {
     return;
   }
 
+  // Si el modo canvas está activo, usar el flujo normal con canvas
+  if (canvasMode) {
+    return originalHandleSubmit.call(this, event);
+  }
   
   // Si el modo web está activo, buscar en internet primero con UI visual
   if (webSearchMode) {

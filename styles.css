@@ -7232,21 +7232,61 @@ button.research-active-btn svg {
    =========================== */
 body.canvas-visible .main-column {
   display: grid;
-  grid-template-columns: 1fr 550px;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
   gap: 16px;
-  padding-right: 12px;
+  padding: 12px;
+  height: 100vh;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
 }
 
 body.canvas-visible #canvas-panel {
-  display: flex;
+  display: flex !important;
+  grid-column: 2;
+  grid-row: 1;
+  height: 100%;
+  min-height: 0;
+  max-height: calc(100vh - 24px);
 }
 
 body.canvas-visible #chat-state {
-  display: flex;
+  display: flex !important;
+  grid-column: 1;
+  grid-row: 1;
+  height: 100%;
+  min-height: 0;
+  max-height: calc(100vh - 24px);
 }
 
 body.canvas-visible #empty-state {
-  grid-column: 1 / -1;
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  height: 100%;
+  min-height: 0;
+}
+
+body.canvas-visible #background-image {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  grid-column: unset;
+  grid-row: unset;
+}
+
+body.canvas-visible #empty-state-header {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  grid-column: unset;
+  grid-row: unset;
 }
 
 #canvas-panel {
@@ -7256,12 +7296,40 @@ body.canvas-visible #empty-state {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   padding: 0;
-  height: fit-content;
-  max-height: calc(100vh - 40px);
+  height: 100%;
+  max-height: 100%;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  position: sticky;
-  top: 20px;
   overflow: hidden;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  /* En pantallas muy pequeñas, usar overlay para mejor UX */
+  body.canvas-visible .main-column {
+    grid-template-columns: 1fr;
+  }
+
+  body.canvas-visible #canvas-panel {
+    position: fixed;
+    right: 12px;
+    top: 12px;
+    bottom: 12px;
+    left: auto;
+    width: min(90vw, 640px);
+    max-height: calc(100vh - 24px);
+    z-index: 50;
+    background: #111;
+  }
+
+  /* En móviles, apilar el editor y la vista previa verticalmente */
+  .canvas-content[data-view-mode="split"] {
+    flex-direction: column;
+  }
+
+  .canvas-content[data-view-mode="split"] .canvas-editor-pane {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
 }
 
 .canvas-header {
@@ -7290,6 +7358,31 @@ body.canvas-visible #empty-state {
   color: rgba(255, 255, 255, 0.4);
 }
 
+.canvas-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.canvas-view-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.canvas-view-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
 .canvas-close-btn {
   background: transparent;
   border: none;
@@ -7309,18 +7402,88 @@ body.canvas-visible #empty-state {
   color: #fff;
 }
 
+/* Contenedor principal del canvas */
+.canvas-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: calc(100% - 60px);
+}
+
+/* Vista dividida (por defecto) */
+.canvas-content[data-view-mode="split"] .canvas-editor-pane,
+.canvas-content[data-view-mode="split"] .canvas-preview-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Solo editor */
+.canvas-content[data-view-mode="editor"] .canvas-editor-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.canvas-content[data-view-mode="editor"] .canvas-preview-pane {
+  display: none;
+}
+
+/* Solo vista previa */
+.canvas-content[data-view-mode="preview"] .canvas-editor-pane {
+  display: none;
+}
+
+.canvas-content[data-view-mode="preview"] .canvas-preview-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Paneles */
+.canvas-editor-pane,
+.canvas-preview-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+.canvas-editor-pane {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.canvas-pane-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.canvas-pane-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Editor de texto */
 .canvas-editor {
+  flex: 1;
   background: #1a1a1a;
   border: none;
-  min-height: 400px;
-  max-height: calc(85vh - 80px);
   padding: 24px;
   color: #f5f5f5;
   overflow-y: auto;
   font-size: 15px;
   line-height: 1.6;
   outline: none;
-  border-radius: 0 0 12px 12px;
+  resize: none;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.canvas-editor::placeholder {
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .canvas-editor::-webkit-scrollbar {
@@ -7340,42 +7503,70 @@ body.canvas-visible #empty-state {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Estilos para el contenido del editor */
-.canvas-editor h1 {
+/* Vista previa */
+.canvas-preview {
+  flex: 1;
+  background: #1a1a1a;
+  padding: 24px;
+  color: #f5f5f5;
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.canvas-preview::-webkit-scrollbar {
+  width: 8px;
+}
+
+.canvas-preview::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.canvas-preview::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.canvas-preview::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Estilos para el contenido renderizado en la vista previa */
+.canvas-preview h1 {
   font-size: 28px;
   font-weight: 700;
   margin: 24px 0 16px;
   color: #fff;
 }
 
-.canvas-editor h2 {
+.canvas-preview h2 {
   font-size: 22px;
   font-weight: 600;
   margin: 20px 0 12px;
   color: #fff;
 }
 
-.canvas-editor h3 {
+.canvas-preview h3 {
   font-size: 18px;
   font-weight: 600;
   margin: 16px 0 10px;
-  color: #f5f5f5;
+  color: #fff;
 }
 
-.canvas-editor p {
+.canvas-preview p {
   margin: 12px 0;
 }
 
-.canvas-editor ul, .canvas-editor ol {
+.canvas-preview ul, .canvas-preview ol {
   margin: 12px 0;
   padding-left: 24px;
 }
 
-.canvas-editor li {
+.canvas-preview li {
   margin: 6px 0;
 }
 
-.canvas-editor code {
+.canvas-preview code {
   background: rgba(255, 255, 255, 0.08);
   padding: 2px 6px;
   border-radius: 4px;
@@ -7383,7 +7574,7 @@ body.canvas-visible #empty-state {
   font-size: 14px;
 }
 
-.canvas-editor pre {
+.canvas-preview pre {
   background: rgba(0, 0, 0, 0.3);
   padding: 16px;
   border-radius: 8px;
@@ -7391,9 +7582,58 @@ body.canvas-visible #empty-state {
   margin: 16px 0;
 }
 
-.canvas-editor pre code {
+.canvas-preview pre code {
   background: transparent;
   padding: 0;
+}
+
+.canvas-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.canvas-preview th,
+.canvas-preview td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.canvas-preview th {
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+}
+
+.canvas-preview blockquote {
+  border-left: 3px solid rgba(255, 255, 255, 0.3);
+  padding-left: 16px;
+  margin: 16px 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.canvas-preview a {
+  color: var(--theme-primary);
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.canvas-preview a:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.canvas-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.canvas-preview hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 24px 0;
 }
 
 /* Tarjeta de artifact en el chat */
@@ -7431,6 +7671,17 @@ body.canvas-visible #empty-state {
   font-size: 14px;
   color: #fff;
   flex: 1;
+}
+
+.artifact-version {
+  display: inline-block;
+  background: var(--theme-primary);
+  color: #000;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: auto;
 }
 
 .artifact-preview {
