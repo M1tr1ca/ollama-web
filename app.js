@@ -913,114 +913,155 @@ async function renderPdfVisually(base64Data, container, textToHighlight) {
 
   container.innerHTML = '';
 
-  const normalizedSearch = textToHighlight ? textToHighlight.toLowerCase().trim() : '';
-  let foundPage = null;
+  // Normalize search text (remove extra spaces, lowercase)
+  const normalizedSearch = textToHighlight
+    ? textToHighlight.toLowerCase().replace(/\s+/g, ' ').trim()
+    : '';
+
+  // Use first 50 chars for matching (long quotes may have different formatting)
+  const searchPrefix = normalizedSearch.substring(0, 50);
+
+  console.log('🔍 Searching for text:', searchPrefix);
+
+  let foundPageDiv = null;
+  let foundPageNum = 0;
 
   // Render all pages
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
-    const scale = 1.5; // Higher scale for better quality
+    const scale = 1.5;
     const viewport = page.getViewport({ scale });
 
     // Create page container
     const pageDiv = document.createElement('div');
     pageDiv.className = 'pdf-page';
     pageDiv.dataset.pageNum = pageNum;
-    pageDiv.style.position = 'relative';
-    pageDiv.style.marginBottom = '10px';
+    pageDiv.style.cssText = `
+      position: relative;
+      margin-bottom: 10px;
+      background: white;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      border-radius: 4px;
+      overflow: hidden;
+    `;
 
     // Create canvas for rendering
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.height = viewport.height;
     canvas.width = viewport.width;
-    canvas.style.display = 'block';
-    canvas.style.width = '100%';
-    canvas.style.height = 'auto';
+    canvas.style.cssText = 'display: block; width: 100%; height: auto;';
 
     // Render PDF page to canvas
     await page.render({ canvasContext: context, viewport: viewport }).promise;
+    pageDiv.appendChild(canvas);
 
     // Get text content for this page
     const textContent = await page.getTextContent();
-    const pageText = textContent.items.map(item => item.str).join(' ').toLowerCase();
+    const pageTextItems = textContent.items;
+    const fullPageText = pageTextItems.map(item => item.str).join(' ').toLowerCase().replace(/\s+/g, ' ');
 
-    // Store text for search
-    pageDiv.dataset.textContent = pageText;
+    // Check if this page contains the search text (use prefix for more flexible matching)
+    const matchFound = searchPrefix && fullPageText.includes(searchPrefix);
 
-    // Check if this page contains the search text
-    if (normalizedSearch && pageText.includes(normalizedSearch) && !foundPage) {
-      foundPage = pageDiv;
+    if (matchFound && !foundPageDiv) {
+      foundPageDiv = pageDiv;
+      foundPageNum = pageNum;
+      console.log(`✅ Found text on page ${pageNum}`);
 
-      // Create text layer with highlighting
+      // Create highlight overlay for matching text items
       const textLayerDiv = document.createElement('div');
-      textLayerDiv.className = 'pdf-text-layer-overlay';
+      textLayerDiv.className = 'pdf-text-layer';
       textLayerDiv.style.cssText = `
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        overflow: hidden;
-        opacity: 0.4;
-        line-height: 1;
         pointer-events: none;
       `;
 
-      // Create highlight overlays for text items that match
-      for (const item of textContent.items) {
-        if (item.str.toLowerCase().includes(normalizedSearch) ||
-          normalizedSearch.includes(item.str.toLowerCase())) {
-          const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+      // Find items that contain parts of the search text
+      const searchWords = searchPrefix.split(' ').filter(w => w.length > 3);
+      let highlightCount = 0;
 
-          const highlightDiv = document.createElement('div');
-          highlightDiv.className = 'pdf-text-highlight-box';
-          highlightDiv.style.cssText = `
+      for (const item of pageTextItems) {
+        if (!item.transform || !item.str) continue;
+
+        const itemText = item.str.toLowerCase();
+        const matches = searchWords.some(word => itemText.includes(word));
+
+        if (matches) {
+          const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+          const fontSize = Math.sqrt(tx[0] * tx[0] + tx[1] * tx[1]);
+          const x = tx[4];
+          const y = viewport.height - tx[5];
+
+          const highlight = document.createElement('div');
+          highlight.className = 'pdf-highlight-box';
+          highlight.style.cssText = `
             position: absolute;
-            left: ${tx[4]}px;
-            bottom: ${tx[5]}px;
-            font-size: ${Math.abs(tx[0])}px;
-            transform: scaleX(${tx[0] / Math.abs(tx[0])});
-            background: #ffd700;
-            padding: 2px 4px;
-            border-radius: 2px;
+            left: ${x}px;
+            top: ${y - fontSize}px;
+            height: ${fontSize * 1.3}px;
+            width: ${(item.width || item.str.length * fontSize * 0.5) * scale}px;
+            background: rgba(255, 235, 59, 0.5);
+            border-bottom: 3px solid #f9a825;
+            pointer-events: none;
+            animation: highlightPulse 1.5s ease-in-out infinite;
           `;
-          highlightDiv.textContent = item.str;
-          textLayerDiv.appendChild(highlightDiv);
+          textLayerDiv.appendChild(highlight);
+          highlightCount++;
         }
       }
 
+      console.log(`📝 Created ${highlightCount} highlight boxes`);
       pageDiv.appendChild(textLayerDiv);
 
-      // Add found indicator
-      const indicator = document.createElement('div');
-      indicator.className = 'pdf-page-found-indicator';
-      indicator.innerHTML = '📍 Texto encontrado aquí';
-      indicator.style.cssText = `
+      // Add found banner
+      const banner = document.createElement('div');
+      banner.className = 'pdf-found-banner';
+      banner.innerHTML = `📍 Página ${pageNum} - Texto citado encontrado`;
+      banner.style.cssText = `
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
-        background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-dark));
+        background: linear-gradient(135deg, #ff9800, #f57c00);
         color: white;
-        padding: 8px 12px;
-        font-size: 13px;
-        font-weight: 500;
+        padding: 12px 16px;
+        font-size: 14px;
+        font-weight: 600;
         text-align: center;
-        z-index: 10;
+        z-index: 100;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       `;
-      pageDiv.insertBefore(indicator, pageDiv.firstChild);
+      pageDiv.appendChild(banner);
     }
 
-    pageDiv.appendChild(canvas);
+    // Add page number footer
+    const pageFooter = document.createElement('div');
+    pageFooter.style.cssText = `
+      text-align: center;
+      padding: 8px;
+      color: rgba(255,255,255,0.6);
+      font-size: 12px;
+      background: rgba(0,0,0,0.3);
+    `;
+    pageFooter.textContent = `Página ${pageNum} de ${pdf.numPages}`;
+    pageDiv.appendChild(pageFooter);
+
     container.appendChild(pageDiv);
   }
 
   // Scroll to found page
-  if (foundPage) {
+  if (foundPageDiv) {
+    console.log(`📜 Scrolling to page ${foundPageNum}`);
     setTimeout(() => {
-      foundPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
+      foundPageDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+  } else {
+    console.log('❌ Text not found in any page');
   }
 }
 
