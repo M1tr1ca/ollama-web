@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat con Captura - Ollama Web</title>
-  <link rel="icon" type="image/png" href="/assets/Fondo.png" />
+  <title>Chat con Captura - Kaisio Chat</title>
+  <link rel="icon" type="image/png" href="/assets/Estrella.png" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
@@ -52,10 +52,10 @@
       color: rgba(255, 255, 255, 0.9);
     }
 
-    .popup-title svg {
+    .popup-logo-img {
       width: 18px;
       height: 18px;
-      color: #60a5fa;
+      object-fit: contain;
     }
 
     .popup-status {
@@ -516,10 +516,7 @@
 <body>
   <div class="popup-header">
     <div class="popup-title">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="2" y="3" width="20" height="14" rx="2"/>
-        <circle cx="12" cy="10" r="3"/>
-      </svg>
+      <img src="/assets/Estrella.png" alt="Logo" class="popup-logo-img">
       <span>Chat con Captura</span>
       <span class="popup-status" id="popup-status">Conectado</span>
     </div>

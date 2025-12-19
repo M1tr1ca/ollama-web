@@ -5,6 +5,84 @@ const BACKGROUND_STORAGE_KEY = 'ollama-web-background-date';
 const DYSLEXIC_FONT_KEY = 'ollama-web-dyslexic-font';
 const CANVAS_STORAGE_KEY = 'ollama-web-canvas-v1';
 const CANVAS_DEFAULT_TITLE = 'Nuevo documento';
+const PDF_DB_NAME = 'ollama-web-pdf-store';
+const PDF_DB_VERSION = 1;
+
+// IndexedDB for storing large PDF binaries
+let pdfDatabase = null;
+
+async function initPdfDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(PDF_DB_NAME, PDF_DB_VERSION);
+
+    request.onerror = () => {
+      console.warn('IndexedDB not available for PDF storage');
+      resolve(null);
+    };
+
+    request.onsuccess = (event) => {
+      pdfDatabase = event.target.result;
+      console.log('📦 PDF IndexedDB initialized');
+      resolve(pdfDatabase);
+    };
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('pdfFiles')) {
+        db.createObjectStore('pdfFiles', { keyPath: 'id' });
+      }
+    };
+  });
+}
+
+async function savePdfToIndexedDB(fileId, pdfBinary) {
+  if (!pdfDatabase) await initPdfDatabase();
+  if (!pdfDatabase) return false;
+
+  return new Promise((resolve) => {
+    try {
+      const transaction = pdfDatabase.transaction(['pdfFiles'], 'readwrite');
+      const store = transaction.objectStore('pdfFiles');
+      store.put({ id: fileId, binary: pdfBinary, timestamp: Date.now() });
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = () => resolve(false);
+    } catch (e) {
+      console.warn('Error saving PDF to IndexedDB:', e);
+      resolve(false);
+    }
+  });
+}
+
+async function getPdfFromIndexedDB(fileId) {
+  if (!pdfDatabase) await initPdfDatabase();
+  if (!pdfDatabase) return null;
+
+  return new Promise((resolve) => {
+    try {
+      const transaction = pdfDatabase.transaction(['pdfFiles'], 'readonly');
+      const store = transaction.objectStore('pdfFiles');
+      const request = store.get(fileId);
+      request.onsuccess = () => resolve(request.result?.binary || null);
+      request.onerror = () => resolve(null);
+    } catch (e) {
+      console.warn('Error getting PDF from IndexedDB:', e);
+      resolve(null);
+    }
+  });
+}
+
+async function deletePdfFromIndexedDB(fileId) {
+  if (!pdfDatabase) await initPdfDatabase();
+  if (!pdfDatabase) return;
+
+  try {
+    const transaction = pdfDatabase.transaction(['pdfFiles'], 'readwrite');
+    const store = transaction.objectStore('pdfFiles');
+    store.delete(fileId);
+  } catch (e) {
+    console.warn('Error deleting PDF from IndexedDB:', e);
+  }
+}
 
 const chatList = document.getElementById('chat-list');
 const chatForm = document.getElementById('chat-form');
@@ -267,7 +345,7 @@ function toggleCanvasVisibility(show) {
 
 function extractJsonFromText(text) {
   if (!text) return null;
-  
+
   // Limpiar bloques de código markdown si existen
   let cleanText = text;
   const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
@@ -277,30 +355,30 @@ function extractJsonFromText(text) {
 
   const start = text.indexOf('{');
   if (start === -1) return null;
-  
+
   let balance = 0;
   let end = -1;
   let inString = false;
   let escape = false;
-  
+
   for (let i = start; i < text.length; i++) {
     const char = text[i];
-    
+
     if (escape) {
       escape = false;
       continue;
     }
-    
+
     if (char === '\\') {
       escape = true;
       continue;
     }
-    
+
     if (char === '"') {
       inString = !inString;
       continue;
     }
-    
+
     if (!inString) {
       if (char === '{') balance++;
       else if (char === '}') {
@@ -312,7 +390,7 @@ function extractJsonFromText(text) {
       }
     }
   }
-  
+
   if (end !== -1) {
     return text.substring(start, end + 1);
   }
@@ -344,7 +422,7 @@ let canvasEditorListenerAdded = false;
 function updateCanvasPreview(markdownContent) {
   const previewEl = document.getElementById('canvas-preview');
   if (!previewEl) return;
-  
+
   // Convertir markdown a HTML
   let htmlContent = '';
   if (typeof marked !== 'undefined') {
@@ -357,9 +435,9 @@ function updateCanvasPreview(markdownContent) {
   } else {
     htmlContent = markdownContent || '';
   }
-  
+
   previewEl.innerHTML = htmlContent;
-  
+
   // Renderizar fórmulas matemáticas si KaTeX está disponible
   if (typeof renderMathInElement !== 'undefined') {
     try {
@@ -379,11 +457,11 @@ function updateCanvasPreview(markdownContent) {
 function initCanvasEditor(content = '', readOnly = false) {
   const editorEl = document.getElementById('canvas-editor');
   if (!editorEl) return;
-  
+
   // El canvas-editor es un textarea, usar value en vez de innerHTML
   editorEl.value = content || '';
   editorEl.readOnly = readOnly;
-  
+
   // Cambiar estilo si es solo lectura
   if (readOnly) {
     editorEl.style.opacity = '0.7';
@@ -394,16 +472,16 @@ function initCanvasEditor(content = '', readOnly = false) {
     editorEl.style.cursor = 'text';
     editorEl.placeholder = 'Escribe aquí tu contenido en Markdown...';
   }
-  
+
   // Actualizar la vista previa inicial
   updateCanvasPreview(content);
-  
+
   // Añadir listener solo una vez
   if (!canvasEditorListenerAdded) {
     editorEl.addEventListener('input', () => {
       // No permitir edición si es solo lectura
       if (editorEl.readOnly) return;
-      
+
       const conversation = state.conversations[state.activeId];
       if (!conversation) return;
       const doc = getCanvasDoc(conversation.id);
@@ -411,7 +489,7 @@ function initCanvasEditor(content = '', readOnly = false) {
       doc.content = editorEl.value;
       doc.updatedAt = Date.now();
       saveCanvasDoc(conversation.id, doc);
-      
+
       // Actualizar vista previa en tiempo real
       updateCanvasPreview(editorEl.value);
     });
@@ -430,12 +508,12 @@ function renderCanvasPanel(conversationId, versionNumber = null) {
     toggleCanvasVisibility(false);
     return;
   }
-  
+
   // Si se especifica una versión, cargar esa versión
   let contentToShow = doc.content;
   let titleToShow = doc.title;
   let isOldVersion = false;
-  
+
   if (versionNumber && versionNumber < (doc.version || 1)) {
     // Buscar la versión en el historial
     const versionData = doc.versions?.find(v => v.version === versionNumber);
@@ -445,11 +523,11 @@ function renderCanvasPanel(conversationId, versionNumber = null) {
       isOldVersion = true;
     }
   }
-  
+
   toggleCanvasVisibility(true);
   if (canvasTitleInput) {
     canvasTitleInput.value = (isOldVersion ? `${titleToShow} (v${versionNumber})` : titleToShow) || CANVAS_DEFAULT_TITLE;
-    
+
     if (!isOldVersion) {
       canvasTitleInput.addEventListener('input', () => {
         doc.title = canvasTitleInput.value;
@@ -458,9 +536,9 @@ function renderCanvasPanel(conversationId, versionNumber = null) {
       });
     }
   }
-  
+
   initCanvasEditor(contentToShow || '', isOldVersion);
-  
+
   // Guardar la versión actual que se está visualizando
   doc.currentViewVersion = versionNumber || doc.version || 1;
 }
@@ -468,17 +546,17 @@ function renderCanvasPanel(conversationId, versionNumber = null) {
 function parseCanvasPayload(content) {
   if (!content) return null;
   let candidate = content.trim();
-  
+
   // Limpiar bloques de código markdown
   candidate = candidate.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-  
+
   // Buscar JSON con type canvas - regex más flexible
   let jsonMatch = candidate.match(/\{[^{}]*"type"\s*:\s*["']canvas["'][^{}]*\}/s);
   if (!jsonMatch) {
     // Intentar buscar JSON anidado más complejo
     jsonMatch = candidate.match(/\{[\s\S]*?"type"\s*:\s*["']canvas["'][\s\S]*?\}(?=\s*[^{]|$)/);
   }
-  
+
   if (jsonMatch) {
     candidate = jsonMatch[0];
   } else {
@@ -488,7 +566,7 @@ function parseCanvasPayload(content) {
       candidate = jsonMatch[0];
     }
   }
-  
+
   // Intentar parsear como JSON
   try {
     const parsed = JSON.parse(candidate);
@@ -500,7 +578,7 @@ function parseCanvasPayload(content) {
     const typeMatch = candidate.match(/"type"\s*:\s*["']([^"']+)["']/);
     const ctypeMatch = candidate.match(/"content_type"\s*:\s*["']([^"']+)["']/);
     const titleMatch = candidate.match(/"title"\s*:\s*["']([^"']*)["']/);
-    
+
     // Regex mejorado para contenido - maneja escapes y multilinea
     let contentValue = null;
     const contentMatch = candidate.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
@@ -522,7 +600,7 @@ function parseCanvasPayload(content) {
       };
     }
   }
-  
+
   return null;
 }
 
@@ -536,7 +614,7 @@ function detectCanvasIntent(prompt) {
 function createArtifactCard(payload) {
   const preview = stripHtml(payload.content).slice(0, 150) + '...';
   const versionBadge = payload.version ? `<span class="artifact-version">v${payload.version}</span>` : '';
-  
+
   return `
     <div class="artifact-card" data-canvas-id="${payload.canvasId || ''}" data-canvas-version="${payload.version || 1}">
       <div class="artifact-card-header">
@@ -567,7 +645,7 @@ function applyCanvasPayload(conversation, payload) {
   const doc = ensureCanvasDoc(conversation.id, payload);
   // Guardar el contenido como markdown plano (el textarea lo mostrará directamente)
   let content = payload.content || '';
-  
+
   // Si el contenido es diferente, guardar versión anterior
   if (doc.content && doc.content !== content) {
     // Guardar versión anterior en el historial
@@ -578,56 +656,56 @@ function applyCanvasPayload(conversation, payload) {
       content: doc.content,
       timestamp: doc.updatedAt || Date.now()
     });
-    
+
     // Incrementar número de versión
     doc.version = (doc.version || 1) + 1;
   }
-  
+
   doc.title = payload.title || doc.title || CANVAS_DEFAULT_TITLE;
   doc.contentType = payload.content_type || 'document';
   doc.content = content;
   doc.updatedAt = Date.now();
   saveCanvasDoc(conversation.id, doc);
   renderCanvasPanel(conversation.id);
-  
+
   return doc.id;
 }
 
 // Procesar respuesta con canvas estilo Claude
 function processCanvasResponse(conversation, assistantMessage) {
   if (!conversation || !assistantMessage?.content) return false;
-  
+
   const payload = parseCanvasPayload(assistantMessage.content);
   if (!payload) return false;
-  
+
   // Obtener el documento actual para ver si es una actualización
   const existingDoc = getCanvasDoc(conversation.id);
   const isUpdate = existingDoc && existingDoc.content && existingDoc.content !== payload.content;
-  
+
   // Aplicar el canvas y obtener su ID
   const canvasId = applyCanvasPayload(conversation, payload);
-  
+
   // Obtener la versión actualizada
   const updatedDoc = getCanvasDoc(conversation.id);
   const currentVersion = updatedDoc?.version || 1;
-  
+
   // Añadir versión al payload para la tarjeta
   payload.canvasId = canvasId;
   payload.version = currentVersion;
-  
+
   // Limpiar el JSON del contenido del mensaje
   // Buscar y eliminar todo el bloque JSON (incluyendo bloques de código markdown)
   let cleanContent = assistantMessage.content;
-  
+
   // Eliminar bloques ```json ... ```
   cleanContent = cleanContent.replace(/```json\s*\{[\s\S]*?\}\s*```/g, '');
-  
+
   // Eliminar JSON sin bloques de código
   cleanContent = cleanContent.replace(/\{[\s\S]*?"type"\s*:\s*["']canvas["'][\s\S]*?\}/g, '');
-  
+
   // Limpiar espacios en blanco excesivos
   cleanContent = cleanContent.replace(/\n{3,}/g, '\n\n').trim();
-  
+
   // Si después de limpiar queda texto útil, usarlo; sino crear mensaje por defecto
   let explanation = '';
   if (cleanContent && cleanContent.length > 10 && !cleanContent.match(/^\s*$/)) {
@@ -645,7 +723,7 @@ function processCanvasResponse(conversation, assistantMessage) {
       explanation += `Los cambios se han aplicado al documento en el panel de la derecha. `;
     } else {
       explanation = `He creado el documento "${payload.title}" (v${currentVersion}).\n\n[CANVAS_ARTIFACT]\n\n`;
-      
+
       // Agregar breve descripción de lo que se hizo
       if (payload.content_type === 'code') {
         explanation += `Este es un código que puedes revisar y editar en el panel de la derecha. `;
@@ -653,14 +731,14 @@ function processCanvasResponse(conversation, assistantMessage) {
         explanation += `Este documento está disponible en el panel de la derecha para que puedas revisarlo y editarlo. `;
       }
     }
-    
+
     explanation += `Puedes pedirme que lo modifique o amplíe en cualquier momento.`;
   }
-  
+
   assistantMessage.content = explanation;
   assistantMessage.canvasId = canvasId;
   assistantMessage.canvasVersion = currentVersion;
-  
+
   return true;
 }
 
@@ -668,21 +746,21 @@ function processCanvasResponse(conversation, assistantMessage) {
 function buildCanvasInstruction(doc, userPrompt) {
   let docContext = '';
   let versionInfo = '';
-  
+
   if (doc?.content) {
     const plainText = stripHtml(doc.content).slice(0, 2000); // Limitar contexto
     const currentVersion = doc.version || 1;
     const viewingVersion = doc.currentViewVersion || currentVersion;
-    
+
     versionInfo = `\n\nVersión actual del documento: v${currentVersion}`;
     if (viewingVersion < currentVersion) {
       versionInfo += `\nEl usuario está viendo la versión: v${viewingVersion} (versión anterior)`;
       versionInfo += `\nSi el usuario pide modificaciones, se aplicarán sobre la versión más reciente (v${currentVersion}), no sobre la versión que está viendo.`;
     }
-    
+
     docContext = `${versionInfo}\n\nContenido del documento (v${viewingVersion}):\n${plainText}`;
   }
-  
+
   return `Cuando el usuario pida crear, redactar o modificar un documento, responde con JSON válido en este formato:
 
 {
@@ -703,6 +781,415 @@ function stripHtml(html) {
   tmp.innerHTML = html || '';
   return (tmp.textContent || '').trim();
 }
+
+// ========================================
+// PDF Source References System
+// ========================================
+
+// Parse source references and convert to clickable badges
+function parseSourceReferences(content) {
+  if (!content) return content;
+
+  // Match [[FUENTE:filename.pdf:"quoted text"]]
+  const sourceRegex = /\[\[FUENTE:([^:]+):"([^"]+)"\]\]/g;
+
+  return content.replace(sourceRegex, (match, fileName, citedText) => {
+    const safeFileName = escapeHtml(fileName.trim());
+    const safeCitedText = escapeHtml(citedText.trim());
+
+    return `<span class="source-badge" 
+                  data-file="${safeFileName}" 
+                  data-text="${safeCitedText}"
+                  onclick="window.openPdfViewer('${safeFileName.replace(/'/g, "\\'")}', '${safeCitedText.replace(/'/g, "\\'")}')"
+                  title="Ver fuente: ${safeFileName}">
+              <span class="source-badge-icon">📄</span>
+              <span class="source-badge-name">${safeFileName}</span>
+            </span>`;
+  });
+}
+
+// State for PDF viewer
+let pdfViewerState = {
+  currentPdf: null,
+  currentFile: null,
+  scale: 1.2
+};
+
+// Open PDF viewer panel with highlighted text
+window.openPdfViewer = async function (fileName, textToHighlight) {
+  const project = getActiveProject();
+  if (!project) {
+    console.warn('No hay proyecto activo');
+    return;
+  }
+
+  // Find the file in project - try exact match first, then flexible match
+  let file = project.files.find(f => f.name === fileName);
+
+  // If not found, try flexible comparison (normalize accents, case, hyphens/spaces)
+  if (!file) {
+    const normalizeFileName = (name) => {
+      return name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove accents
+        .replace(/[-_]/g, ' ')           // Convert hyphens/underscores to spaces
+        .replace(/\s+/g, ' ')            // Normalize multiple spaces
+        .trim();
+    };
+
+    const normalizedSearch = normalizeFileName(fileName);
+    file = project.files.find(f => {
+      const normalizedName = normalizeFileName(f.name);
+      return normalizedName === normalizedSearch ||
+        normalizedName.includes(normalizedSearch) ||
+        normalizedSearch.includes(normalizedName);
+    });
+  }
+
+  if (!file) {
+    console.warn(`Archivo no encontrado: ${fileName}`);
+    console.log('Archivos disponibles en el proyecto:', project.files.map(f => f.name));
+    return;
+  }
+
+  // Get panel elements
+  const panel = document.getElementById('pdf-viewer-panel');
+  const filenameEl = document.getElementById('pdf-viewer-filename');
+  const highlightTextEl = document.getElementById('pdf-highlight-text');
+  const container = document.getElementById('pdf-viewer-container');
+
+  if (!panel || !container) {
+    console.warn('Panel de visor de PDF no encontrado');
+    return;
+  }
+
+  // Show panel
+  panel.style.display = 'flex';
+  document.body.classList.add('pdf-viewer-visible');
+
+  // Update header info
+  if (filenameEl) filenameEl.textContent = fileName;
+  if (highlightTextEl) highlightTextEl.textContent = `"${textToHighlight}"`;
+
+  // Show loading state
+  container.innerHTML = '<div class="pdf-loading"><div class="loading-spinner"></div><span>Cargando PDF...</span></div>';
+
+  try {
+    // Always load the content (since we're showing extracted text, it's fast)
+    await loadPdfIntoViewer(file, container, textToHighlight);
+    pdfViewerState.currentFile = fileName;
+
+  } catch (error) {
+    console.error('Error al cargar PDF:', error);
+    container.innerHTML = `<div class="pdf-error">
+      <span class="error-icon">⚠️</span>
+      <span>Error al cargar el PDF: ${error.message}</span>
+    </div>`;
+  }
+};
+
+// Render PDF visually with text highlighting overlay
+async function renderPdfVisually(base64Data, container, textToHighlight) {
+  const isLoaded = await waitForPdfJs();
+  if (!isLoaded) throw new Error('PDF.js no disponible');
+
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  // Decode base64 to binary
+  const base64 = base64Data.split(',')[1];
+  const pdfData = atob(base64);
+  const bytes = new Uint8Array(pdfData.length);
+  for (let i = 0; i < pdfData.length; i++) {
+    bytes[i] = pdfData.charCodeAt(i);
+  }
+
+  // Load PDF document
+  const loadingTask = pdfjsLib.getDocument({ data: bytes });
+  const pdf = await loadingTask.promise;
+  pdfViewerState.currentPdf = pdf;
+
+  container.innerHTML = '';
+
+  const normalizedSearch = textToHighlight ? textToHighlight.toLowerCase().trim() : '';
+  let foundPage = null;
+
+  // Render all pages
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const scale = 1.5; // Higher scale for better quality
+    const viewport = page.getViewport({ scale });
+
+    // Create page container
+    const pageDiv = document.createElement('div');
+    pageDiv.className = 'pdf-page';
+    pageDiv.dataset.pageNum = pageNum;
+    pageDiv.style.position = 'relative';
+    pageDiv.style.marginBottom = '10px';
+
+    // Create canvas for rendering
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    canvas.style.display = 'block';
+    canvas.style.width = '100%';
+    canvas.style.height = 'auto';
+
+    // Render PDF page to canvas
+    await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+    // Get text content for this page
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items.map(item => item.str).join(' ').toLowerCase();
+
+    // Store text for search
+    pageDiv.dataset.textContent = pageText;
+
+    // Check if this page contains the search text
+    if (normalizedSearch && pageText.includes(normalizedSearch) && !foundPage) {
+      foundPage = pageDiv;
+
+      // Create text layer with highlighting
+      const textLayerDiv = document.createElement('div');
+      textLayerDiv.className = 'pdf-text-layer-overlay';
+      textLayerDiv.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+        opacity: 0.4;
+        line-height: 1;
+        pointer-events: none;
+      `;
+
+      // Create highlight overlays for text items that match
+      for (const item of textContent.items) {
+        if (item.str.toLowerCase().includes(normalizedSearch) ||
+          normalizedSearch.includes(item.str.toLowerCase())) {
+          const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+
+          const highlightDiv = document.createElement('div');
+          highlightDiv.className = 'pdf-text-highlight-box';
+          highlightDiv.style.cssText = `
+            position: absolute;
+            left: ${tx[4]}px;
+            bottom: ${tx[5]}px;
+            font-size: ${Math.abs(tx[0])}px;
+            transform: scaleX(${tx[0] / Math.abs(tx[0])});
+            background: #ffd700;
+            padding: 2px 4px;
+            border-radius: 2px;
+          `;
+          highlightDiv.textContent = item.str;
+          textLayerDiv.appendChild(highlightDiv);
+        }
+      }
+
+      pageDiv.appendChild(textLayerDiv);
+
+      // Add found indicator
+      const indicator = document.createElement('div');
+      indicator.className = 'pdf-page-found-indicator';
+      indicator.innerHTML = '📍 Texto encontrado aquí';
+      indicator.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-dark));
+        color: white;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        text-align: center;
+        z-index: 10;
+      `;
+      pageDiv.insertBefore(indicator, pageDiv.firstChild);
+    }
+
+    pageDiv.appendChild(canvas);
+    container.appendChild(pageDiv);
+  }
+
+  // Scroll to found page
+  if (foundPage) {
+    setTimeout(() => {
+      foundPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+}
+
+// Load PDF into viewer container
+async function loadPdfIntoViewer(file, container, textToHighlight) {
+  // Debug: Log what we have in the file
+  console.log('📄 PDF Viewer - Loading file:', {
+    name: file.name,
+    id: file.id,
+    hasPdfBinary: file.hasPdfBinary,
+    hasContent: !!file.content,
+    contentStart: file.content?.substring(0, 50),
+    isPDF: file.isPDF
+  });
+
+  // Check if no content at all
+  // Check if no content at all
+  if (!file.content && !file.hasPdfBinary && !file.pdfBinary) {
+    container.innerHTML = '<div class="pdf-error"><span class="error-icon">⚠️</span><span>Sin contenido disponible</span></div>';
+    return;
+  }
+
+  // NEW FORMAT: Load PDF binary from IndexedDB
+  if (file.hasPdfBinary && file.id) {
+    try {
+      console.log('📄 Loading PDF from IndexedDB:', file.id);
+      const pdfBinary = await getPdfFromIndexedDB(file.id);
+      if (pdfBinary && pdfBinary.startsWith('data:application/pdf')) {
+        console.log('📄 ✅ Rendering PDF visually from IndexedDB');
+        await renderPdfVisually(pdfBinary, container, textToHighlight);
+        return;
+      } else {
+        console.warn('📄 ⚠️ PDF binary not found in IndexedDB, falling back to text');
+      }
+    } catch (e) {
+      console.warn('📄 ⚠️ Could not load PDF from IndexedDB:', e);
+    }
+  }
+
+  // LEGACY: Check if file has pdfBinary directly (old storage format)
+  if (file.pdfBinary && file.pdfBinary.startsWith('data:application/pdf')) {
+    try {
+      console.log('📄 ✅ Rendering PDF visually from legacy pdfBinary');
+      await renderPdfVisually(file.pdfBinary, container, textToHighlight);
+      return;
+    } catch (e) {
+      console.warn('📄 ⚠️ Could not render PDF binary:', e);
+    }
+  }
+
+  // LEGACY: Check if content itself is base64 PDF data
+  if (file.content && file.content.startsWith('data:application/pdf')) {
+    try {
+      console.log('📄 ✅ Rendering PDF visually from content');
+      await renderPdfVisually(file.content, container, textToHighlight);
+      return;
+    } catch (e) {
+      console.warn('📄 ⚠️ Could not render PDF binary:', e);
+    }
+  }
+
+  // FALLBACK: Show text content (PDF was uploaded before visual support)
+  console.log('📄 ⚠️ No PDF binary available, showing extracted text');
+  console.log('📄 💡 TIP: Re-upload the PDF to enable visual rendering');
+  // Text content view (extracted text from PDF) - FALLBACK
+  container.innerHTML = '';
+  const textView = document.createElement('div');
+  textView.className = 'pdf-text-view';
+
+  // Process text to highlight the cited text
+  let displayContent = file.content || 'Sin contenido disponible';
+
+  if (textToHighlight) {
+    const searchText = textToHighlight.toLowerCase().trim();
+    const contentLower = displayContent.toLowerCase();
+    const index = contentLower.indexOf(searchText);
+
+    if (index !== -1) {
+      const before = escapeHtml(displayContent.substring(0, index));
+      const match = escapeHtml(displayContent.substring(index, index + textToHighlight.length));
+      const after = escapeHtml(displayContent.substring(index + textToHighlight.length));
+      displayContent = `${before}<mark class="pdf-highlight">${match}</mark>${after}`;
+    } else {
+      displayContent = escapeHtml(displayContent);
+    }
+  } else {
+    displayContent = escapeHtml(displayContent);
+  }
+
+  textView.innerHTML = `
+    <div class="pdf-text-header">
+      <span class="pdf-text-icon">📄</span>
+      <span>Contenido extraído de: ${escapeHtml(file.name)}</span>
+    </div>
+    <div class="pdf-text-content">${displayContent}</div>
+  `;
+  container.appendChild(textView);
+
+  // Scroll to highlighted text
+  setTimeout(() => {
+    const highlight = container.querySelector('.pdf-highlight');
+    if (highlight) {
+      highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 100);
+}
+
+// Highlight text in PDF viewer
+async function highlightTextInPdf(container, searchText) {
+  if (!searchText || !container) return;
+
+  const pages = container.querySelectorAll('.pdf-page');
+  const normalizedSearch = searchText.toLowerCase().trim();
+
+  // Remove existing highlights
+  container.querySelectorAll('.pdf-highlight').forEach(el => el.remove());
+
+  // For text-view mode (extracted text)
+  const textView = container.querySelector('.pdf-text-content');
+  if (textView) {
+    const content = textView.textContent;
+    const index = content.toLowerCase().indexOf(normalizedSearch);
+
+    if (index !== -1) {
+      const before = escapeHtml(content.substring(0, index));
+      const match = escapeHtml(content.substring(index, index + searchText.length));
+      const after = escapeHtml(content.substring(index + searchText.length));
+
+      textView.innerHTML = `${before}<mark class="pdf-highlight">${match}</mark>${after}`;
+
+      // Scroll to highlight
+      const highlight = textView.querySelector('.pdf-highlight');
+      if (highlight) {
+        highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+    return;
+  }
+
+  // For actual PDF pages
+  for (const page of pages) {
+    const textContent = (page.dataset.textContent || '').toLowerCase();
+
+    if (textContent.includes(normalizedSearch)) {
+      // Found the text in this page - scroll to it
+      page.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Add visual indicator
+      const indicator = document.createElement('div');
+      indicator.className = 'pdf-highlight-indicator';
+      indicator.innerHTML = `<span class="highlight-pulse">📍 Texto encontrado en esta página</span>`;
+      page.insertBefore(indicator, page.firstChild);
+
+      // Remove indicator after animation
+      setTimeout(() => indicator.remove(), 5000);
+
+      break;
+    }
+  }
+}
+
+// Close PDF viewer
+window.closePdfViewer = function () {
+  const panel = document.getElementById('pdf-viewer-panel');
+  if (panel) {
+    panel.style.display = 'none';
+  }
+  document.body.classList.remove('pdf-viewer-visible');
+};
 
 function parseMarkdown(text) {
   if (!text) return '';
@@ -764,12 +1251,39 @@ function parseMarkdown(text) {
     return `MATH_BLOCK_PLACEHOLDER_${mathBlocks.length - 1}`;
   });
 
+  // Proteger referencias de fuente antes del markdown
+  // Formato: [[FUENTE:filename.pdf:"quoted text"]]
+  const sourceBlocks = [];
+  protectedText = protectedText.replace(/\[\[FUENTE:([^\]]+):"([^"]+)"\]\]/g, (match, fileName, citedText) => {
+    sourceBlocks.push({ fileName: fileName.trim(), citedText: citedText.trim() });
+    return `SOURCE_REF_PLACEHOLDER_${sourceBlocks.length - 1}`;
+  });
+
   // Parsear markdown
   let html = marked.parse(protectedText);
 
   // Restaurar fórmulas matemáticas
   html = html.replace(/MATH_BLOCK_PLACEHOLDER_(\d+)/g, (match, index) => {
     return mathBlocks[index];
+  });
+
+  // Restaurar referencias de fuente como badges HTML
+  html = html.replace(/SOURCE_REF_PLACEHOLDER_(\d+)/g, (match, index) => {
+    const ref = sourceBlocks[index];
+    if (!ref) return match;
+
+    // Use base64 encoding to safely pass data through HTML attributes
+    const fileNameB64 = btoa(unescape(encodeURIComponent(ref.fileName)));
+    const citedTextB64 = btoa(unescape(encodeURIComponent(ref.citedText)));
+    const displayName = escapeHtml(ref.fileName);
+
+    return `<span class="source-badge" 
+                  data-file-b64="${fileNameB64}" 
+                  data-text-b64="${citedTextB64}"
+                  title="Ver fuente: ${displayName}">
+              <span class="source-badge-icon">📄</span>
+              <span class="source-badge-name">${displayName}</span>
+            </span>`;
   });
 
   // Agregar clase markdown-table a todas las tablas para que se apliquen los estilos CSS
@@ -1005,21 +1519,21 @@ function appendMessageElement(message) {
     // Comprobar si hay un canvas asociado a esta conversación
     const conversation = state.conversations[state.activeId];
     const canvasDoc = conversation ? getCanvasDoc(conversation.id) : null;
-    
+
     // Si hay canvas y el mensaje tiene indicadores de canvas creado
     if (canvasDoc && message.role === 'assistant' && message.canvasId === canvasDoc.id) {
       // Dividir el contenido en texto antes del canvas, tarjeta canvas, y texto después
       const parts = message.content.split('[CANVAS_ARTIFACT]');
-      
+
       // Usar la versión del mensaje si existe, sino la actual del documento
       const messageVersion = message.canvasVersion || canvasDoc.version || 1;
-      
+
       if (parts.length > 1) {
         // Hay marcador de artifact
         if (parts[0]) {
           content += parseMarkdown(parts[0]);
         }
-        
+
         // Insertar tarjeta de artifact con versión
         content += createArtifactCard({
           title: canvasDoc.title,
@@ -1027,7 +1541,7 @@ function appendMessageElement(message) {
           canvasId: canvasDoc.id,
           version: messageVersion
         });
-        
+
         if (parts[1]) {
           content += parseMarkdown(parts[1]);
         }
@@ -1065,7 +1579,7 @@ function appendMessageElement(message) {
   // Crear botón de regenerar respuesta (solo para mensajes del asistente)
   let webSourcesBtn = null;
   let webSourcesPopup = null;
-  
+
   if (message.role === 'assistant') {
     const regenerateButton = document.createElement('button');
     regenerateButton.className = 'regenerate-message-btn';
@@ -1076,7 +1590,7 @@ function appendMessageElement(message) {
       await regenerateResponse(message.id);
     });
     copyContainer.appendChild(regenerateButton);
-    
+
     // Preparar botón de fuentes web si el mensaje tiene webSearchData (se añade después del copiar)
     if (message.webSearchData && message.webSearchData.results && message.webSearchData.results.length > 0) {
       webSourcesBtn = document.createElement('button');
@@ -1089,15 +1603,15 @@ function appendMessageElement(message) {
         </svg>
         <span>${message.webSearchData.results.length}</span>
       `;
-      
+
       // Crear popup de fuentes
       webSourcesPopup = document.createElement('div');
       webSourcesPopup.className = 'web-sources-popup';
       webSourcesPopup.style.display = 'none';
-      
+
       let popupContent = '<div class="web-sources-popup-header"><span>Fuentes consultadas</span></div>';
       popupContent += '<div class="web-sources-popup-list">';
-      
+
       message.webSearchData.results.forEach(result => {
         let domain = '';
         let faviconUrl = '';
@@ -1108,7 +1622,7 @@ function appendMessageElement(message) {
         } catch (e) {
           domain = 'web';
         }
-        
+
         popupContent += `
           <a href="${result.link}" target="_blank" rel="noopener noreferrer" class="web-sources-popup-item">
             <img src="${faviconUrl}" alt="" class="web-sources-popup-favicon" onerror="this.style.display='none'">
@@ -1119,10 +1633,10 @@ function appendMessageElement(message) {
           </a>
         `;
       });
-      
+
       popupContent += '</div>';
       webSourcesPopup.innerHTML = popupContent;
-      
+
       webSourcesBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isVisible = webSourcesPopup.style.display === 'block';
@@ -1153,18 +1667,18 @@ function appendMessageElement(message) {
   copyContainer.appendChild(copyButton);
   copyContainer.appendChild(timeElement)
 
-  
+
   // Orden correcto: regenerar (ya añadido) → copiar → fuentes → hora
   copyContainer.appendChild(copyButton);
-  
+
   // Añadir botón de fuentes web después del copiar (si existe)
   if (webSourcesBtn) {
     copyContainer.appendChild(webSourcesBtn);
     copyContainer.appendChild(webSourcesPopup);
   }
-  
+
   copyContainer.appendChild(timeElement);
-  
+
   // Agregar contenido y luego el contenedor de copiar dentro del bubble
   // Solo agregar contenido HTML si NO es un Deep Research activo (ya tiene el progressContainer)
   if (!isActiveDeepResearch) {
@@ -1805,9 +2319,9 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
     // Scroll solo si ha pasado suficiente tiempo y no se debe saltar
     if (!skipScroll) {
       const now = Date.now();
-    if (now - lastScrollUpdateTime >= SCROLL_UPDATE_INTERVAL) {
+      if (now - lastScrollUpdateTime >= SCROLL_UPDATE_INTERVAL) {
         scrollChatToBottom();
-      lastScrollUpdateTime = now;
+        lastScrollUpdateTime = now;
       }
     }
 
@@ -2235,7 +2749,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
               }
 
               assistantMessage.content += contentChunk;
-              
+
               // Detectar si estamos recibiendo JSON de canvas para no mostrarlo
               if (!canvasProcessed && assistantMessage.content.includes('"type"') && assistantMessage.content.includes('"canvas"')) {
                 // Verificar si es un JSON de canvas completo
@@ -2256,7 +2770,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                   }
                 }
               }
-              
+
               pendingUpdate = true;
 
               // Programar actualización de forma asíncrona
@@ -2293,23 +2807,23 @@ async function streamAssistantResponse(conversation, payloadMessages) {
               if (canvasProcessed) {
                 // Re-renderizar el mensaje completo para mostrar la tarjeta
                 bubble.innerHTML = '';
-                
+
                 // Agregar pensamiento si existe
                 if (thinkingData && thinkingData.thinking) {
                   bubble.innerHTML += createThinkingBlock(thinkingData.thinking, thinkingData.duration, false);
                 }
-                
+
                 // Procesar el contenido con la tarjeta de artifact
                 const canvasDoc = getCanvasDoc(conversation.id);
                 const messageVersion = assistantMessage.canvasVersion || canvasDoc?.version || 1;
                 const parts = assistantMessage.content.split('[CANVAS_ARTIFACT]');
-                
+
                 if (parts.length > 1 && canvasDoc) {
                   // Hay marcador de artifact
                   if (parts[0]) {
                     bubble.innerHTML += parseMarkdown(parts[0]);
                   }
-                  
+
                   // Insertar tarjeta de artifact
                   bubble.innerHTML += createArtifactCard({
                     title: canvasDoc.title,
@@ -2317,7 +2831,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                     canvasId: canvasDoc.id,
                     version: messageVersion
                   });
-                  
+
                   if (parts[1]) {
                     bubble.innerHTML += parseMarkdown(parts[1]);
                   }
@@ -2325,27 +2839,27 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                   // Sin marcador, solo parsear markdown
                   bubble.innerHTML += parseMarkdown(assistantMessage.content);
                 }
-                
+
                 // Volver a agregar los botones de acción
                 const copyContainer = bubble.querySelector('.copy-message-container');
                 if (!copyContainer) {
                   const newCopyContainer = document.createElement('div');
                   newCopyContainer.className = 'copy-message-container';
-                  
+
                   const copyButton = document.createElement('button');
                   copyButton.className = 'copy-message-btn';
                   copyButton.title = 'Copiar mensaje';
                   copyButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
-                  
+
                   const timeElement = document.createElement('span');
                   timeElement.className = 'message-time';
                   timeElement.textContent = formatTime(assistantMessage.timestamp || Date.now());
-                  
+
                   newCopyContainer.appendChild(copyButton);
                   newCopyContainer.appendChild(timeElement);
                   bubble.appendChild(newCopyContainer);
                 }
-                
+
                 // Renderizar las tarjetas si existen
                 renderCanvasPanel(conversation.id);
               }
@@ -2412,35 +2926,35 @@ async function streamAssistantResponse(conversation, payloadMessages) {
         if (canvasProcessed) {
           // Re-renderizar el mensaje completo para mostrar la tarjeta
           bubble.innerHTML = '';
-          
+
           // Agregar pensamiento si existe
           if (thinkingData && thinkingData.thinking) {
             bubble.innerHTML += createThinkingBlock(thinkingData.thinking, thinkingData.duration, false);
           }
-          
+
           // Agregar contenido con la tarjeta
           bubble.innerHTML += parseMarkdown(assistantMessage.content);
-          
+
           // Volver a agregar los botones de acción
           const copyContainer = bubble.querySelector('.copy-message-container');
           if (!copyContainer) {
             const newCopyContainer = document.createElement('div');
             newCopyContainer.className = 'copy-message-container';
-            
+
             const copyButton = document.createElement('button');
             copyButton.className = 'copy-message-btn';
             copyButton.title = 'Copiar mensaje';
             copyButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
-            
+
             const timeElement = document.createElement('span');
             timeElement.className = 'message-time';
             timeElement.textContent = formatTime(assistantMessage.timestamp || Date.now());
-            
+
             newCopyContainer.appendChild(copyButton);
             newCopyContainer.appendChild(timeElement);
             bubble.appendChild(newCopyContainer);
           }
-          
+
           // Renderizar las tarjetas si existen
           renderCanvasPanel(conversation.id);
         }
@@ -2954,11 +3468,11 @@ let handleSubmit = async function handleSubmitOriginal(event) {
   if (state.loading) return;
 
   const isEmptyState = emptyState?.style.display !== 'none';
-  
+
   // Buscar el input que tenga contenido (más robusto)
   let activeInput = isEmptyState ? promptInput : promptInputInline;
   let prompt = activeInput?.value.trim();
-  
+
   // Si el input seleccionado está vacío, intentar con el otro
   if (!prompt) {
     const otherInput = isEmptyState ? promptInputInline : promptInput;
@@ -2968,7 +3482,7 @@ let handleSubmit = async function handleSubmitOriginal(event) {
       prompt = otherPrompt;
     }
   }
-  
+
   if (!prompt) return;
 
   const conversation = state.conversations[state.activeId];
@@ -3141,7 +3655,7 @@ INSTRUCCIONES:
 5. Complementa con tu conocimiento cuando sea apropiado.
 6. Al final, puedes sugerir búsquedas adicionales si el usuario quiere profundizar.
 ` : '';
-    
+
     // Determinar las instrucciones finales
     let instructions = '';
     const hasDocuments = textFiles.length > 0 || shouldIncludeProjectContext;
@@ -3158,7 +3672,7 @@ INSTRUCCIONES:
       let finalContent = systemContent;
 
       // Añadir instrucciones del modo estudio primero (alta prioridad)
-      
+
       // Añadir contexto de búsqueda web primero (máxima prioridad)
       if (webSearchInstructions) {
         if (finalContent) {
@@ -3167,7 +3681,7 @@ INSTRUCCIONES:
         finalContent += webSearchInstructions;
         console.log('🌐 Modo Web activado - Añadiendo resultados de búsqueda');
       }
-      
+
       // Añadir instrucciones del modo estudio (alta prioridad)
       if (studyModeInstructions) {
         if (finalContent) {
@@ -3507,10 +4021,23 @@ async function readFileContent(file) {
     // Para imágenes, devolvemos el base64 directamente
     return await convertImageToBase64(file);
   } else if (isPDF) {
-    return await extractTextFromPDF(file, null); // Sin callback de progreso aquí
+    // Para PDFs, devolvemos tanto el texto extraído como el binario
+    const textContent = await extractTextFromPDF(file, null);
+    const binaryContent = await convertFileToBase64(file);
+    return { text: textContent, binary: binaryContent, isPdfData: true };
   } else {
     return await readFileAsText(file);
   }
+}
+
+// Convierte un archivo a base64 data URL
+async function convertFileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
+  });
 }
 
 // Función para crear y mostrar indicador de progreso
@@ -4169,10 +4696,10 @@ function setupCanvasEvents() {
     canvasViewToggle.addEventListener('click', () => {
       const canvasContent = document.querySelector('.canvas-content');
       if (!canvasContent) return;
-      
+
       const currentMode = canvasContent.getAttribute('data-view-mode') || 'split';
       let nextMode = 'split';
-      
+
       if (currentMode === 'split') {
         nextMode = 'editor';
       } else if (currentMode === 'editor') {
@@ -4180,7 +4707,7 @@ function setupCanvasEvents() {
       } else {
         nextMode = 'split';
       }
-      
+
       canvasContent.setAttribute('data-view-mode', nextMode);
       console.log('🔄 Vista Canvas cambiada a:', nextMode);
     });
@@ -4192,7 +4719,7 @@ function setupCanvasEvents() {
     if (artifactCard) {
       const canvasId = artifactCard.dataset.canvasId;
       const versionNumber = parseInt(artifactCard.dataset.canvasVersion) || null;
-      
+
       if (canvasId) {
         // Buscar el documento canvas en todas las conversaciones
         Object.keys(state.conversations).forEach(convId => {
@@ -4685,13 +5212,13 @@ function saveVisibleChatModes(modes) {
 function updateChatModeTogglesVisibility() {
   const visibleModes = getVisibleChatModes();
   const toggles = document.querySelectorAll('.chat-mode-toggle');
-  
+
   toggles.forEach(toggle => {
     const options = toggle.querySelectorAll('.chat-mode-option');
     let visibleCount = 0;
     let firstVisibleMode = null;
     const visibleModesList = [];
-    
+
     options.forEach(option => {
       const mode = option.dataset.mode;
       const isVisible = visibleModes.includes(mode);
@@ -4702,16 +5229,16 @@ function updateChatModeTogglesVisibility() {
         if (!firstVisibleMode) firstVisibleMode = mode;
       }
     });
-    
+
     // Si solo hay un modo visible, ocultar todo el toggle
     toggle.style.display = visibleCount > 1 ? '' : 'none';
-    
+
     // Si el modo activo actual no está visible, cambiar al primer modo visible
     const currentMode = toggle.getAttribute('data-active-mode');
     if (!visibleModes.includes(currentMode) && firstVisibleMode) {
       setChatMode(firstVisibleMode);
     }
-    
+
     // Actualizar la posición del slider basada en modos visibles
     updateSliderPosition(toggle, visibleModesList);
   });
@@ -4720,10 +5247,10 @@ function updateChatModeTogglesVisibility() {
 function updateSliderPosition(toggle, visibleModesList) {
   const slider = toggle.querySelector('.chat-mode-slider');
   if (!slider) return;
-  
+
   const currentMode = toggle.getAttribute('data-active-mode');
   const index = visibleModesList.indexOf(currentMode);
-  
+
   if (index !== -1) {
     // Calcular la posición: 3px inicial + (34px * índice)
     const translateX = 34 * index;
@@ -5341,14 +5868,14 @@ function initUserMenu() {
           }
         });
 
-        
+
         // Cargar modos de chat visibles
         const visibleModes = getVisibleChatModes();
         const modeCheckboxes = aiPersonalizationModal.querySelectorAll('#chat-modes-selector input[type="checkbox"]');
         modeCheckboxes.forEach(checkbox => {
           checkbox.checked = visibleModes.includes(checkbox.dataset.mode);
         });
-        
+
         setTimeout(() => aiPersonalInfoInput.focus(), 100);
         if (settingsMenu) {
           settingsMenu.style.display = 'none';
@@ -5616,7 +6143,7 @@ function initUserMenu() {
         saveAIResponseStyle(selectedStyle);
       }
 
-      
+
       // Guardar modos de chat visibles
       const modeCheckboxes = aiPersonalizationModal?.querySelectorAll('#chat-modes-selector input[type="checkbox"]');
       if (modeCheckboxes) {
@@ -5628,7 +6155,7 @@ function initUserMenu() {
         });
         saveVisibleChatModes(selectedModes);
       }
-      
+
       closeAIPersonalizationModalFunc();
     });
 
@@ -6586,12 +7113,44 @@ document.addEventListener('DOMContentLoaded', () => {
   initDashboard();
   initDeepResearch();
   initScreenOverlay();
+  initSourceBadgeHandler(); // PDF source references click handler
+  initPdfDatabase(); // Initialize IndexedDB for PDF storage
   try {
     initTranslationSystem();
   } catch (error) {
     console.warn('Translation system failed to initialize:', error);
   }
 });
+
+// Initialize click handler for source badges (PDF references)
+function initSourceBadgeHandler() {
+  document.addEventListener('click', (e) => {
+    const badge = e.target.closest('.source-badge');
+    if (!badge) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Decode base64 encoded data
+    const fileNameB64 = badge.dataset.fileB64;
+    const citedTextB64 = badge.dataset.textB64;
+
+    if (!fileNameB64) {
+      console.warn('Source badge missing file data');
+      return;
+    }
+
+    try {
+      const fileName = decodeURIComponent(escape(atob(fileNameB64)));
+      const citedText = citedTextB64 ? decodeURIComponent(escape(atob(citedTextB64))) : '';
+
+      console.log('📄 Opening PDF viewer:', fileName, citedText);
+      window.openPdfViewer(fileName, citedText);
+    } catch (err) {
+      console.error('Error decoding source badge data:', err);
+    }
+  });
+}
 
 // ========================================
 // Project System
@@ -6684,7 +7243,9 @@ function createProject(name, instructions, files = []) {
       size: f.size,
       type: f.type,
       content: f.content,
-      isImage: f.isImage || false
+      isImage: f.isImage || false,
+      isPDF: f.isPDF || false,
+      hasPdfBinary: f.hasPdfBinary || false
     })),
     conversationIds: [], // IDs de conversaciones asociadas
     createdAt: Date.now(),
@@ -6709,7 +7270,9 @@ function updateProject(projectId, updates) {
       size: f.size,
       type: f.type,
       content: f.content,
-      isImage: f.isImage || false
+      isImage: f.isImage || false,
+      isPDF: f.isPDF || false,
+      hasPdfBinary: f.hasPdfBinary || false
     }));
   }
 
@@ -6835,7 +7398,29 @@ function buildProjectContext(project) {
   }
 
   if (context) {
-    context += 'IMPORTANTE: Debes seguir las instrucciones del proyecto y USAR el contenido de los documentos proporcionados para responder las preguntas del usuario. Si el usuario pregunta sobre los documentos, resume o explica lo que contienen.\n';
+    context += `
+═══════════════════════════════════════════════════════════════
+📌 INSTRUCCIONES DE CITACIÓN Y USO DE DOCUMENTOS
+═══════════════════════════════════════════════════════════════
+
+IMPORTANTE: Debes seguir las instrucciones del proyecto y USAR el contenido de los documentos proporcionados para responder las preguntas del usuario.
+
+FORMATO DE CITAS OBLIGATORIO:
+Cuando uses información de los documentos del proyecto, DEBES incluir referencias inline usando este formato EXACTO:
+[[FUENTE:nombre_del_archivo.pdf:"texto citado del documento"]]
+
+EJEMPLOS DE USO CORRECTO:
+- "La paginación simple utiliza un solo nivel [[FUENTE:T1.-Gestion-de-Memoria.pdf:"paginación simple o de un nivel"]]"
+- "El tamaño de marco es de 4KB [[FUENTE:memoria.pdf:"el tamaño del marco de página es 4096 bytes"]]"
+
+REGLAS DE CITACIÓN:
+1. Cita fragmentos EXACTOS que aparecen en el documento (pueden ser frases cortas de 3-10 palabras)
+2. El nombre del archivo debe coincidir EXACTAMENTE con el nombre en los documentos
+3. Incluye múltiples citas si usas información de varias partes del documento
+4. Las citas deben aparecer JUSTO DESPUÉS de la información que respaldan
+5. No inventes citas - solo cita texto que realmente existe en los documentos
+
+`;
   }
 
   return context;
@@ -6957,7 +7542,7 @@ function renderProjectsList() {
     const fileCount = (project.files || []).length;
     const convCount = (project.conversationIds || []).length;
 
-    
+
     return `
       <li class="project-item ${isActive ? 'active' : ''}" data-project-id="${project.id}">
         <div class="project-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></div>
@@ -7175,19 +7760,44 @@ async function handleProjectFiles(files) {
       // Log de depuración para verificar el contenido extraído
       console.log(`📂 Proyecto - Archivo procesado: ${file.name}`);
       console.log(`   - Tipo: ${isImage ? 'Imagen' : (isPDF ? 'PDF' : 'Texto')}`);
-      console.log(`   - Contenido extraído: ${content?.length || 0} caracteres`);
-      if (!isImage && content) {
-        console.log(`   - Primeros 200 chars: ${content.substring(0, 200)}...`);
-      }
 
-      projectsState.tempProjectFiles.push({
-        id: generateId('pfile'),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        content: content,
-        isImage: isImage
-      });
+      // Para PDFs, content es un objeto { text, binary, isPdfData }
+      if (content && content.isPdfData) {
+        const fileId = generateId('pfile');
+        console.log(`   - Texto extraído: ${content.text?.length || 0} caracteres`);
+
+        // Save PDF binary to IndexedDB (avoids localStorage size limits)
+        let pdfStored = false;
+        if (content.binary) {
+          pdfStored = await savePdfToIndexedDB(fileId, content.binary);
+          console.log(`   - Binario PDF: ${pdfStored ? 'Guardado en IndexedDB' : 'Error al guardar'}`);
+        }
+
+        projectsState.tempProjectFiles.push({
+          id: fileId,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: content.text,           // Texto para el contexto de la IA (localStorage)
+          hasPdfBinary: pdfStored,          // Flag indicating PDF is in IndexedDB
+          isImage: false,
+          isPDF: true
+        });
+      } else {
+        console.log(`   - Contenido extraído: ${content?.length || 0} caracteres`);
+        if (!isImage && content) {
+          console.log(`   - Primeros 200 chars: ${content.substring(0, 200)}...`);
+        }
+
+        projectsState.tempProjectFiles.push({
+          id: generateId('pfile'),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: content,
+          isImage: isImage
+        });
+      }
     } catch (error) {
       console.error(`Error al leer el archivo ${file.name}:`, error);
       alert(window.translationManager
@@ -7872,7 +8482,7 @@ function toggleDeepResearch(button) {
   });
 
   console.log(`🔬 Deep Research: ${deepResearchMode ? 'activado' : 'desactivado'}`);
-  
+
   console.log(`🧠 Deep Think: ${deepResearchMode ? 'activado' : 'desactivado'}`);
 }
 
@@ -7886,7 +8496,7 @@ const SERPER_API_KEY = '7ea5d17c7248272c4a1d3d0790ae7388e72f295c';
 // Crear HTML estático de búsqueda web para restaurar desde el estado guardado
 function createWebSearchUIForRestore(webData) {
   if (!webData || !webData.results) return '';
-  
+
   const sourcesHtml = webData.results.map((result, index) => {
     let domain = '';
     let faviconUrl = '';
@@ -7897,7 +8507,7 @@ function createWebSearchUIForRestore(webData) {
     } catch (e) {
       domain = 'web';
     }
-    
+
     return `
       <a class="web-search-source-item" href="${result.link}" target="_blank" rel="noopener noreferrer" style="animation: none; opacity: 1; transform: none;">
         <img class="web-search-source-icon" src="${faviconUrl}" alt="${domain}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
@@ -7922,7 +8532,7 @@ function createWebSearchUIForRestore(webData) {
       </a>
     `;
   }).join('');
-  
+
   const finalSourcesHtml = webData.results.map(result => {
     let domain = '';
     try {
@@ -7937,7 +8547,7 @@ function createWebSearchUIForRestore(webData) {
       </a>
     `;
   }).join('');
-  
+
   return `
     <div class="web-search-container minimized">
       <div class="web-search-header" style="cursor: pointer;" onclick="this.parentElement.classList.toggle('minimized');">
@@ -8053,7 +8663,7 @@ function createSkeletonSources(count) {
 // Actualizar UI con resultados de búsqueda
 function updateWebSearchUI(container, searchData, query) {
   if (!container || !searchData) return;
-  
+
   // Actualizar estado a completado
   const statusDot = container.querySelector('.web-search-status-dot');
   const statusText = container.querySelector('.web-search-status-text');
@@ -8061,12 +8671,12 @@ function updateWebSearchUI(container, searchData, query) {
   const progressLabel = container.querySelector('.web-search-progress-label');
   const toggleBtn = container.querySelector('.web-search-toggle-btn');
   const content = container.querySelector('.web-search-content');
-  
+
   if (statusDot) statusDot.classList.add('done');
   if (statusText) statusText.textContent = 'Completado';
   if (searchIcon) searchIcon.classList.add('done');
   if (progressLabel) progressLabel.textContent = 'Fuentes encontradas';
-  
+
   // Mostrar botón de minimizar
   if (toggleBtn) {
     toggleBtn.style.display = 'flex';
@@ -8076,7 +8686,7 @@ function updateWebSearchUI(container, searchData, query) {
       toggleBtn.title = container.classList.contains('minimized') ? 'Expandir' : 'Minimizar';
     };
   }
-  
+
   // Permitir hacer clic en el header para expandir/minimizar
   const header = container.querySelector('.web-search-header');
   if (header) {
@@ -8088,12 +8698,12 @@ function updateWebSearchUI(container, searchData, query) {
       }
     };
   }
-  
+
   // Actualizar fuentes
   const sourcesContainer = container.querySelector('.web-search-sources');
   if (sourcesContainer && searchData.organic) {
     sourcesContainer.innerHTML = '';
-    
+
     searchData.organic.slice(0, 5).forEach((result, index) => {
       const sourceItem = document.createElement('a');
       sourceItem.className = 'web-search-source-item';
@@ -8101,7 +8711,7 @@ function updateWebSearchUI(container, searchData, query) {
       sourceItem.target = '_blank';
       sourceItem.rel = 'noopener noreferrer';
       sourceItem.style.animationDelay = `${index * 0.1}s`;
-      
+
       // Extraer dominio para el favicon
       let domain = '';
       let faviconUrl = '';
@@ -8114,7 +8724,7 @@ function updateWebSearchUI(container, searchData, query) {
         domain = 'web';
         faviconUrl = '';
       }
-      
+
       sourceItem.innerHTML = `
         <img class="web-search-source-icon" src="${faviconUrl}" alt="${domain}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
         <div class="web-search-source-icon-fallback" style="display:none;">
@@ -8136,11 +8746,11 @@ function updateWebSearchUI(container, searchData, query) {
           </div>
         </div>
       `;
-      
+
       sourcesContainer.appendChild(sourceItem);
     });
   }
-  
+
   // Añadir sección de fuentes finales
   addFinalSources(container, searchData);
 }
@@ -8148,12 +8758,12 @@ function updateWebSearchUI(container, searchData, query) {
 // Añadir las fuentes usadas al final
 function addFinalSources(container, searchData) {
   if (!container || !searchData || !searchData.organic) return;
-  
+
   const finalSourcesDiv = document.createElement('div');
   finalSourcesDiv.className = 'web-search-final-sources';
-  
+
   const sourcesCount = Math.min(searchData.organic.length, 5);
-  
+
   finalSourcesDiv.innerHTML = `
     <div class="web-search-final-sources-title">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -8164,22 +8774,22 @@ function addFinalSources(container, searchData) {
     </div>
     <div class="web-search-final-sources-list">
       ${searchData.organic.slice(0, 5).map(result => {
-        let domain = '';
-        try {
-          domain = new URL(result.link).hostname.replace('www.', '');
-        } catch (e) {
-          domain = 'web';
-        }
-        return `
+    let domain = '';
+    try {
+      domain = new URL(result.link).hostname.replace('www.', '');
+    } catch (e) {
+      domain = 'web';
+    }
+    return `
           <a href="${result.link}" target="_blank" rel="noopener noreferrer" class="web-search-final-source" title="${escapeHtml(result.title)}">
             <img class="web-search-final-source-favicon" src="https://www.google.com/s2/favicons?domain=${domain}&sz=32" alt="" onerror="this.style.display='none'">
             <span class="web-search-final-source-name">${domain}</span>
           </a>
         `;
-      }).join('')}
+  }).join('')}
     </div>
   `;
-  
+
   // Añadir al contenedor de contenido si existe, sino al container principal
   const contentContainer = container.querySelector('.web-search-content');
   if (contentContainer) {
@@ -8205,11 +8815,11 @@ async function searchWeb(query) {
         num: 5
       })
     });
-    
+
     if (!response.ok) {
       throw new Error(`Error en búsqueda: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -8221,9 +8831,9 @@ async function searchWeb(query) {
 // Formatear resultados de búsqueda para el contexto del modelo
 function formatSearchResults(searchData) {
   if (!searchData) return '';
-  
+
   let context = '📊 **Resultados de búsqueda web:**\n\n';
-  
+
   // Answer box si existe
   if (searchData.answerBox) {
     context += `📌 **Respuesta destacada:**\n`;
@@ -8232,7 +8842,7 @@ function formatSearchResults(searchData) {
     if (searchData.answerBox.snippet) context += `${searchData.answerBox.snippet}\n`;
     context += '\n';
   }
-  
+
   // Knowledge graph si existe
   if (searchData.knowledgeGraph) {
     const kg = searchData.knowledgeGraph;
@@ -8243,7 +8853,7 @@ function formatSearchResults(searchData) {
     if (kg.description) context += `${kg.description}\n`;
     context += '\n';
   }
-  
+
   // Resultados orgánicos
   if (searchData.organic && searchData.organic.length > 0) {
     context += `🔍 **Resultados principales:**\n\n`;
@@ -8253,7 +8863,7 @@ function formatSearchResults(searchData) {
       context += `   🔗 ${result.link}\n\n`;
     });
   }
-  
+
   // People also ask
   if (searchData.peopleAlsoAsk && searchData.peopleAlsoAsk.length > 0) {
     context += `❓ **Preguntas relacionadas:**\n`;
@@ -8263,7 +8873,7 @@ function formatSearchResults(searchData) {
     });
     context += '\n';
   }
-  
+
   return context;
 }
 
@@ -8276,17 +8886,17 @@ function setChatMode(mode) {
   webSearchMode = mode === 'web';
   canvasMode = mode === 'canvas';
   window._canvasModeActive = canvasMode;
-  
+
   // Actualizar todos los toggles
   const toggles = document.querySelectorAll('.chat-mode-toggle');
   const visibleModes = getVisibleChatModes();
-  
+
   toggles.forEach(toggle => {
     toggle.setAttribute('data-active-mode', mode);
     toggle.querySelectorAll('.chat-mode-option').forEach(opt => {
       opt.classList.toggle('active', opt.dataset.mode === mode);
     });
-    
+
     // Calcular posición del slider basado en modos visibles
     const visibleModesList = [];
     toggle.querySelectorAll('.chat-mode-option').forEach(opt => {
@@ -8334,7 +8944,7 @@ function initDeepResearch() {
       });
     });
   });
-  
+
   // Aplicar visibilidad de modos según preferencias guardadas
   updateChatModeTogglesVisibility();
 }
@@ -8890,7 +9500,7 @@ async function executeDeepResearch(userQuery, conversation) {
   console.log('🔬 Iniciando Deep Research:', userQuery);
 
   console.log('🧠 Iniciando Deep Think:', userQuery);
-  
+
   // Configurar control de cancelación y tiempo
   deepResearchAbortController = new AbortController();
   deepResearchActiveConversationId = conversation.id;
@@ -9262,27 +9872,27 @@ async function handleSubmitWithDeepResearch(event) {
   if (canvasMode) {
     return originalHandleSubmit.call(this, event);
   }
-  
+
   // Si el modo web está activo, buscar en internet primero con UI visual
   if (webSearchMode) {
     const isEmptyState = emptyState?.style.display !== 'none';
     const activeInput = isEmptyState ? promptInput : promptInputInline;
     const prompt = activeInput?.value.trim();
-    
+
     if (!prompt) return;
-    
+
     const conversation = state.conversations[state.activeId];
     if (!conversation) return;
-    
+
     // Limpiar input
     activeInput.value = '';
     autoResizeTextarea(activeInput);
-    
+
     // Mostrar el chat si estamos en empty state
     if (isEmptyState) {
       showChatState();
     }
-    
+
     // Crear mensaje del usuario
     const userMessage = createMessage('user', prompt);
     conversation.messages.push(userMessage);
@@ -9292,62 +9902,62 @@ async function handleSubmitWithDeepResearch(event) {
     conversation.updatedAt = Date.now();
     persistState();
     renderConversationList();
-    
+
     // Crear UI de búsqueda web
     const webSearchUI = createWebSearchUI(prompt);
-    
+
     // Crear mensaje del asistente con la UI de búsqueda
     const assistantMessage = createMessage('assistant', '');
     conversation.messages.push(assistantMessage);
     const { bubble } = appendMessageElement(assistantMessage);
-    
+
     // Insertar la UI de búsqueda en el bubble
     bubble.innerHTML = '';
     bubble.appendChild(webSearchUI);
-    
+
     // Scroll hacia abajo
     const chatArea = document.querySelector('.chat-area');
     if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
-    
+
     console.log('🌐 Buscando en la web:', prompt);
-    
+
     try {
       // Realizar la búsqueda
       const searchResults = await searchWeb(prompt);
-      
+
       if (searchResults) {
         // Actualizar la UI con los resultados
         updateWebSearchUI(webSearchUI, searchResults, prompt);
-        
+
         const formattedResults = formatSearchResults(searchResults);
         window._webSearchContext = formattedResults;
         window._webSearchQuery = prompt;
         window._webSearchResults = searchResults;
         console.log('🌐 Resultados encontrados:', searchResults);
-        
+
         // Pequeña pausa para que se vea la animación
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         // Ahora generar la respuesta del modelo
         // Añadir un separador visual
         const separator = document.createElement('div');
         separator.style.cssText = 'height: 1px; background: rgba(255,255,255,0.1); margin: 16px 0;';
         bubble.appendChild(separator);
-        
+
         // Crear contenedor para la respuesta
         const responseContainer = document.createElement('div');
         responseContainer.className = 'web-search-response';
         bubble.appendChild(responseContainer);
-        
+
         // Guardar referencia para la respuesta streaming
         window._webSearchResponseContainer = responseContainer;
         window._webSearchModeActive = true;
-        
+
         // Construir mensajes para el modelo
         const payloadMessages = buildWebSearchPayload(conversation, prompt, formattedResults);
-        
+
         state.loading = true;
-        
+
         try {
           // Pasar los resultados de búsqueda para el botón de fuentes
           await streamAssistantResponseInContainer(conversation, payloadMessages, responseContainer, assistantMessage, searchResults);
@@ -9360,7 +9970,7 @@ async function handleSubmitWithDeepResearch(event) {
           window._webSearchContext = null;
           window._webSearchResponseContainer = null;
         }
-        
+
       } else {
         // Error en la búsqueda
         webSearchUI.innerHTML = `
@@ -9381,15 +9991,15 @@ async function handleSubmitWithDeepResearch(event) {
       window._webSearchContext = null;
       window._webSearchQuery = null;
     }
-    
+
     persistState();
     return;
   }
-  
+
   // Reset web search state
   window._webSearchModeActive = false;
   window._webSearchContext = null;
-  
+
   // Si el modo estudio está activo, añadir el prompt de sistema
   if (studyMode) {
     window._studyModeActive = true;
@@ -9404,7 +10014,7 @@ async function handleSubmitWithDeepResearch(event) {
 // Construir payload para búsqueda web
 function buildWebSearchPayload(conversation, prompt, webContext) {
   const payloadMessages = [];
-  
+
   // Mensaje de sistema con contexto web
   const systemMessage = `🌐 MODO BÚSQUEDA WEB ACTIVADO
 
@@ -9424,7 +10034,7 @@ INSTRUCCIONES:
     role: 'system',
     content: systemMessage
   });
-  
+
   // Añadir historial de conversación (últimos mensajes relevantes)
   const recentMessages = conversation.messages.slice(-6, -1); // Excluir el último que es el actual
   recentMessages.forEach(msg => {
@@ -9435,13 +10045,13 @@ INSTRUCCIONES:
       });
     }
   });
-  
+
   // Añadir el mensaje actual del usuario
   payloadMessages.push({
     role: 'user',
     content: prompt
   });
-  
+
   return payloadMessages;
 }
 
@@ -9463,7 +10073,7 @@ function createWebThinkingBlock(thinking, isLoading = true) {
       </div>
     `;
   }
-  
+
   // Bloque colapsado después de terminar
   return `
     <div class="web-thinking-block collapsed" onclick="this.classList.toggle('expanded'); this.classList.toggle('collapsed');">
@@ -9490,7 +10100,7 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
 
   // Mostrar bloque de razonamiento inicial
   container.innerHTML = createWebThinkingBlock('', true);
-  
+
   const body = {
     model: state.currentModel,
     stream: true,
@@ -9538,19 +10148,19 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
           const json = JSON.parse(line);
           if (json.message?.content) {
             fullContent += json.message.content;
-            
+
             // Actualizar el bloque de razonamiento en vivo
             const thinkingTextEl = container.querySelector('.web-thinking-block-text');
             if (thinkingTextEl) {
               thinkingTextEl.innerHTML = escapeHtml(fullContent) + '<span class="web-thinking-cursor">▊</span>';
-              
+
               // Auto-scroll dentro del bloque de pensamiento
               const contentEl = container.querySelector('.web-thinking-block-content');
               if (contentEl) {
                 contentEl.scrollTop = contentEl.scrollHeight;
               }
             }
-            
+
             // Scroll del chat
             const chatArea = document.querySelector('.chat-area');
             if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
@@ -9567,19 +10177,19 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
     currentStreamReader = null;
     updateStopButtonToSend();
   }
-  
+
   // Cuando termina: mostrar bloque colapsado + respuesta formateada
   if (fullContent) {
     let html = createWebThinkingBlock(fullContent, false);
     html += '<div class="web-response-content">' + parseMarkdown(fullContent) + '</div>';
     container.innerHTML = html;
-    
+
     const responseEl = container.querySelector('.web-response-content');
     if (responseEl && typeof renderMathInElement !== 'undefined') {
       renderMathInElement(responseEl, {
         delimiters: [
-          {left: '$$', right: '$$', display: true},
-          {left: '$', right: '$', display: false}
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false }
         ],
         throwOnError: false
       });
@@ -9588,7 +10198,7 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
 
   // Actualizar el mensaje en la conversación
   assistantMessage.content = fullContent;
-  
+
   // Guardar datos de búsqueda web en el mensaje para persistencia
   if (searchResults && searchResults.organic) {
     assistantMessage.webSearchData = {
@@ -9600,16 +10210,16 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
       }))
     };
   }
-  
+
   // Añadir botones de copiar, regenerar y fuentes (si es búsqueda web)
   const copyContainer = document.createElement('div');
   copyContainer.className = 'copy-message-container';
-  
+
   const regenerateBtn = document.createElement('button');
   regenerateBtn.className = 'regenerate-message-btn';
   regenerateBtn.title = 'Regenerar respuesta';
   regenerateBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M23 20v-6h-6"></path><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>';
-  
+
   const copyBtn = document.createElement('button');
   copyBtn.className = 'copy-message-btn';
   copyBtn.title = 'Copiar mensaje';
@@ -9620,10 +10230,10 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
     </svg>
   `;
   copyBtn.onclick = () => copyToClipboard(fullContent, copyBtn);
-  
+
   copyContainer.appendChild(regenerateBtn);
   copyContainer.appendChild(copyBtn);
-  
+
   // Añadir botón de fuentes solo si hay resultados de búsqueda web
   if (searchResults && searchResults.organic && searchResults.organic.length > 0) {
     const sourcesBtn = document.createElement('button');
@@ -9636,15 +10246,15 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
       </svg>
       <span>${searchResults.organic.length}</span>
     `;
-    
+
     // Crear el popup de fuentes
     const sourcesPopup = document.createElement('div');
     sourcesPopup.className = 'web-sources-popup';
     sourcesPopup.style.display = 'none';
-    
+
     let popupContent = '<div class="web-sources-popup-header"><span>Fuentes consultadas</span></div>';
     popupContent += '<div class="web-sources-popup-list">';
-    
+
     searchResults.organic.slice(0, 5).forEach(result => {
       let domain = '';
       let faviconUrl = '';
@@ -9655,7 +10265,7 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
       } catch (e) {
         domain = 'web';
       }
-      
+
       popupContent += `
         <a href="${result.link}" target="_blank" rel="noopener noreferrer" class="web-sources-popup-item">
           <img src="${faviconUrl}" alt="" class="web-sources-popup-favicon" onerror="this.style.display='none'">
@@ -9666,35 +10276,35 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
         </a>
       `;
     });
-    
+
     popupContent += '</div>';
     sourcesPopup.innerHTML = popupContent;
-    
+
     // Toggle del popup
     sourcesBtn.onclick = (e) => {
       e.stopPropagation();
       const isVisible = sourcesPopup.style.display === 'block';
       sourcesPopup.style.display = isVisible ? 'none' : 'block';
     };
-    
+
     // Cerrar popup al hacer clic fuera
     document.addEventListener('click', (e) => {
       if (!sourcesBtn.contains(e.target) && !sourcesPopup.contains(e.target)) {
         sourcesPopup.style.display = 'none';
       }
     });
-    
+
     copyContainer.appendChild(sourcesBtn);
     copyContainer.appendChild(sourcesPopup);
   }
-  
+
   const timeSpan = document.createElement('span');
   timeSpan.className = 'message-time';
   timeSpan.textContent = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  
+
   copyContainer.appendChild(timeSpan);
   container.appendChild(copyContainer);
-  
+
   persistState();
   console.log('🌐 Respuesta completada');
 }

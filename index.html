@@ -988,6 +988,29 @@
           </div>
         </div>
       </div>
+
+      <!-- Panel Visor de PDF - Vista de Fuentes -->
+      <div id="pdf-viewer-panel" class="pdf-viewer-panel" style="display: none;">
+        <header class="pdf-viewer-header">
+          <div class="pdf-viewer-title">
+            <span class="pdf-icon">📄</span>
+            <span id="pdf-viewer-filename">documento.pdf</span>
+          </div>
+          <div class="pdf-viewer-actions">
+            <button id="pdf-viewer-close" class="pdf-viewer-close-btn" onclick="window.closePdfViewer()" title="Cerrar">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </header>
+        <div class="pdf-highlight-info" id="pdf-viewer-highlight-info">
+          <span class="highlight-label">📍 Texto citado:</span>
+          <span id="pdf-highlight-text" class="highlight-text"></span>
+        </div>
+        <div id="pdf-viewer-container" class="pdf-viewer-container"></div>
+      </div>
     </div>
   </div>
 
