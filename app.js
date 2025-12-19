@@ -889,7 +889,7 @@ window.openPdfViewer = async function (fileName, textToHighlight) {
   }
 };
 
-// Render PDF visually with text highlighting overlay
+// Render PDF visually with selectable text layer and highlighting
 async function renderPdfVisually(base64Data, container, textToHighlight) {
   const isLoaded = await waitForPdfJs();
   if (!isLoaded) throw new Error('PDF.js no disponible');
@@ -913,13 +913,12 @@ async function renderPdfVisually(base64Data, container, textToHighlight) {
 
   container.innerHTML = '';
 
-  // Normalize search text (remove extra spaces, lowercase)
+  // Normalize search text
   const normalizedSearch = textToHighlight
     ? textToHighlight.toLowerCase().replace(/\s+/g, ' ').trim()
     : '';
-
-  // Use first 50 chars for matching (long quotes may have different formatting)
   const searchPrefix = normalizedSearch.substring(0, 50);
+  const searchWords = searchPrefix.split(' ').filter(w => w.length > 3);
 
   console.log('🔍 Searching for text:', searchPrefix);
 
@@ -932,91 +931,89 @@ async function renderPdfVisually(base64Data, container, textToHighlight) {
     const scale = 1.5;
     const viewport = page.getViewport({ scale });
 
-    // Create page container
+    // Create page wrapper
     const pageDiv = document.createElement('div');
     pageDiv.className = 'pdf-page';
     pageDiv.dataset.pageNum = pageNum;
     pageDiv.style.cssText = `
       position: relative;
-      margin-bottom: 10px;
+      margin-bottom: 16px;
       background: white;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
       border-radius: 4px;
       overflow: hidden;
+      width: ${viewport.width}px;
+      max-width: 100%;
     `;
 
-    // Create canvas for rendering
+    // Create canvas container (maintains aspect ratio)
+    const canvasWrapper = document.createElement('div');
+    const aspectRatio = (viewport.height / viewport.width) * 100;
+    canvasWrapper.style.cssText = `
+      position: relative;
+      width: 100%;
+    `;
+
+    // Create canvas for rendering PDF graphics
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.height = viewport.height;
     canvas.width = viewport.width;
-    canvas.style.cssText = 'display: block; width: 100%; height: auto;';
+    canvas.style.cssText = `
+      display: block;
+      width: 100%;
+      height: auto;
+    `;
 
     // Render PDF page to canvas
     await page.render({ canvasContext: context, viewport: viewport }).promise;
-    pageDiv.appendChild(canvas);
+    canvasWrapper.appendChild(canvas);
 
     // Get text content for this page
     const textContent = await page.getTextContent();
     const pageTextItems = textContent.items;
-    const fullPageText = pageTextItems.map(item => item.str).join(' ').toLowerCase().replace(/\s+/g, ' ');
 
-    // Check if this page contains the search text (use prefix for more flexible matching)
+    // Create text layer for selectable text using PDF.js official API
+    const textLayerDiv = document.createElement('div');
+    textLayerDiv.className = 'pdf-text-layer';
+    textLayerDiv.style.cssText = `
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      overflow: hidden;
+      line-height: 1;
+      user-select: text;
+      cursor: text;
+      transform-origin: 0% 0%;
+    `;
+
+    // Use the official PDF.js TextLayer rendering API
+    // This properly handles font scaling and positioning
+    const textLayerRenderTask = pdfjsLib.renderTextLayer({
+      textContentSource: textContent,
+      container: textLayerDiv,
+      viewport: viewport,
+      textDivs: []
+    });
+
+    await textLayerRenderTask.promise;
+
+    // Note: We removed the individual word highlighting as it was too aggressive
+    // The page banner will indicate where the cited text was found
+
+    canvasWrapper.appendChild(textLayerDiv);
+    pageDiv.appendChild(canvasWrapper);
+
+    // Check if this page contains the search text
+    const fullPageText = pageTextItems.map(item => item.str).join(' ').toLowerCase().replace(/\s+/g, ' ');
     const matchFound = searchPrefix && fullPageText.includes(searchPrefix);
 
     if (matchFound && !foundPageDiv) {
       foundPageDiv = pageDiv;
       foundPageNum = pageNum;
       console.log(`✅ Found text on page ${pageNum}`);
-
-      // Create highlight overlay for matching text items
-      const textLayerDiv = document.createElement('div');
-      textLayerDiv.className = 'pdf-text-layer';
-      textLayerDiv.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        pointer-events: none;
-      `;
-
-      // Find items that contain parts of the search text
-      const searchWords = searchPrefix.split(' ').filter(w => w.length > 3);
-      let highlightCount = 0;
-
-      for (const item of pageTextItems) {
-        if (!item.transform || !item.str) continue;
-
-        const itemText = item.str.toLowerCase();
-        const matches = searchWords.some(word => itemText.includes(word));
-
-        if (matches) {
-          const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-          const fontSize = Math.sqrt(tx[0] * tx[0] + tx[1] * tx[1]);
-          const x = tx[4];
-          const y = viewport.height - tx[5];
-
-          const highlight = document.createElement('div');
-          highlight.className = 'pdf-highlight-box';
-          highlight.style.cssText = `
-            position: absolute;
-            left: ${x}px;
-            top: ${y - fontSize}px;
-            height: ${fontSize * 1.3}px;
-            width: ${(item.width || item.str.length * fontSize * 0.5) * scale}px;
-            background: rgba(255, 235, 59, 0.5);
-            border-bottom: 3px solid #f9a825;
-            pointer-events: none;
-            animation: highlightPulse 1.5s ease-in-out infinite;
-          `;
-          textLayerDiv.appendChild(highlight);
-          highlightCount++;
-        }
-      }
-
-      console.log(`📝 Created ${highlightCount} highlight boxes`);
-      pageDiv.appendChild(textLayerDiv);
 
       // Add found banner
       const banner = document.createElement('div');
@@ -1046,7 +1043,7 @@ async function renderPdfVisually(base64Data, container, textToHighlight) {
       padding: 8px;
       color: rgba(255,255,255,0.6);
       font-size: 12px;
-      background: rgba(0,0,0,0.3);
+      background: rgba(0,0,0,0.4);
     `;
     pageFooter.textContent = `Página ${pageNum} de ${pdf.numPages}`;
     pageDiv.appendChild(pageFooter);
@@ -1060,7 +1057,7 @@ async function renderPdfVisually(base64Data, container, textToHighlight) {
     setTimeout(() => {
       foundPageDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 200);
-  } else {
+  } else if (searchPrefix) {
     console.log('❌ Text not found in any page');
   }
 }

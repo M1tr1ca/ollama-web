@@ -8041,6 +8041,65 @@ body.pdf-viewer-visible #empty-state {
   border-radius: 4px 4px 0 0;
 }
 
+/* PDF Selectable Text Layer - Styles for PDF.js official renderTextLayer API */
+.pdf-text-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  opacity: 0.2;
+  line-height: 1;
+  text-align: initial;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.pdf-text-layer>span,
+.pdf-text-layer span {
+  color: transparent !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  pointer-events: auto;
+  user-select: text;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Selection styles - only visible when user selects text */
+.pdf-text-layer span::selection {
+  background: var(--theme-primary-alpha-30) !important;
+  color: transparent !important;
+}
+
+.pdf-text-layer span::-moz-selection {
+  background: var(--theme-primary-alpha-30) !important;
+  color: transparent !important;
+}
+
+/* Endspace fix for PDF.js text layer */
+.pdf-text-layer .endOfContent {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  cursor: default;
+  user-select: none;
+}
+
+.pdf-text-highlight {
+  animation: highlightPulse 1.5s ease-in-out infinite;
+}
+
 /* PDF Text View (for extracted text) */
 .pdf-text-view {
   display: flex;
@@ -8092,14 +8151,7 @@ body.pdf-viewer-visible #empty-state {
   height: auto;
 }
 
-.pdf-text-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-}
+
 
 /* PDF Highlight */
 .pdf-highlight {
