@@ -9040,6 +9040,53 @@ body.score-canvas-visible #score-canvas-panel {
   fill: var(--theme-primary) !important;
 }
 
+/* Highlight currently playing notes */
+.score-preview svg .abcjs-highlight path,
+.score-preview svg .abcjs-highlight ellipse,
+.score-preview svg .abcjs-highlight circle,
+.score-preview svg .abcjs-highlight rect,
+.score-preview svg .abcjs-highlight polygon {
+  fill: var(--theme-primary) !important;
+  stroke: var(--theme-primary) !important;
+  transition: all 0.15s ease-out;
+  animation: note-highlight 0.3s ease-out;
+}
+
+@keyframes note-highlight {
+  0% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.score-preview svg .abcjs-highlight {
+  filter: drop-shadow(0 0 10px var(--theme-primary)) drop-shadow(0 0 5px var(--theme-primary-alpha-50));
+}
+
+/* Note head highlight */
+.score-preview svg .abcjs-note.abcjs-highlight .abcjs-notehead {
+  fill: var(--theme-primary) !important;
+}
+
+/* Beam highlight */
+.score-preview svg .abcjs-beam.abcjs-highlight {
+  fill: var(--theme-primary) !important;
+}
+
+/* Stem highlight */
+.score-preview svg .abcjs-stem.abcjs-highlight {
+  fill: var(--theme-primary) !important;
+  stroke: var(--theme-primary) !important;
+}
+
 /* History drawer */
 .score-history-drawer {
   position: absolute;

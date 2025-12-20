@@ -12384,6 +12384,11 @@ function renderScorePreview(abcContent) {
   }
 
   try {
+    // Clear cached visual object so playback uses fresh render
+    if (typeof clearVisualObj === 'function') {
+      clearVisualObj();
+    }
+
     // Clear previous content
     container.innerHTML = '';
 
@@ -12623,7 +12628,61 @@ function renderHistoryList() {
   });
 }
 
-// Audio playback with piano
+// Store the current visual object for playback (avoid re-rendering)
+let currentVisualObj = null;
+let cursorControl = null;
+
+// Cursor animation class for abcjs
+class CursorControl {
+  constructor(rootSelector) {
+    this.cursor = null;
+    this.rootSelector = rootSelector;
+    this.beatCallbacksSet = false;
+  }
+
+  onReady() {
+    // No need to create visual cursor, just track state
+    console.log('🎼 Note highlighting ready');
+  }
+
+  removeSelection() {
+    // Remove previous highlights
+    const elements = document.querySelectorAll(this.rootSelector + ' .abcjs-highlight');
+    elements.forEach(el => el.classList.remove('abcjs-highlight'));
+  }
+
+  onStart() {
+    this.removeSelection();
+    console.log('🎼 Playback started');
+  }
+
+  onFinished() {
+    this.removeSelection();
+    console.log('🎼 Playback finished');
+  }
+
+  onBeat(beatNumber, totalBeats, totalTime) {
+    // Optional: could update a progress bar here
+  }
+
+  onEvent(event) {
+    if (!event || !event.elements || event.elements.length === 0) return;
+
+    // Remove previous highlights
+    this.removeSelection();
+
+    // Highlight current notes only
+    event.elements.forEach(elemArr => {
+      elemArr.forEach(elem => {
+        if (elem) {
+          elem.classList.add('abcjs-highlight');
+        }
+      });
+    });
+  }
+}
+
+// Audio playback with piano and cursor animation
 async function playScore() {
   const doc = getScoreDoc(state.activeId);
   if (!doc?.abc) return;
@@ -12642,44 +12701,131 @@ async function playScore() {
     // Stop any existing playback
     stopScore();
 
-    // Render with cursor support
-    const visualObj = ABCJS.renderAbc(previewContainer, doc.abc, {
-      add_classes: true,
-      responsive: 'resize'
-    })[0];
+    // Use stored visualObj or render fresh ONLY if not already rendered
+    // Check if we already have a valid render
+    const existingSvg = previewContainer.querySelector('svg');
+    if (!existingSvg || !currentVisualObj) {
+      // Get actual width after layout
+      const containerWidth = previewContainer.clientWidth || 400;
+      
+      // Need to render - use the SAME options as renderScorePreview to avoid visual bugs
+      currentVisualObj = ABCJS.renderAbc(previewContainer, doc.abc, {
+        responsive: 'resize',
+        add_classes: true,
+        staffwidth: Math.max(300, containerWidth - 40),
+        paddingtop: 15,
+        paddingbottom: 15,
+        paddingleft: 10,
+        paddingright: 10,
+        scale: 1.2,
+        foregroundColor: '#000000',
+        selectionColor: '#ff7744'
+      })[0];
+      
+      // Force solid colors on SVG elements
+      const svg = previewContainer.querySelector('svg');
+      if (svg) {
+        svg.style.backgroundColor = '#ffffff';
+        svg.querySelectorAll('path, line, rect, circle, polygon').forEach(el => {
+          el.style.opacity = '1';
+          el.style.stroke = el.style.stroke || '#000000';
+        });
+      }
+    }
 
-    // Create synth controller
+    // Create cursor control
+    cursorControl = new CursorControl('#score-preview');
+
+    // Create synth controller with cursor support
     scoreSynthControl = new ABCJS.synth.SynthController();
+
+    // Initialize audio context if needed
+    if (ABCJS.synth.activeAudioContext && ABCJS.synth.activeAudioContext().state === 'suspended') {
+      await ABCJS.synth.activeAudioContext().resume();
+    }
 
     const synth = new ABCJS.synth.CreateSynth();
     await synth.init({
-      visualObj: visualObj,
+      visualObj: currentVisualObj,
       options: {
         program: 0, // Piano sound
+        qpm: parseInt(doc.tempo) || 120,
+        soundFontUrl: 'https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/',
         drum: ''
       }
     });
 
-    await scoreSynthControl.setTune(visualObj, false, {
-      chordsOff: false
+    // Set tune with cursor callbacks
+    await scoreSynthControl.setTune(currentVisualObj, false, {
+      chordsOff: false,
+      voicesOff: false,
+      onEnded: () => {
+        console.log('🎼 Playback ended');
+        if (cursorControl) cursorControl.onFinished();
+        if (playBtn) playBtn.disabled = false;
+        if (stopBtn) stopBtn.disabled = true;
+      }
     });
+
+    // Set up cursor
+    cursorControl.onReady();
+
+    // Create timer with cursor callback
+    const timingCallbacks = new ABCJS.TimingCallbacks(currentVisualObj, {
+      eventCallback: (event) => {
+        if (cursorControl) cursorControl.onEvent(event);
+      },
+      beatCallback: (beatNumber, totalBeats, totalTime) => {
+        if (cursorControl) cursorControl.onBeat(beatNumber, totalBeats, totalTime);
+      }
+    });
+
+    // Start timer alongside playback
+    cursorControl.onStart();
+    timingCallbacks.start();
 
     // Apply tempo multiplier
     const tempoMultiplier = parseFloat(tempoSlider?.value || 1);
+    if (tempoMultiplier !== 1) {
+      scoreSynthControl.setWarp(tempoMultiplier * 100);
+    }
 
     scoreSynthControl.play();
+
+    // Store timing callbacks for later cleanup
+    window._scoreTimingCallbacks = timingCallbacks;
 
     if (playBtn) playBtn.disabled = true;
     if (stopBtn) stopBtn.disabled = false;
 
-    console.log('🎼 Playback started');
+    console.log('🎼 Playback started with cursor animation');
 
   } catch (error) {
     console.error('🎼 Playback error:', error);
+    // Restore buttons on error
+    if (playBtn) playBtn.disabled = false;
+    if (stopBtn) stopBtn.disabled = true;
   }
 }
 
 function stopScore() {
+  // Stop timing callbacks
+  if (window._scoreTimingCallbacks) {
+    try {
+      window._scoreTimingCallbacks.stop();
+    } catch (e) { }
+    window._scoreTimingCallbacks = null;
+  }
+
+  // Clean cursor
+  if (cursorControl) {
+    try {
+      cursorControl.onFinished();
+    } catch (e) { }
+    cursorControl = null;
+  }
+
+  // Stop synth
   if (scoreSynthControl) {
     try {
       scoreSynthControl.pause();
@@ -12687,10 +12833,18 @@ function stopScore() {
     scoreSynthControl = null;
   }
 
+  // Reset button states
   const playBtn = document.getElementById('score-play-btn');
   const stopBtn = document.getElementById('score-stop-btn');
   if (playBtn) playBtn.disabled = false;
   if (stopBtn) stopBtn.disabled = true;
+
+  console.log('🎼 Playback stopped');
+}
+
+// Clear the visual object when score changes
+function clearVisualObj() {
+  currentVisualObj = null;
 }
 
 // AI Edit Approval Modal
