@@ -19,6 +19,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.0/dist/abcjs-basic-min.js"></script>
   <script src="js/translation-manager.js"></script>
 </head>
 
@@ -254,6 +255,13 @@
                   <span class="chip-content">
                     <span class="chip-icon">📚</span>
                     <span class="chip-text">Estudio</span>
+                  </span>
+                </label>
+                <label class="chat-mode-chip" data-mode="music">
+                  <input type="checkbox" id="mode-music-visible" data-mode="music" checked>
+                  <span class="chip-content">
+                    <span class="chip-icon">🎵</span>
+                    <span class="chip-text">Música</span>
                   </span>
                 </label>
               </div>
@@ -865,6 +873,14 @@
                           stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
                     </button>
+                    <button type="button" class="chat-mode-option" data-mode="music" title="Modo Música - Partituras">
+                      <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                          stroke-linejoin="round" />
+                        <circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="2" />
+                        <circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="2" />
+                      </svg>
+                    </button>
                     <div class="chat-mode-slider"></div>
                   </div>
                 </div>
@@ -1028,6 +1044,14 @@
                           stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
                     </button>
+                    <button type="button" class="chat-mode-option" data-mode="music" title="Modo Música - Partituras">
+                      <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                          stroke-linejoin="round" />
+                        <circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="2" />
+                        <circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="2" />
+                      </svg>
+                    </button>
                     <div class="chat-mode-slider"></div>
                   </div>
                 </div>
@@ -1090,6 +1114,45 @@
             </div>
             <div id="canvas-preview" class="canvas-preview"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- Panel Música - Partituras -->
+      <div id="music-panel" class="music-panel" style="display: none;">
+        <header class="music-header">
+          <div class="music-title">
+            <span class="music-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18V5l12-2v13" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </span>
+            <span id="music-title-text">Partitura</span>
+          </div>
+          <div class="music-header-actions">
+            <button id="music-download-btn" class="music-action-btn" title="Descargar como imagen">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+            <button id="music-close-btn" class="music-close-btn" title="Cerrar">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </header>
+        <div class="music-info-bar" id="music-info-bar">
+          <span class="music-info-item" id="music-time-sig">4/4</span>
+          <span class="music-info-item" id="music-key">Clave de Sol</span>
+          <span class="music-info-item" id="music-tempo">♩ = 120</span>
+        </div>
+        <div id="music-score-container" class="music-score-container">
+          <div id="music-score" class="music-score"></div>
         </div>
       </div>
 
@@ -1206,6 +1269,43 @@
       </div>
     </div>
 
+    <!-- Panel de Música / Partitura -->
+    <div id="music-panel" class="music-panel" style="display: none;">
+      <div class="music-panel-header">
+        <div class="music-panel-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M9 18V5l12-2v13" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="18" cy="16" r="3" />
+          </svg>
+          <span id="music-title-text">Partitura</span>
+        </div>
+        <div class="music-panel-actions">
+          <button id="music-download-btn" class="music-action-btn" title="Descargar como imagen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          </button>
+          <button id="music-close-btn" class="music-action-btn" title="Cerrar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="music-panel-content">
+        <div id="music-score" class="music-score-container"></div>
+      </div>
+      <div class="music-panel-info">
+        <span id="music-time-sig">4/4</span>
+        <span id="music-key">Clave de Sol</span>
+        <span id="music-tempo">♩ = 120</span>
+      </div>
+    </div>
+
     <div class="screen-overlay-minimized" id="screen-overlay-minimized" style="display: none;">
       <button id="screen-overlay-restore" class="screen-overlay-restore-btn" title="Restaurar chat">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
@@ -1237,6 +1337,8 @@
       </div>
     </div>
   </div>
+
+
 
   <!-- Tooltip de selección de texto -->
   <div id="selection-tooltip" class="selection-tooltip" style="display: none;">

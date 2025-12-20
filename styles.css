@@ -8354,3 +8354,333 @@ body.pdf-viewer-visible #empty-state {
 .quote-close-inline:hover {
   color: rgba(255, 255, 255, 0.9);
 }
+
+/* ========================================
+   Music Panel - Partituras con VexFlow
+   ======================================== */
+
+/* Layout cuando música está visible */
+body.music-visible .main-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding-right: 16px;
+}
+
+body.music-visible #music-panel {
+  display: flex;
+}
+
+.music-panel {
+  display: none;
+  flex-direction: column;
+  background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  height: 100%;
+  max-height: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+}
+
+.music-header,
+.music-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.music-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.music-panel-title svg {
+  color: var(--theme-primary);
+}
+
+.music-panel-title span {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f5f5f5;
+}
+
+.music-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.music-panel-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  min-height: 0;
+}
+
+.music-panel-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.music-panel-info span {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.3px;
+}
+
+.music-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.music-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-dark));
+  border-radius: 10px;
+  color: white;
+}
+
+.music-title span:last-child {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f5f5f5;
+}
+
+.music-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.music-action-btn,
+.music-close-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.music-action-btn:hover,
+.music-close-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* Info bar con tiempo, clave, tempo */
+.music-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.music-info-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.3px;
+}
+
+/* Contenedor de la partitura - abcjs */
+.music-score-container {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 12px;
+  margin: 16px;
+}
+
+/* abcjs SVG styling */
+.music-score-container svg {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
+/* abcjs specific classes */
+.music-score-container .abcjs-container {
+  width: 100%;
+}
+
+/* Lyrics styling */
+.music-score-container text.abcjs-lyric {
+  fill: #555;
+  font-size: 12px;
+}
+
+/* Title styling */
+.music-score-container text.abcjs-title {
+  fill: #333;
+  font-weight: bold;
+}
+
+/* Composer styling */
+.music-score-container text.abcjs-composer {
+  fill: #666;
+  font-style: italic;
+}
+
+/* Tarjeta de partitura en el chat */
+.music-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(255, 115, 77, 0.1), rgba(255, 115, 77, 0.05));
+  border: 1px solid rgba(255, 115, 77, 0.25);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 12px;
+}
+
+.music-card:hover {
+  background: linear-gradient(135deg, rgba(255, 115, 77, 0.15), rgba(255, 115, 77, 0.08));
+  border-color: rgba(255, 115, 77, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 115, 77, 0.15);
+}
+
+.music-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.music-card-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-dark));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.music-card-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.music-card-info {
+  flex: 1;
+}
+
+.music-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f5f5f5;
+  margin-bottom: 2px;
+}
+
+.music-card-meta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.music-card-preview {
+  height: 80px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.music-card-preview svg {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.music-card-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--theme-primary);
+  font-weight: 500;
+}
+
+.music-card-action svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  body.music-visible .main-column {
+    grid-template-columns: 1fr;
+  }
+
+  body.music-visible #music-panel {
+    position: fixed;
+    right: 12px;
+    top: 12px;
+    bottom: 12px;
+    left: auto;
+    width: min(90vw, 600px);
+    max-height: calc(100vh - 24px);
+    z-index: 50;
+  }
+}
+
+@media (max-width: 768px) {
+  .music-score-container {
+    padding: 16px;
+  }
+
+  .music-score {
+    padding: 16px;
+  }
+
+  .music-info-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 16px;
+  }
+}

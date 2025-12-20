@@ -3183,6 +3183,20 @@ async function streamAssistantResponse(conversation, payloadMessages) {
         }
       }
 
+      // Procesar respuesta de música si contiene [PARTITURA] - SIEMPRE verificar
+      const hasPartitura = assistantMessage.content?.includes('[PARTITURA]');
+      if (hasPartitura) {
+        console.log('🎵 Detectado bloque [PARTITURA] en respuesta');
+        setTimeout(() => {
+          if (window.musicModeUtils?.processMusicResponse) {
+            console.log('🎵 Llamando processMusicResponse...');
+            window.musicModeUtils.processMusicResponse(conversation, assistantMessage);
+          } else {
+            console.error('🎵 musicModeUtils no disponible');
+          }
+        }, 200);
+      }
+
       // Extraer información importante automáticamente al finalizar
       const lastUserMessage = conversation.messages.filter(m => m.role === 'user').pop();
       if (lastUserMessage && assistantMessage.content) {
@@ -3238,6 +3252,20 @@ async function streamAssistantResponse(conversation, payloadMessages) {
         updateAssistantBubble(bubble, assistantMessage.content, null);
         persistState();
       }
+    }
+
+    // SIEMPRE intentar procesar música al finalizar, incluso si hubo error (como 500)
+    // Detectar tanto ABC como el formato antiguo PARTITURA
+    const hasMusic = assistantMessage.content?.includes('[ABC]') ||
+      assistantMessage.content?.includes('```abc') ||
+      assistantMessage.content?.includes('[PARTITURA]');
+    if (hasMusic && !wasCancelled) {
+      console.log('🎵 Fin de stream (o error) - Procesando partitura detectada');
+      setTimeout(() => {
+        if (window.musicModeUtils?.processMusicResponse) {
+          window.musicModeUtils.processMusicResponse(conversation, assistantMessage, bubble);
+        }
+      }, 500);
     }
   }
 }
@@ -3935,6 +3963,23 @@ INSTRUCCIONES:
           if (finalContent) finalContent += '\n\n';
           finalContent += canvasMsg;
         }
+      }
+
+      // Instrucciones para modo música
+      const wantsMusic = window._musicModeActive;
+      if (wantsMusic) {
+        const musicMsg = `Responde usando este formato para la partitura:
+[PARTITURA]
+titulo: Nombre de la pieza
+compas: 4/4
+clave: G
+tempo: 120
+| C4 D4 E4 F4 | G4 A4 B4 C5 |
+[/PARTITURA]
+Después del bloque añade una explicación.`;
+        if (finalContent) finalContent += '\n\n';
+        finalContent += musicMsg;
+        console.log('🎵 Modo Música activado - Instrucciones añadidas');
       }
 
       if (finalContent.trim()) {
@@ -9123,6 +9168,10 @@ function setChatMode(mode) {
   canvasMode = mode === 'canvas';
   window._canvasModeActive = canvasMode;
 
+  // Modo música
+  musicMode = mode === 'music';
+  window._musicModeActive = musicMode;
+
   // Actualizar todos los toggles
   const toggles = document.querySelectorAll('.chat-mode-toggle');
   const visibleModes = getVisibleChatModes();
@@ -9149,7 +9198,8 @@ function setChatMode(mode) {
     'deep': '🧠 Deep Think',
     'study': '📚 Modo Estudio',
     'web': '🌐 Búsqueda Web',
-    'canvas': '📝 Canvas'
+    'canvas': '📝 Canvas',
+    'music': '🎵 Música'
   };
   console.log(`Modo de chat: ${modeNames[mode]}`);
 
@@ -9160,6 +9210,11 @@ function setChatMode(mode) {
   } else {
     // Cuando no está en modo canvas, ocultar el panel
     toggleCanvasVisibility(false);
+  }
+
+  // Ocultar panel de música cuando no está en modo música
+  if (!musicMode) {
+    toggleMusicPanel(false);
   }
 }
 
@@ -11587,3 +11642,453 @@ Responde específicamente sobre este texto citado.`;
 
 }, 1000);
 
+// ========================================
+// Music Mode - Generación de Partituras
+// ========================================
+
+let musicMode = false;
+let currentMusicScore = null;
+
+// Get DOM elements dynamically (they may not exist at script load time)
+function getMusicElements() {
+  return {
+    panel: document.getElementById('music-panel'),
+    closeBtn: document.getElementById('music-close-btn'),
+    downloadBtn: document.getElementById('music-download-btn'),
+    scoreContainer: document.getElementById('music-score'),
+    titleText: document.getElementById('music-title-text'),
+    timeSig: document.getElementById('music-time-sig'),
+    key: document.getElementById('music-key'),
+    tempo: document.getElementById('music-tempo')
+  };
+}
+
+// Toggle music panel visibility
+function toggleMusicPanel(show) {
+  const { panel } = getMusicElements();
+  if (!panel) {
+    console.error('🎵 Panel de música no encontrado en el DOM');
+    return;
+  }
+
+  console.log('🎵 Toggle panel:', show ? 'mostrar' : 'ocultar');
+
+  if (show) {
+    document.body.classList.add('music-visible');
+    panel.style.display = 'flex';
+  } else {
+    document.body.classList.remove('music-visible');
+    panel.style.display = 'none';
+  }
+}
+
+// Parse ABC notation from AI response (with backwards compatibility for PARTITURA)
+function parseMusicNotation(text) {
+  if (!text) return null;
+
+  // Strip markdown formatting
+  let cleanText = text
+    .replace(/```abc/gi, '[ABC]')
+    .replace(/```/g, '[/ABC]')
+    .replace(/\*\*\[ABC\]\*\*/gi, '[ABC]')
+    .replace(/\*\*\[\/ABC\]\*\*/gi, '[/ABC]')
+    .replace(/\*\*\[PARTITURA\]\*\*/gi, '[PARTITURA]')
+    .replace(/\*\*\[\/PARTITURA\]\*\*/gi, '[/PARTITURA]');
+
+  // First try ABC format
+  const abcMatch = cleanText.match(/\[ABC\]([\s\S]*?)(?:\[\/ABC\]|$)/i);
+  if (abcMatch) {
+    const abcContent = abcMatch[1].trim();
+    console.log('🎵 Contenido ABC encontrado:', abcContent.substring(0, 200));
+
+    const titleMatch = abcContent.match(/^T:\s*(.+)$/m);
+    const title = titleMatch ? titleMatch[1].trim() : 'Partitura';
+    const keyMatch = abcContent.match(/^K:\s*(.+)$/m);
+    const key = keyMatch ? keyMatch[1].trim() : 'C';
+    const meterMatch = abcContent.match(/^M:\s*(.+)$/m);
+    const meter = meterMatch ? meterMatch[1].trim() : '4/4';
+    const tempoMatch = abcContent.match(/^Q:\s*(.+)$/m);
+    const tempo = tempoMatch ? tempoMatch[1].trim() : '1/4=120';
+
+    return {
+      abc: abcContent,
+      title: title,
+      key: key,
+      meter: meter,
+      tempo: tempo
+    };
+  }
+
+  // Fallback: try old PARTITURA format and convert to ABC
+  const partituraMatch = cleanText.match(/\[PARTITURA\]([\s\S]*?)(?:\[\/PARTITURA\]|$)/i);
+  if (partituraMatch) {
+    console.log('🎵 Formato PARTITURA detectado, convirtiendo a ABC...');
+    const content = partituraMatch[1].trim();
+
+    // Parse old format metadata
+    const titulo = content.match(/titulo:\s*(.+?)(?:\n|$)/i)?.[1]?.replace(/[*_"]/g, '').trim() || 'Partitura';
+    const compas = content.match(/compas:\s*(\d+\/\d+)/i)?.[1] || '4/4';
+    const clave = content.match(/clave:\s*([A-Ga-g][#♯b♭]?\s*(?:mayor|menor|m)?)/i)?.[1]?.trim() || 'C';
+    const tempo = content.match(/tempo:\s*(\d+)/i)?.[1] || '120';
+
+    // Extract notes from | ... | lines
+    const noteLines = [];
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Look for lines starting with | that contain notes
+      if (trimmed.startsWith('|') && /[A-Ga-g][#♯b♭]?\d/.test(trimmed)) {
+        // Extract note names from the line
+        const notes = trimmed.match(/[A-Ga-g][#♯b♭]?\d/g);
+        if (notes && notes.length > 0) {
+          noteLines.push(notes.join(' '));
+        }
+      }
+    }
+
+    // Convert key format
+    let abcKey = clave.replace(/♯/g, '#').replace(/♭/g, 'b');
+    if (abcKey.includes('menor') || abcKey.includes(' m')) {
+      abcKey = abcKey.replace(/\s*(menor|m)/i, 'm');
+    }
+
+    // Build ABC content
+    let abcContent = `X:1
+T:${titulo}
+M:${compas}
+L:1/4
+Q:1/4=${tempo}
+K:${abcKey}
+`;
+
+    // Add notes if found
+    if (noteLines.length > 0) {
+      // Convert notes to ABC format (C4 -> C, c5 -> c, etc.)
+      const abcNotes = noteLines.map(line => {
+        return line.replace(/([A-Ga-g])([#♯b♭])?(\d)/g, (match, note, acc, oct) => {
+          let abcNote = note;
+          if (parseInt(oct) >= 5) {
+            abcNote = note.toLowerCase();
+          } else {
+            abcNote = note.toUpperCase();
+          }
+          if (acc === '#' || acc === '♯') abcNote = '^' + abcNote;
+          if (acc === 'b' || acc === '♭') abcNote = '_' + abcNote;
+          return abcNote;
+        });
+      }).join(' | ') + ' |]';
+      abcContent += abcNotes;
+    } else {
+      // Default simple melody if no notes found
+      abcContent += 'C D E F | G A B c |]';
+    }
+
+    console.log('🎵 ABC generado:', abcContent.substring(0, 200));
+
+    return {
+      abc: abcContent,
+      title: titulo,
+      key: abcKey,
+      meter: compas,
+      tempo: `1/4=${tempo}`
+    };
+  }
+
+  console.log('🎵 No se encontró marcador [ABC] ni [PARTITURA]');
+  return null;
+}
+
+// Render music score using abcjs
+function renderMusicScore(parsedMusic) {
+  const elements = getMusicElements();
+  const { scoreContainer, titleText, timeSig, key: keyEl, tempo: tempoEl } = elements;
+
+  if (!parsedMusic) {
+    console.error('🎵 No hay datos de partitura para renderizar');
+    return;
+  }
+
+  if (!scoreContainer) {
+    console.error('🎵 Contenedor de partitura no encontrado');
+    return;
+  }
+
+  console.log('🎵 Renderizando partitura:', parsedMusic.title);
+
+  // Clear previous content
+  scoreContainer.innerHTML = '';
+
+  // Update panel info
+  if (titleText) titleText.textContent = parsedMusic.title;
+  if (timeSig) timeSig.textContent = parsedMusic.meter;
+  if (keyEl) keyEl.textContent = `Tonalidad: ${parsedMusic.key}`;
+  if (tempoEl) tempoEl.textContent = parsedMusic.tempo;
+
+  // Check if abcjs is available
+  if (typeof ABCJS === 'undefined') {
+    console.error('🎵 abcjs no cargado');
+    scoreContainer.innerHTML = '<p style="color: #666; text-align: center; padding: 40px;">Error: abcjs no cargado. Recarga la página.</p>';
+    return;
+  }
+
+  try {
+    // Render with abcjs
+    ABCJS.renderAbc(scoreContainer, parsedMusic.abc, {
+      responsive: 'resize',
+      add_classes: true,
+      staffwidth: Math.max(350, scoreContainer.clientWidth - 60),
+      paddingtop: 20,
+      paddingbottom: 20,
+      paddingleft: 20,
+      paddingright: 20,
+      scale: 1.2,
+      foregroundColor: '#333333'
+    });
+
+    // Store for download
+    currentMusicScore = parsedMusic;
+    console.log('🎵 Partitura renderizada exitosamente');
+
+  } catch (error) {
+    console.error('🎵 Error rendering music score:', error);
+    scoreContainer.innerHTML = `<p style="color: #ff6b6b; text-align: center; padding: 40px;">Error al renderizar: ${error.message}</p>`;
+  }
+}
+
+// Build music instruction for AI - ABC Notation
+function buildMusicInstruction() {
+  return `🎵 MODO MÚSICA - REGLA OBLIGATORIA:
+
+⚠️ DEBES responder SIEMPRE con un bloque [ABC]. SIN EXCEPCIONES.
+⚠️ NO escribas descripciones de música. USA ESTA ESTRUCTURA:
+
+[ABC]
+X:1
+T:Nombre de la Pieza
+M:4/4
+L:1/4
+K:C
+C D E F | G A B c | c B A G | F E D C |
+[/ABC]
+
+Breve explicación aquí después del bloque.
+
+Notas: C D E F G A B (octava 4), c d e f g a b (octava 5)
+Sostenido: ^C, Bemol: _B, Silencio: z
+Duraciones: C2 (blanca), C/2 (corchea), C4 (redonda)
+
+RECUERDA: Si el usuario pide música, partitura, melodía o composición, 
+TU RESPUESTA DEBE COMENZAR CON [ABC] - es OBLIGATORIO.`;
+}
+
+// Detect music intent in user prompt
+function detectMusicIntent(prompt) {
+  if (!prompt) return false;
+
+  const keywords = [
+    'partitura', 'música', 'musical', 'notas musicales',
+    'compón', 'componer', 'melodía', 'acordes', 'pentagrama',
+    'sheet music', 'score', 'compose', 'melody',
+    'escribe música', 'genera música', 'crea música',
+    'canción', 'pieza musical', 'tema musical'
+  ];
+
+  const lower = prompt.toLowerCase();
+  return keywords.some(k => lower.includes(k));
+}
+
+// Process music response from AI
+function processMusicResponse(conversation, assistantMessage, bubbleElement) {
+  if (!conversation || !assistantMessage?.content) return false;
+
+  console.log('🎵 Procesando respuesta de música...');
+
+  const parsedMusic = parseMusicNotation(assistantMessage.content);
+  if (!parsedMusic) {
+    console.log('🎵 No se pudo parsear la partitura');
+    return false;
+  }
+
+  console.log('🎵 Partitura parseada:', parsedMusic.title);
+
+  // Render the score
+  renderMusicScore(parsedMusic);
+
+  // Show the music panel
+  toggleMusicPanel(true);
+
+  // Clean the message content - remove both ABC and PARTITURA blocks
+  let cleanContent = assistantMessage.content
+    // Remove ABC code blocks
+    .replace(/```abc[\s\S]*?```/gi, '')
+    // Remove [ABC] blocks
+    .replace(/\[ABC\][\s\S]*?\[\/ABC\]/gi, '')
+    .replace(/\[ABC\][\s\S]*/gi, '')
+    // Remove [PARTITURA] blocks (legacy format)
+    .replace(/\*\*\[PARTITURA\]\*\*[\s\S]*?(?:\*\*\[\/PARTITURA\]\*\*|\[\/PARTITURA\])/gi, '')
+    .replace(/\[PARTITURA\][\s\S]*?\[\/PARTITURA\]/gi, '')
+    .replace(/\[PARTITURA\][\s\S]*/gi, '')
+    // Clean up extra whitespace
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  let explanation = cleanContent || `He creado la partitura "${parsedMusic.title}".`;
+
+  // Store music data and update message
+  assistantMessage.musicData = parsedMusic;
+  assistantMessage.content = explanation;
+
+  // Update the bubble in the DOM
+  // bubbleElement is the .message-bubble, we need .bubble-content inside it
+  let targetBubble = null;
+
+  if (bubbleElement) {
+    // If we have the bubble element, find bubble-content inside it
+    targetBubble = bubbleElement.querySelector('.bubble-content') || bubbleElement;
+  }
+
+  if (!targetBubble) {
+    // Fallback: find the last assistant message's bubble
+    const lastMessage = document.querySelector('.message.assistant:last-child');
+    if (lastMessage) {
+      targetBubble = lastMessage.querySelector('.bubble-content') || lastMessage.querySelector('.message-bubble');
+    }
+  }
+
+  if (targetBubble) {
+    const cardHtml = createMusicCard(parsedMusic);
+    targetBubble.innerHTML = parseMarkdown(explanation) + cardHtml;
+    console.log('🎵 Tarjeta de música añadida al chat');
+  } else {
+    console.warn('🎵 No se pudo encontrar el bubble para actualizar');
+  }
+
+  return true;
+}
+
+// Create music artifact card HTML
+function createMusicCard(musicData) {
+  if (!musicData) return '';
+
+  return `
+    <div class="music-card" onclick="window.showMusicPanel()">
+      <div class="music-card-header">
+        <div class="music-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 18V5l12-2v13" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="18" cy="16" r="3" />
+          </svg>
+        </div>
+        <div class="music-card-info">
+          <div class="music-card-title">${escapeHtml(musicData.title)}</div>
+          <div class="music-card-meta">${musicData.meter} • ${musicData.key}</div>
+        </div>
+      </div>
+      <div class="music-card-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        Ver partitura
+      </div>
+    </div>
+  `;
+}
+
+// Global function to show music panel
+window.showMusicPanel = function () {
+  toggleMusicPanel(true);
+  if (currentMusicScore) {
+    renderMusicScore(currentMusicScore);
+  }
+};
+
+// Download music as image
+function downloadMusicAsImage() {
+  const { scoreContainer } = getMusicElements();
+  if (!scoreContainer) return;
+
+  const svg = scoreContainer.querySelector('svg');
+  if (!svg) return;
+
+  // Create a canvas to convert SVG to image
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const svgData = new XMLSerializer().serializeToString(svg);
+  const img = new Image();
+
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+
+    const a = document.createElement('a');
+    a.download = `${currentMusicScore?.titulo || 'partitura'}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  };
+
+  img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+}
+
+// Initialize music mode event listeners
+function initMusicMode() {
+  const elements = getMusicElements();
+
+  // Close button
+  if (elements.closeBtn) {
+    elements.closeBtn.addEventListener('click', () => {
+      toggleMusicPanel(false);
+    });
+  }
+
+  // Download button
+  if (elements.downloadBtn) {
+    elements.downloadBtn.addEventListener('click', downloadMusicAsImage);
+  }
+
+  // Add music mode to chat mode toggles
+  const modeToggles = document.querySelectorAll('.chat-mode-toggle');
+  modeToggles.forEach(toggle => {
+    const musicBtn = toggle.querySelector('[data-mode="music"]');
+    if (musicBtn) {
+      musicBtn.addEventListener('click', () => {
+        musicMode = !musicBtn.classList.contains('active');
+
+        // Update all toggles
+        document.querySelectorAll('.chat-mode-toggle').forEach(t => {
+          t.querySelectorAll('.chat-mode-option').forEach(opt => {
+            opt.classList.remove('active');
+          });
+          const currentBtn = t.querySelector(`[data-mode="${musicMode ? 'music' : 'normal'}"]`);
+          if (currentBtn) currentBtn.classList.add('active');
+        });
+      });
+    }
+  });
+
+  console.log('🎵 Music mode initialized');
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initMusicMode);
+} else {
+  setTimeout(initMusicMode, 100);
+}
+
+// Export functions for use in other parts of the app
+window.musicModeUtils = {
+  parseMusicNotation,
+  renderMusicScore,
+  buildMusicInstruction,
+  detectMusicIntent,
+  processMusicResponse,
+  createMusicCard,
+  toggleMusicPanel
+};
