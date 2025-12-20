@@ -12636,22 +12636,50 @@ function initScoreCanvas() {
     const doc = getScoreDoc(state.activeId);
     const title = doc?.title || 'partitura';
 
+    // Get SVG dimensions
+    const svgRect = svg.getBoundingClientRect();
+    const svgWidth = svgRect.width;
+    const svgHeight = svgRect.height;
+
+    // Scale factor for high quality (3x = 300 DPI equivalent)
+    const scale = 3;
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    const svgData = new XMLSerializer().serializeToString(svg);
+    
+    // Set canvas size to scaled dimensions
+    canvas.width = svgWidth * scale;
+    canvas.height = svgHeight * scale;
+
+    // Create a copy of the SVG with explicit dimensions
+    const svgClone = svg.cloneNode(true);
+    svgClone.setAttribute('width', svgWidth * scale);
+    svgClone.setAttribute('height', svgHeight * scale);
+    
+    const svgData = new XMLSerializer().serializeToString(svgClone);
     const img = new Image();
 
     img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
+      // Fill white background
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0);
+      
+      // Enable smooth rendering
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      // Draw the image
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      const a = document.createElement('a');
-      a.download = `${title}.png`;
-      a.href = canvas.toDataURL('image/png');
-      a.click();
+      // Download with high quality
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.download = `${title}.png`;
+        a.href = url;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/png', 1.0); // Maximum quality
     };
 
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
