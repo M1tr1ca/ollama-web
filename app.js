@@ -913,17 +913,69 @@ async function renderPdfVisually(base64Data, container, textToHighlight) {
 
   container.innerHTML = '';
 
-  // Normalize search text
-  const normalizedSearch = textToHighlight
-    ? textToHighlight.toLowerCase().replace(/\s+/g, ' ').trim()
-    : '';
-  const searchPrefix = normalizedSearch.substring(0, 50);
-  const searchWords = searchPrefix.split(' ').filter(w => w.length > 3);
+  // =====================================================
+  // IMPROVED TEXT SEARCH ALGORITHM - Multi-strategy approach
+  // =====================================================
 
-  console.log('🔍 Searching for text:', searchPrefix);
+  // Advanced text normalization function
+  const normalizeText = (text) => {
+    if (!text) return '';
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[""''«»]/g, '"')       // Normalize quotes
+      .replace(/[—–]/g, '-')           // Normalize dashes
+      .replace(/\s+/g, ' ')            // Normalize whitespace
+      .replace(/[.,;:!?()[\]{}]/g, ' ') // Remove punctuation
+      .replace(/\s+/g, ' ')            // Clean up spaces again
+      .trim();
+  };
+
+  // Extract significant words (length > 3, not common stopwords)
+  const stopwords = new Set(['para', 'como', 'esta', 'este', 'esto', 'esos', 'esas', 'unos', 'unas',
+    'cada', 'todo', 'toda', 'todos', 'todas', 'pero', 'sino', 'porque', 'cuando', 'donde',
+    'quien', 'cual', 'cuyo', 'cuya', 'algo', 'nada', 'mucho', 'poco', 'otro', 'otra',
+    'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one',
+    'our', 'out', 'has', 'have', 'been', 'were', 'from', 'this', 'that', 'with', 'they', 'what']);
+
+  const extractKeywords = (text) => {
+    const normalized = normalizeText(text);
+    return normalized.split(' ')
+      .filter(w => w.length > 3 && !stopwords.has(w))
+      .slice(0, 20); // Limit to 20 most important words
+  };
+
+  // Generate n-grams (sequences of consecutive words)
+  const generateNgrams = (text, n) => {
+    const words = normalizeText(text).split(' ').filter(w => w.length > 2);
+    const ngrams = [];
+    for (let i = 0; i <= words.length - n; i++) {
+      ngrams.push(words.slice(i, i + n).join(' '));
+    }
+    return ngrams;
+  };
+
+  // Prepare search data
+  const normalizedSearch = textToHighlight ? normalizeText(textToHighlight) : '';
+  const searchKeywords = extractKeywords(textToHighlight || '');
+  const searchNgrams4 = generateNgrams(textToHighlight || '', 4);
+  const searchNgrams3 = generateNgrams(textToHighlight || '', 3);
+  const searchFragments = normalizedSearch.length > 30
+    ? [normalizedSearch.substring(0, 40), normalizedSearch.substring(normalizedSearch.length - 40)]
+    : [normalizedSearch];
+
+  console.log('🔍 PDF Search - Full text:', textToHighlight?.substring(0, 100));
+  console.log('🔍 PDF Search - Keywords:', searchKeywords.slice(0, 10));
+  console.log('🔍 PDF Search - N-grams (4):', searchNgrams4.slice(0, 5));
 
   let foundPageDiv = null;
   let foundPageNum = 0;
+  let bestScore = 0;
+  let matchMethod = '';
+
+  // Track page scores for multi-strategy matching
+  const pageScores = [];
 
   // Render all pages
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -1006,35 +1058,63 @@ async function renderPdfVisually(base64Data, container, textToHighlight) {
     canvasWrapper.appendChild(textLayerDiv);
     pageDiv.appendChild(canvasWrapper);
 
-    // Check if this page contains the search text
-    const fullPageText = pageTextItems.map(item => item.str).join(' ').toLowerCase().replace(/\s+/g, ' ');
-    const matchFound = searchPrefix && fullPageText.includes(searchPrefix);
+    // =====================================================
+    // MULTI-STRATEGY TEXT MATCHING
+    // =====================================================
+    const fullPageText = pageTextItems.map(item => item.str).join(' ');
+    const normalizedPageText = normalizeText(fullPageText);
 
-    if (matchFound && !foundPageDiv) {
-      foundPageDiv = pageDiv;
-      foundPageNum = pageNum;
-      console.log(`✅ Found text on page ${pageNum}`);
+    let pageScore = 0;
+    let pageMatchMethods = [];
 
-      // Add found banner
-      const banner = document.createElement('div');
-      banner.className = 'pdf-found-banner';
-      banner.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -1px; margin-right: 4px; opacity: 0.9;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>Pág. ${pageNum} · Texto encontrado`;
-      banner.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--theme-primary, #ff9800);
-        color: white;
-        padding: 6px 14px;
-        font-size: 11px;
-        font-weight: 500;
-        text-align: center;
-        z-index: 100;
-        border-radius: 0 0 8px 8px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      `;
-      pageDiv.appendChild(banner);
+    if (normalizedSearch) {
+      // Strategy 1: Exact match (highest priority)
+      if (normalizedPageText.includes(normalizedSearch)) {
+        pageScore += 100;
+        pageMatchMethods.push('exact');
+      }
+
+      // Strategy 2: Fragment match (beginning and end of cited text)
+      for (const fragment of searchFragments) {
+        if (fragment.length > 10 && normalizedPageText.includes(fragment)) {
+          pageScore += 50;
+          pageMatchMethods.push('fragment');
+          break;
+        }
+      }
+
+      // Strategy 3: N-gram match (sequences of 4 words)
+      for (const ngram of searchNgrams4) {
+        if (normalizedPageText.includes(ngram)) {
+          pageScore += 30;
+          pageMatchMethods.push('ngram4');
+          break;
+        }
+      }
+
+      // Strategy 4: N-gram match (sequences of 3 words)
+      for (const ngram of searchNgrams3) {
+        if (normalizedPageText.includes(ngram)) {
+          pageScore += 20;
+          pageMatchMethods.push('ngram3');
+          break;
+        }
+      }
+
+      // Strategy 5: Keyword density (how many keywords found)
+      const keywordsFound = searchKeywords.filter(kw => normalizedPageText.includes(kw));
+      const keywordRatio = keywordsFound.length / Math.max(searchKeywords.length, 1);
+      if (keywordRatio >= 0.5) {
+        pageScore += Math.round(keywordRatio * 40);
+        pageMatchMethods.push(`keywords(${keywordsFound.length}/${searchKeywords.length})`);
+      }
+    }
+
+    // Store page score
+    pageScores.push({ pageNum, pageDiv, score: pageScore, methods: pageMatchMethods });
+
+    if (pageScore > 0) {
+      console.log(`📄 Page ${pageNum} score: ${pageScore} [${pageMatchMethods.join(', ')}]`);
     }
 
     // Add page number footer
@@ -1052,14 +1132,56 @@ async function renderPdfVisually(base64Data, container, textToHighlight) {
     container.appendChild(pageDiv);
   }
 
+  // =====================================================
+  // FIND BEST MATCHING PAGE
+  // =====================================================
+  if (normalizedSearch && pageScores.length > 0) {
+    // Sort by score descending
+    pageScores.sort((a, b) => b.score - a.score);
+    const bestPage = pageScores[0];
+
+    if (bestPage.score > 0) {
+      foundPageDiv = bestPage.pageDiv;
+      foundPageNum = bestPage.pageNum;
+      matchMethod = bestPage.methods.join(', ');
+      bestScore = bestPage.score;
+
+      console.log(`✅ Best match: Page ${foundPageNum} with score ${bestScore} [${matchMethod}]`);
+
+      // Add found banner to best matching page
+      const banner = document.createElement('div');
+      banner.className = 'pdf-found-banner';
+      const confidenceText = bestScore >= 100 ? 'Coincidencia exacta' :
+        bestScore >= 50 ? 'Alta coincidencia' : 'Coincidencia parcial';
+      banner.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -1px; margin-right: 4px; opacity: 0.9;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>Pág. ${foundPageNum} · ${confidenceText}`;
+      banner.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${bestScore >= 100 ? '#4caf50' : bestScore >= 50 ? 'var(--theme-primary, #ff9800)' : '#2196f3'};
+        color: white;
+        padding: 6px 14px;
+        font-size: 11px;
+        font-weight: 500;
+        text-align: center;
+        z-index: 100;
+        border-radius: 0 0 8px 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      `;
+      foundPageDiv.appendChild(banner);
+    } else {
+      console.log('❌ No matching text found in any page');
+      console.log('🔍 Search text was:', textToHighlight?.substring(0, 100));
+    }
+  }
+
   // Scroll to found page
   if (foundPageDiv) {
     console.log(`📜 Scrolling to page ${foundPageNum}`);
     setTimeout(() => {
       foundPageDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 200);
-  } else if (searchPrefix) {
-    console.log('❌ Text not found in any page');
   }
 }
 
@@ -1133,14 +1255,54 @@ async function loadPdfIntoViewer(file, container, textToHighlight) {
   let displayContent = file.content || 'Sin contenido disponible';
 
   if (textToHighlight) {
-    const searchText = textToHighlight.toLowerCase().trim();
-    const contentLower = displayContent.toLowerCase();
-    const index = contentLower.indexOf(searchText);
+    // Use improved search with normalization
+    const normalizeForSearch = (text) => {
+      if (!text) return '';
+      return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
+    const normalizedSearch = normalizeForSearch(textToHighlight);
+    const normalizedContent = normalizeForSearch(displayContent);
+    let index = normalizedContent.indexOf(normalizedSearch);
+
+    // If exact match not found, try finding key phrases (first 30 chars, last 30 chars)
+    if (index === -1 && normalizedSearch.length > 30) {
+      const startPhrase = normalizedSearch.substring(0, 30);
+      const endPhrase = normalizedSearch.substring(normalizedSearch.length - 30);
+
+      index = normalizedContent.indexOf(startPhrase);
+      if (index === -1) {
+        index = normalizedContent.indexOf(endPhrase);
+      }
+    }
+
+    // If still not found, try with keywords
+    if (index === -1) {
+      const keywords = normalizedSearch.split(' ').filter(w => w.length > 4).slice(0, 5);
+      for (const kw of keywords) {
+        const kwIndex = normalizedContent.indexOf(kw);
+        if (kwIndex !== -1) {
+          // Find surrounding context
+          const contextStart = Math.max(0, kwIndex - 50);
+          const contextEnd = Math.min(normalizedContent.length, kwIndex + kw.length + 50);
+          // Map to original content
+          index = contextStart;
+          break;
+        }
+      }
+    }
 
     if (index !== -1) {
+      // Find the best match length (could be partial match)
+      const matchLength = Math.min(textToHighlight.length, displayContent.length - index);
       const before = escapeHtml(displayContent.substring(0, index));
-      const match = escapeHtml(displayContent.substring(index, index + textToHighlight.length));
-      const after = escapeHtml(displayContent.substring(index + textToHighlight.length));
+      const match = escapeHtml(displayContent.substring(index, index + matchLength));
+      const after = escapeHtml(displayContent.substring(index + matchLength));
       displayContent = `${before}<mark class="pdf-highlight">${match}</mark>${after}`;
     } else {
       displayContent = escapeHtml(displayContent);
@@ -2585,10 +2747,13 @@ async function streamAssistantResponse(conversation, payloadMessages) {
   // Configurar num_ctx dinámicamente según el contenido
   // 1 token ≈ 4 caracteres en promedio
   const estimatedTokens = Math.ceil(totalContentLength / 4);
-  // Añadir margen para la respuesta (al menos 2000 tokens extra)
-  const recommendedContext = Math.max(4096, estimatedTokens + 2000);
-  // Limitar a un máximo razonable
-  const numCtx = Math.min(recommendedContext, 32768);
+  // Añadir margen para la respuesta (al menos 4000 tokens extra)
+  const recommendedContext = Math.max(4096, estimatedTokens + 4000);
+  // Obtener el límite del modelo (usar cache si disponible, sino usar 131072 como máximo)
+  const modelInfo = modelContextCache[state.currentModel];
+  const modelMaxContext = modelInfo?.contextLength || 131072;
+  // Limitar al máximo del modelo
+  const numCtx = Math.min(recommendedContext, modelMaxContext);
 
   // Inyectar contexto de cita si existe
   let messagesWithQuoteContext = [...payloadMessages];
@@ -7428,6 +7593,14 @@ function buildProjectContext(project) {
   if (!project) return '';
 
   let context = '';
+
+  // Añadir advertencia importante al inicio
+  context += `⚠️ REGLA CRÍTICA: Estás trabajando en el proyecto "${project.name}". 
+DEBES basar tus respuestas ÚNICAMENTE en los documentos proporcionados a continuación.
+Si la información no está en los documentos, responde "No encuentro esa información en los documentos del proyecto" en lugar de inventar.
+NO inventes fuentes ni información que no esté en los documentos.
+
+`;
 
   // Añadir instrucciones del proyecto
   if (project.instructions) {
