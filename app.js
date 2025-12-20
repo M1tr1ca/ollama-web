@@ -7,6 +7,8 @@ const CANVAS_STORAGE_KEY = 'ollama-web-canvas-v1';
 const CANVAS_DEFAULT_TITLE = 'Nuevo documento';
 const PDF_DB_NAME = 'ollama-web-pdf-store';
 const PDF_DB_VERSION = 1;
+const SCORE_CANVAS_STORAGE_KEY = 'ollama-web-score-canvas-v1';
+const SCORE_CANVAS_DEFAULT_TITLE = 'Nueva partitura';
 
 // IndexedDB for storing large PDF binaries
 let pdfDatabase = null;
@@ -123,6 +125,13 @@ const canvasState = {
 
 let canvasEditor = null;
 let canvasMode = false;
+
+// Score Canvas State - Collaborative music composition
+const scoreCanvasState = {
+  docs: {} // conversationId -> scoreDocument
+};
+let scoreCanvasMode = false;
+let pendingScoreEdit = null; // For AI edit approval flow
 
 // Control de scroll para burbujas (fuera del streaming principal)
 const SCROLL_UPDATE_INTERVAL = 16; // ~60fps
@@ -255,6 +264,181 @@ function pushCanvasCard(conversationId, card) {
   if (!canvasState.cards[conversationId]) canvasState.cards[conversationId] = [];
   canvasState.cards[conversationId].unshift(card);
   persistCanvasState();
+}
+
+// ===========================
+// Score Canvas - State Management
+// ===========================
+
+function persistScoreCanvasState() {
+  if (!hasLocalStorage || incognitoMode) return;
+  try {
+    window.localStorage.setItem(SCORE_CANVAS_STORAGE_KEY, JSON.stringify(scoreCanvasState));
+  } catch (error) {
+    console.warn('🎼 No se pudo guardar el estado de score canvas', error);
+  }
+}
+
+function loadScoreCanvasState() {
+  if (!hasLocalStorage) return;
+  try {
+    const raw = window.localStorage.getItem(SCORE_CANVAS_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    scoreCanvasState.docs = parsed?.docs || {};
+    console.log('🎼 Score canvas state loaded');
+  } catch (error) {
+    console.warn('🎼 No se pudo restaurar el estado de score canvas', error);
+  }
+}
+
+function getScoreDoc(conversationId) {
+  if (!conversationId) return null;
+  return scoreCanvasState.docs[conversationId] || null;
+}
+
+function saveScoreDoc(conversationId, doc) {
+  if (!conversationId || !doc) return;
+  scoreCanvasState.docs[conversationId] = doc;
+  persistScoreCanvasState();
+}
+
+function createEmptyScore() {
+  return {
+    id: generateId('score'),
+    abc: `X:1
+T:Nueva Composición
+M:4/4
+L:1/4
+Q:1/4=120
+K:C
+% Tu música va aquí
+`,
+    title: SCORE_CANVAS_DEFAULT_TITLE,
+    key: 'C',
+    meter: '4/4',
+    tempo: '1/4=120',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    version: 1,
+    versions: [],
+    lastEditBy: 'user'
+  };
+}
+
+function ensureScoreDoc(conversationId) {
+  if (!conversationId) return null;
+  let doc = getScoreDoc(conversationId);
+  if (!doc) {
+    doc = createEmptyScore();
+    saveScoreDoc(conversationId, doc);
+    console.log('🎼 Created new empty score for conversation:', conversationId);
+  }
+  return doc;
+}
+
+function updateScoreFromUser(conversationId, newAbc, newTitle = null) {
+  const doc = ensureScoreDoc(conversationId);
+  if (!doc) return;
+
+  // Save current version to history
+  doc.versions.push({
+    version: doc.version,
+    abc: doc.abc,
+    title: doc.title,
+    editedBy: doc.lastEditBy,
+    timestamp: doc.updatedAt
+  });
+
+  // Update document
+  doc.abc = newAbc;
+  if (newTitle) doc.title = newTitle;
+  doc.updatedAt = Date.now();
+  doc.version += 1;
+  doc.lastEditBy = 'user';
+
+  // Parse metadata from ABC
+  const meterMatch = newAbc.match(/^M:\s*(.+)$/m);
+  const keyMatch = newAbc.match(/^K:\s*(.+)$/m);
+  const tempoMatch = newAbc.match(/^Q:\s*(.+)$/m);
+  const titleMatch = newAbc.match(/^T:\s*(.+)$/m);
+
+  if (meterMatch) doc.meter = meterMatch[1].trim();
+  if (keyMatch) doc.key = keyMatch[1].trim();
+  if (tempoMatch) doc.tempo = tempoMatch[1].trim();
+  if (titleMatch && !newTitle) doc.title = titleMatch[1].trim();
+
+  saveScoreDoc(conversationId, doc);
+  console.log('🎼 Score updated by user, now v' + doc.version);
+  return doc;
+}
+
+function updateScoreFromAI(conversationId, scoreEdit) {
+  const doc = ensureScoreDoc(conversationId);
+  if (!doc) return;
+
+  // Save current version to history
+  doc.versions.push({
+    version: doc.version,
+    abc: doc.abc,
+    title: doc.title,
+    editedBy: doc.lastEditBy,
+    timestamp: doc.updatedAt
+  });
+
+  // Update with AI's edit
+  doc.abc = scoreEdit.abc;
+  doc.title = scoreEdit.title || doc.title;
+  doc.key = scoreEdit.key || doc.key;
+  doc.meter = scoreEdit.meter || doc.meter;
+  doc.tempo = scoreEdit.tempo || doc.tempo;
+  doc.updatedAt = Date.now();
+  doc.version += 1;
+  doc.lastEditBy = 'ai';
+
+  saveScoreDoc(conversationId, doc);
+  console.log('🎼 Score updated by AI, now v' + doc.version);
+  return doc;
+}
+
+function getScoreHistory(conversationId) {
+  const doc = getScoreDoc(conversationId);
+  if (!doc) return [];
+  return doc.versions || [];
+}
+
+function restoreScoreVersion(conversationId, versionNumber) {
+  const doc = getScoreDoc(conversationId);
+  if (!doc) return null;
+
+  const targetVersion = doc.versions.find(v => v.version === versionNumber);
+  if (!targetVersion) return null;
+
+  // Save current as a version before restoring
+  doc.versions.push({
+    version: doc.version,
+    abc: doc.abc,
+    title: doc.title,
+    editedBy: doc.lastEditBy,
+    timestamp: doc.updatedAt
+  });
+
+  // Restore the old version
+  doc.abc = targetVersion.abc;
+  doc.title = targetVersion.title;
+  doc.updatedAt = Date.now();
+  doc.version += 1;
+  doc.lastEditBy = 'user'; // User initiated the restore
+
+  saveScoreDoc(conversationId, doc);
+  console.log('🎼 Restored to v' + versionNumber + ', now v' + doc.version);
+  return doc;
+}
+
+function deleteScoreDoc(conversationId) {
+  if (!conversationId) return;
+  delete scoreCanvasState.docs[conversationId];
+  persistScoreCanvasState();
 }
 
 function autoResizeTextarea(textarea) {
@@ -3267,6 +3451,17 @@ async function streamAssistantResponse(conversation, payloadMessages) {
         }
       }, 500);
     }
+
+    // Procesar Score Canvas edits (collaborative score)
+    const hasScoreEdit = assistantMessage.content?.includes('[SCORE_EDIT]');
+    if (hasScoreEdit && !wasCancelled) {
+      console.log('🎼 Fin de stream - Procesando SCORE_EDIT detectado');
+      setTimeout(() => {
+        if (typeof processScoreResponse === 'function') {
+          processScoreResponse(conversation, assistantMessage, bubble);
+        }
+      }, 500);
+    }
   }
 }
 
@@ -3968,18 +4163,31 @@ INSTRUCCIONES:
       // Instrucciones para modo música
       const wantsMusic = window._musicModeActive;
       if (wantsMusic) {
-        const musicMsg = `Responde usando este formato para la partitura:
-[PARTITURA]
-titulo: Nombre de la pieza
-compas: 4/4
-clave: G
-tempo: 120
-| C4 D4 E4 F4 | G4 A4 B4 C5 |
-[/PARTITURA]
-Después del bloque añade una explicación.`;
+        const musicMsg = `MODO MÚSICA: Responde SIEMPRE con este formato:
+[ABC]
+X:1
+T:Nombre
+M:4/4
+L:1/4
+Q:1/4=120
+K:C
+C D E F | G A B c |
+[/ABC]
+Luego explica.`;
         if (finalContent) finalContent += '\n\n';
         finalContent += musicMsg;
-        console.log('🎵 Modo Música activado - Instrucciones añadidas');
+        console.log('🎵 Modo Música activado - Instrucciones [ABC] añadidas');
+      }
+
+      // Instrucciones para Score Canvas (partitura colaborativa)
+      const scoreCanvasActive = scoreCanvasMode || (state.activeId && getScoreDoc(state.activeId));
+      if (scoreCanvasActive) {
+        const scoreInstruction = buildScoreInstruction(state.activeId, prompt);
+        if (scoreInstruction) {
+          if (finalContent) finalContent += '\n\n';
+          finalContent += scoreInstruction;
+          console.log('🎼 Score Canvas activo - Instrucciones de partitura colaborativa añadidas');
+        }
       }
 
       if (finalContent.trim()) {
@@ -11897,7 +12105,7 @@ function detectMusicIntent(prompt) {
   return keywords.some(k => lower.includes(k));
 }
 
-// Process music response from AI
+// Process music response from AI - Now uses Score Canvas for editing
 function processMusicResponse(conversation, assistantMessage, bubbleElement) {
   if (!conversation || !assistantMessage?.content) return false;
 
@@ -11911,11 +12119,24 @@ function processMusicResponse(conversation, assistantMessage, bubbleElement) {
 
   console.log('🎵 Partitura parseada:', parsedMusic.title);
 
-  // Render the score
-  renderMusicScore(parsedMusic);
+  // Save to Score Canvas state for editing
+  const scoreEdit = {
+    abc: parsedMusic.abc,
+    title: parsedMusic.title,
+    key: parsedMusic.key,
+    meter: parsedMusic.meter,
+    tempo: parsedMusic.tempo || '1/4=120'
+  };
 
-  // Show the music panel
-  toggleMusicPanel(true);
+  // Update or create score document
+  updateScoreFromAI(conversation.id, scoreEdit);
+
+  // Show the Score Canvas panel (editable)
+  toggleScoreCanvasPanel(true);
+  renderScoreCanvasPanel(conversation.id);
+
+  // Store for legacy music panel compatibility
+  currentMusicScore = parsedMusic;
 
   // Clean the message content - remove both ABC and PARTITURA blocks
   let cleanContent = assistantMessage.content
@@ -11939,16 +12160,13 @@ function processMusicResponse(conversation, assistantMessage, bubbleElement) {
   assistantMessage.content = explanation;
 
   // Update the bubble in the DOM
-  // bubbleElement is the .message-bubble, we need .bubble-content inside it
   let targetBubble = null;
 
   if (bubbleElement) {
-    // If we have the bubble element, find bubble-content inside it
     targetBubble = bubbleElement.querySelector('.bubble-content') || bubbleElement;
   }
 
   if (!targetBubble) {
-    // Fallback: find the last assistant message's bubble
     const lastMessage = document.querySelector('.message.assistant:last-child');
     if (lastMessage) {
       targetBubble = lastMessage.querySelector('.bubble-content') || lastMessage.querySelector('.message-bubble');
@@ -11958,7 +12176,7 @@ function processMusicResponse(conversation, assistantMessage, bubbleElement) {
   if (targetBubble) {
     const cardHtml = createMusicCard(parsedMusic);
     targetBubble.innerHTML = parseMarkdown(explanation) + cardHtml;
-    console.log('🎵 Tarjeta de música añadida al chat');
+    console.log('🎵 Tarjeta de música añadida al chat (Score Canvas)');
   } else {
     console.warn('🎵 No se pudo encontrar el bubble para actualizar');
   }
@@ -11966,12 +12184,12 @@ function processMusicResponse(conversation, assistantMessage, bubbleElement) {
   return true;
 }
 
-// Create music artifact card HTML
+// Create music artifact card HTML - Now opens Score Canvas
 function createMusicCard(musicData) {
   if (!musicData) return '';
 
   return `
-    <div class="music-card" onclick="window.showMusicPanel()">
+    <div class="music-card" onclick="window.showScoreCanvasPanel()">
       <div class="music-card-header">
         <div class="music-card-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -11982,26 +12200,26 @@ function createMusicCard(musicData) {
         </div>
         <div class="music-card-info">
           <div class="music-card-title">${escapeHtml(musicData.title)}</div>
-          <div class="music-card-meta">${musicData.meter} • ${musicData.key}</div>
+          <div class="music-card-meta">${musicData.meter} • ${musicData.key} • Editable</div>
         </div>
       </div>
       <div class="music-card-action">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-          <polyline points="15 3 21 3 21 9"/>
-          <line x1="10" y1="14" x2="21" y2="3"/>
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
         </svg>
-        Ver partitura
+        Editar partitura
       </div>
     </div>
   `;
 }
 
-// Global function to show music panel
+// Global function to show music panel - Now opens Score Canvas
 window.showMusicPanel = function () {
-  toggleMusicPanel(true);
-  if (currentMusicScore) {
-    renderMusicScore(currentMusicScore);
+  // Redirect to Score Canvas for editing
+  if (state.activeId) {
+    toggleScoreCanvasPanel(true);
+    renderScoreCanvasPanel(state.activeId);
   }
 };
 
@@ -12081,6 +12299,632 @@ if (document.readyState === 'loading') {
 } else {
   setTimeout(initMusicMode, 100);
 }
+
+// Initialize Score Canvas
+loadScoreCanvasState();
+
+// ========================================
+// Score Canvas - UI and Interaction
+// ========================================
+
+let scoreSynthControl = null;
+
+// Toggle score canvas panel visibility
+function toggleScoreCanvasPanel(show) {
+  const panel = document.getElementById('score-canvas-panel');
+  if (!panel) {
+    console.error('🎼 Score canvas panel not found');
+    return;
+  }
+
+  if (show) {
+    document.body.classList.add('score-canvas-visible');
+    panel.style.display = 'flex';
+  } else {
+    document.body.classList.remove('score-canvas-visible');
+    panel.style.display = 'none';
+  }
+}
+
+// Render the score canvas panel with current document
+function renderScoreCanvasPanel(conversationId) {
+  const doc = getScoreDoc(conversationId);
+  if (!doc) {
+    toggleScoreCanvasPanel(false);
+    return;
+  }
+
+  toggleScoreCanvasPanel(true);
+
+  // Update title
+  const titleInput = document.getElementById('score-title-input');
+  if (titleInput) titleInput.value = doc.title || SCORE_CANVAS_DEFAULT_TITLE;
+
+  // Update version badge
+  const versionBadge = document.getElementById('score-version-badge');
+  if (versionBadge) versionBadge.textContent = 'v' + doc.version;
+
+  // Update editor content
+  const editor = document.getElementById('score-abc-editor');
+  if (editor) editor.value = doc.abc || '';
+
+  // Update metadata selects
+  const timeSigSelect = document.getElementById('score-time-sig');
+  const keySelect = document.getElementById('score-key');
+  const tempoInput = document.getElementById('score-tempo-input');
+
+  if (timeSigSelect) timeSigSelect.value = doc.meter || '4/4';
+  if (keySelect) keySelect.value = doc.key || 'C';
+  if (tempoInput) tempoInput.value = parseInt(doc.tempo?.replace(/.*=/, '')) || 120;
+
+  // Update last edit indicator
+  const lastEditEl = document.getElementById('score-last-edit');
+  if (lastEditEl) {
+    lastEditEl.textContent = doc.lastEditBy === 'ai' ? 'Editado por IA' : 'Editado por ti';
+    lastEditEl.dataset.editor = doc.lastEditBy;
+  }
+
+  // Render preview
+  renderScorePreview(doc.abc);
+}
+
+// Render the ABC notation in the preview pane
+function renderScorePreview(abcContent) {
+  const container = document.getElementById('score-preview');
+  if (!container) return;
+
+  if (!abcContent || !abcContent.trim()) {
+    container.innerHTML = '<p style="color: #999; font-style: italic;">Escribe notación ABC para ver la partitura</p>';
+    return;
+  }
+
+  if (typeof ABCJS === 'undefined') {
+    container.innerHTML = '<p style="color: #f66;">Error: abcjs no cargado</p>';
+    return;
+  }
+
+  try {
+    // Clear previous content
+    container.innerHTML = '';
+
+    // Ensure container has explicit dimensions
+    container.style.minHeight = '200px';
+
+    // Get actual width after layout
+    const containerWidth = container.clientWidth || 400;
+
+    ABCJS.renderAbc(container, abcContent, {
+      responsive: 'resize',
+      add_classes: true,
+      staffwidth: Math.max(300, containerWidth - 40),
+      paddingtop: 15,
+      paddingbottom: 15,
+      paddingleft: 10,
+      paddingright: 10,
+      scale: 1.2,
+      foregroundColor: '#000000',  // Pure black for notes
+      selectionColor: '#ff7744'
+    });
+
+    // Force solid colors on SVG elements
+    const svg = container.querySelector('svg');
+    if (svg) {
+      svg.style.backgroundColor = '#ffffff';
+      // Ensure all paths and shapes are solid black
+      svg.querySelectorAll('path, line, rect, circle, polygon').forEach(el => {
+        if (!el.getAttribute('fill') || el.getAttribute('fill') === 'none') {
+          // Skip elements that should not have fill
+        } else {
+          el.style.opacity = '1';
+        }
+        el.style.stroke = el.style.stroke || '#000000';
+      });
+    }
+
+  } catch (error) {
+    console.error('🎼 Error rendering score:', error);
+    container.innerHTML = `<p style="color: #f66;">Error al renderizar: ${error.message}</p>`;
+  }
+}
+
+// Initialize Score Canvas event handlers
+function initScoreCanvas() {
+  const editor = document.getElementById('score-abc-editor');
+  const titleInput = document.getElementById('score-title-input');
+  const timeSigSelect = document.getElementById('score-time-sig');
+  const keySelect = document.getElementById('score-key');
+  const tempoInput = document.getElementById('score-tempo-input');
+  const closeBtn = document.getElementById('score-close-btn');
+  const downloadBtn = document.getElementById('score-download-btn');
+  const historyBtn = document.getElementById('score-history-btn');
+  const historyDrawer = document.getElementById('score-history-drawer');
+  const historyCloseBtn = document.getElementById('score-history-close');
+  const playBtn = document.getElementById('score-play-btn');
+  const stopBtn = document.getElementById('score-stop-btn');
+  const tempoSlider = document.getElementById('playback-tempo');
+  const tempoDisplay = document.getElementById('tempo-display');
+
+  // Live preview on editor input (debounced)
+  let previewDebounce;
+  editor?.addEventListener('input', () => {
+    clearTimeout(previewDebounce);
+    previewDebounce = setTimeout(() => {
+      renderScorePreview(editor.value);
+    }, 300);
+  });
+
+  // Save on blur
+  editor?.addEventListener('blur', () => {
+    if (state.activeId && editor.value.trim()) {
+      updateScoreFromUser(state.activeId, editor.value);
+      updateScoreVersionBadge();
+    }
+  });
+
+  // Title change
+  titleInput?.addEventListener('blur', () => {
+    if (state.activeId) {
+      const doc = getScoreDoc(state.activeId);
+      if (doc && titleInput.value !== doc.title) {
+        doc.title = titleInput.value;
+        doc.updatedAt = Date.now();
+        saveScoreDoc(state.activeId, doc);
+      }
+    }
+  });
+
+  // Metadata changes - update ABC content
+  const updateMetadataInABC = () => {
+    if (!editor) return;
+    let abc = editor.value;
+
+    // Update or add metadata fields
+    const meter = timeSigSelect?.value || '4/4';
+    const key = keySelect?.value || 'C';
+    const tempo = tempoInput?.value || '120';
+
+    abc = abc.replace(/^M:\s*.+$/m, `M:${meter}`) || abc;
+    abc = abc.replace(/^K:\s*.+$/m, `K:${key}`) || abc;
+    abc = abc.replace(/^Q:\s*.+$/m, `Q:1/4=${tempo}`) || abc;
+
+    if (!abc.includes('M:')) abc = abc.replace(/^(X:\d+\nT:.+\n)/m, `$1M:${meter}\n`);
+    if (!abc.includes('Q:')) abc = abc.replace(/^(M:.+\n)/m, `$1Q:1/4=${tempo}\n`);
+    if (!abc.includes('K:')) abc = abc + `\nK:${key}`;
+
+    editor.value = abc;
+    renderScorePreview(abc);
+  };
+
+  timeSigSelect?.addEventListener('change', updateMetadataInABC);
+  keySelect?.addEventListener('change', updateMetadataInABC);
+  tempoInput?.addEventListener('change', updateMetadataInABC);
+
+  // Close button
+  closeBtn?.addEventListener('click', () => {
+    toggleScoreCanvasPanel(false);
+  });
+
+  // Download as PNG
+  downloadBtn?.addEventListener('click', () => {
+    const preview = document.getElementById('score-preview');
+    const svg = preview?.querySelector('svg');
+    if (!svg) return;
+
+    const doc = getScoreDoc(state.activeId);
+    const title = doc?.title || 'partitura';
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const img = new Image();
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+
+      const a = document.createElement('a');
+      a.download = `${title}.png`;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    };
+
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+  });
+
+  // History drawer toggle
+  historyBtn?.addEventListener('click', () => {
+    if (historyDrawer) {
+      historyDrawer.style.display = historyDrawer.style.display === 'none' ? 'flex' : 'none';
+      if (historyDrawer.style.display === 'flex') {
+        renderHistoryList();
+      }
+    }
+  });
+
+  historyCloseBtn?.addEventListener('click', () => {
+    if (historyDrawer) historyDrawer.style.display = 'none';
+  });
+
+  // Playback controls
+  playBtn?.addEventListener('click', playScore);
+  stopBtn?.addEventListener('click', stopScore);
+
+  tempoSlider?.addEventListener('input', (e) => {
+    if (tempoDisplay) tempoDisplay.textContent = e.target.value + 'x';
+  });
+
+  // AI Edit approval modal handlers
+  initScoreEditApprovalHandlers();
+
+  console.log('🎼 Score Canvas initialized');
+}
+
+// Update version badge after edit
+function updateScoreVersionBadge() {
+  const doc = getScoreDoc(state.activeId);
+  if (doc) {
+    const versionBadge = document.getElementById('score-version-badge');
+    if (versionBadge) versionBadge.textContent = 'v' + doc.version;
+
+    const lastEditEl = document.getElementById('score-last-edit');
+    if (lastEditEl) {
+      lastEditEl.textContent = doc.lastEditBy === 'ai' ? 'Editado por IA' : 'Editado por ti';
+      lastEditEl.dataset.editor = doc.lastEditBy;
+    }
+  }
+}
+
+// Render history list in drawer
+function renderHistoryList() {
+  const list = document.getElementById('score-history-list');
+  if (!list) return;
+
+  const history = getScoreHistory(state.activeId);
+  const doc = getScoreDoc(state.activeId);
+
+  list.innerHTML = '';
+
+  // Add current version
+  if (doc) {
+    const currentItem = document.createElement('li');
+    currentItem.className = 'score-history-item active';
+    currentItem.innerHTML = `
+      <span class="history-version">v${doc.version} (actual)</span>
+      <span class="history-meta">
+        ${new Date(doc.updatedAt).toLocaleString()}
+        <span class="history-editor-badge ${doc.lastEditBy}">${doc.lastEditBy === 'ai' ? 'IA' : 'Tú'}</span>
+      </span>
+    `;
+    list.appendChild(currentItem);
+  }
+
+  // Add history items (newest first)
+  history.slice().reverse().forEach(v => {
+    const item = document.createElement('li');
+    item.className = 'score-history-item';
+    item.innerHTML = `
+      <span class="history-version">v${v.version}</span>
+      <span class="history-meta">
+        ${new Date(v.timestamp).toLocaleString()}
+        <span class="history-editor-badge ${v.editedBy}">${v.editedBy === 'ai' ? 'IA' : 'Tú'}</span>
+      </span>
+    `;
+    item.addEventListener('click', () => {
+      if (confirm(`¿Restaurar versión ${v.version}?`)) {
+        restoreScoreVersion(state.activeId, v.version);
+        renderScoreCanvasPanel(state.activeId);
+        renderHistoryList();
+      }
+    });
+    list.appendChild(item);
+  });
+}
+
+// Audio playback with piano
+async function playScore() {
+  const doc = getScoreDoc(state.activeId);
+  if (!doc?.abc) return;
+
+  const previewContainer = document.getElementById('score-preview');
+  const playBtn = document.getElementById('score-play-btn');
+  const stopBtn = document.getElementById('score-stop-btn');
+  const tempoSlider = document.getElementById('playback-tempo');
+
+  if (typeof ABCJS === 'undefined' || !ABCJS.synth?.supportsAudio()) {
+    console.warn('🎼 Audio not supported');
+    return;
+  }
+
+  try {
+    // Stop any existing playback
+    stopScore();
+
+    // Render with cursor support
+    const visualObj = ABCJS.renderAbc(previewContainer, doc.abc, {
+      add_classes: true,
+      responsive: 'resize'
+    })[0];
+
+    // Create synth controller
+    scoreSynthControl = new ABCJS.synth.SynthController();
+
+    const synth = new ABCJS.synth.CreateSynth();
+    await synth.init({
+      visualObj: visualObj,
+      options: {
+        program: 0, // Piano sound
+        drum: ''
+      }
+    });
+
+    await scoreSynthControl.setTune(visualObj, false, {
+      chordsOff: false
+    });
+
+    // Apply tempo multiplier
+    const tempoMultiplier = parseFloat(tempoSlider?.value || 1);
+
+    scoreSynthControl.play();
+
+    if (playBtn) playBtn.disabled = true;
+    if (stopBtn) stopBtn.disabled = false;
+
+    console.log('🎼 Playback started');
+
+  } catch (error) {
+    console.error('🎼 Playback error:', error);
+  }
+}
+
+function stopScore() {
+  if (scoreSynthControl) {
+    try {
+      scoreSynthControl.pause();
+    } catch (e) { }
+    scoreSynthControl = null;
+  }
+
+  const playBtn = document.getElementById('score-play-btn');
+  const stopBtn = document.getElementById('score-stop-btn');
+  if (playBtn) playBtn.disabled = false;
+  if (stopBtn) stopBtn.disabled = true;
+}
+
+// AI Edit Approval Modal
+function showScoreEditApprovalModal(currentScore, proposedEdit, explanation) {
+  pendingScoreEdit = proposedEdit;
+
+  const modal = document.getElementById('score-ai-edit-modal');
+  const currentPreview = document.getElementById('score-diff-current');
+  const proposedPreview = document.getElementById('score-diff-proposed');
+  const explanationEl = document.getElementById('score-diff-explanation-text');
+
+  // Render current version
+  if (currentScore?.abc && typeof ABCJS !== 'undefined') {
+    ABCJS.renderAbc(currentPreview, currentScore.abc, { scale: 0.7, staffwidth: 300 });
+  } else {
+    currentPreview.innerHTML = '<p class="empty-score">Partitura vacía</p>';
+  }
+
+  // Render proposed version
+  if (proposedEdit?.abc && typeof ABCJS !== 'undefined') {
+    ABCJS.renderAbc(proposedPreview, proposedEdit.abc, { scale: 0.7, staffwidth: 300 });
+  }
+
+  // Set explanation
+  if (explanationEl) {
+    explanationEl.textContent = explanation || 'Sin explicación proporcionada.';
+  }
+
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeScoreEditModal() {
+  const modal = document.getElementById('score-ai-edit-modal');
+  if (modal) modal.style.display = 'none';
+  pendingScoreEdit = null;
+}
+
+function initScoreEditApprovalHandlers() {
+  const approveBtn = document.getElementById('approve-score-edit');
+  const rejectBtn = document.getElementById('reject-score-edit');
+  const closeBtn = document.getElementById('close-score-edit-modal');
+
+  approveBtn?.addEventListener('click', () => {
+    if (pendingScoreEdit && state.activeId) {
+      updateScoreFromAI(state.activeId, pendingScoreEdit);
+      toggleScoreCanvasPanel(true);
+      renderScoreCanvasPanel(state.activeId);
+      console.log('🎼 AI edit approved and applied');
+    }
+    closeScoreEditModal();
+  });
+
+  rejectBtn?.addEventListener('click', () => {
+    console.log('🎼 AI edit rejected');
+    closeScoreEditModal();
+  });
+
+  closeBtn?.addEventListener('click', closeScoreEditModal);
+}
+
+// Build instruction for AI when score canvas is active
+function buildScoreInstruction(conversationId, userPrompt) {
+  const doc = getScoreDoc(conversationId);
+
+  // Always include instruction if there's an existing score with real content
+  const hasExistingScore = doc && doc.abc && doc.abc.trim().length > 0 && !doc.abc.includes('% Tu música va aquí');
+
+  if (!hasExistingScore) return null;
+
+  // Extract just the notes from the ABC (remove headers)
+  const notesOnly = doc.abc
+    .split('\n')
+    .filter(line => !line.match(/^[A-Z]:|^%/))
+    .join(' ')
+    .trim();
+
+  // SHORT and DIRECT instruction for small models
+  const instruction = `PARTITURA ACTIVA - Versión ${doc.version}
+
+NOTAS ACTUALES: ${notesOnly || '(vacío)'}
+
+REGLA: Para editar la partitura, responde con:
+[ABC]
+X:1
+T:${doc.title}
+M:${doc.meter || '4/4'}
+L:1/4
+Q:${doc.tempo || '1/4=120'}
+K:${doc.key || 'C'}
+${notesOnly} (+ tus cambios aquí)
+[/ABC]
+
+Luego explica los cambios.`;
+
+  return instruction;
+}
+
+// Parse [SCORE_EDIT] block from AI response
+function parseScoreEdit(text) {
+  if (!text) return null;
+
+  const match = text.match(/\[SCORE_EDIT\]([\s\S]*?)\[\/SCORE_EDIT\]/i);
+  if (!match) return null;
+
+  const abcContent = match[1].trim();
+
+  // Parse ABC metadata
+  const titleMatch = abcContent.match(/^T:\s*(.+)$/m);
+  const keyMatch = abcContent.match(/^K:\s*(.+)$/m);
+  const meterMatch = abcContent.match(/^M:\s*(.+)$/m);
+  const tempoMatch = abcContent.match(/^Q:\s*(.+)$/m);
+
+  return {
+    abc: abcContent,
+    title: titleMatch?.[1]?.trim() || 'Partitura',
+    key: keyMatch?.[1]?.trim() || 'C',
+    meter: meterMatch?.[1]?.trim() || '4/4',
+    tempo: tempoMatch?.[1]?.trim() || '1/4=120'
+  };
+}
+
+// Process AI response for score edits (called when stream ends)
+function processScoreResponse(conversation, assistantMessage, bubbleElement) {
+  if (!assistantMessage?.content) return false;
+
+  const scoreEdit = parseScoreEdit(assistantMessage.content);
+  if (!scoreEdit) return false;
+
+  console.log('🎼 AI score edit detected:', scoreEdit.title);
+
+  // Get current score for comparison
+  const currentScore = getScoreDoc(conversation.id);
+
+  // Extract explanation (text after the SCORE_EDIT block)
+  const explanation = assistantMessage.content
+    .replace(/\[SCORE_EDIT\][\s\S]*?\[\/SCORE_EDIT\]/i, '')
+    .trim() || 'La IA ha propuesto cambios a la partitura.';
+
+  // Show approval modal instead of applying immediately
+  showScoreEditApprovalModal(currentScore, scoreEdit, explanation);
+
+  // Clean the message content for display
+  const cleanContent = explanation || `He propuesto cambios para "${scoreEdit.title}".`;
+
+  // Create a card to show the proposed edit
+  const cardHtml = createScoreEditCard(scoreEdit);
+
+  // Update the bubble
+  let targetBubble = bubbleElement?.querySelector('.bubble-content') || bubbleElement;
+  if (!targetBubble) {
+    const lastMessage = document.querySelector('.message.assistant:last-child');
+    targetBubble = lastMessage?.querySelector('.bubble-content') || lastMessage?.querySelector('.message-bubble');
+  }
+
+  if (targetBubble && typeof parseMarkdown === 'function') {
+    targetBubble.innerHTML = parseMarkdown(cleanContent) + cardHtml;
+  }
+
+  // Update message content (without the SCORE_EDIT block)
+  assistantMessage.content = cleanContent;
+  assistantMessage.scoreEditProposed = scoreEdit;
+
+  return true;
+}
+
+// Create card HTML for proposed score edit
+function createScoreEditCard(scoreEdit) {
+  if (!scoreEdit) return '';
+
+  return `
+    <div class="music-card score-edit-card" onclick="window.showScoreCanvasPanel()">
+      <div class="music-card-header">
+        <div class="music-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 18V5l12-2v13" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="18" cy="16" r="3" />
+          </svg>
+        </div>
+        <div class="music-card-info">
+          <div class="music-card-title">${escapeHtml(scoreEdit.title)}</div>
+          <div class="music-card-meta">${scoreEdit.meter} • ${scoreEdit.key} • Propuesta de cambio</div>
+        </div>
+      </div>
+      <div class="music-card-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        Ver partitura
+      </div>
+    </div>
+  `;
+}
+
+// Global function to start score canvas mode
+window.startScoreCanvasMode = function (conversationId) {
+  scoreCanvasMode = true;
+  ensureScoreDoc(conversationId);
+  toggleScoreCanvasPanel(true);
+  renderScoreCanvasPanel(conversationId);
+};
+
+// Global function to show score panel
+window.showScoreCanvasPanel = function () {
+  if (state.activeId) {
+    toggleScoreCanvasPanel(true);
+    renderScoreCanvasPanel(state.activeId);
+  }
+};
+
+// Initialize Score Canvas when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initScoreCanvas);
+} else {
+  setTimeout(initScoreCanvas, 150);
+}
+
+// Export score canvas utils
+window.scoreCanvasUtils = {
+  toggleScoreCanvasPanel,
+  renderScoreCanvasPanel,
+  renderScorePreview,
+  getScoreDoc,
+  saveScoreDoc,
+  ensureScoreDoc,
+  updateScoreFromUser,
+  updateScoreFromAI,
+  showScoreEditApprovalModal,
+  buildScoreInstruction,
+  parseScoreEdit,
+  processScoreResponse
+};
 
 // Export functions for use in other parts of the app
 window.musicModeUtils = {
