@@ -825,6 +825,40 @@ function createArtifactCard(payload) {
   `;
 }
 
+function createScoreArtifactCard(payload) {
+  const versionBadge = payload.version ? `<span class="artifact-version">v${payload.version}</span>` : '';
+  const meter = payload.meter || '4/4';
+  const key = payload.key || 'C';
+  const tempo = payload.tempo || '120';
+
+  return `
+    <div class="artifact-card score-artifact-card" data-score-id="${payload.scoreId || ''}" data-score-version="${payload.version || 1}">
+      <div class="artifact-card-header">
+        <svg class="artifact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 18V5l12-2v13"/>
+          <circle cx="6" cy="18" r="3"/>
+          <circle cx="18" cy="16" r="3"/>
+        </svg>
+        <span class="artifact-title">${escapeHtml(payload.title || 'Partitura')}</span>
+        ${versionBadge}
+      </div>
+      <div class="artifact-preview score-metadata">
+        <span>🎵 ${meter}</span>
+        <span>🎹 ${key}</span>
+        <span>⏱ ${tempo} BPM</span>
+      </div>
+      <div class="artifact-action">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        Ver partitura v${payload.version || 1}
+      </div>
+    </div>
+  `;
+}
+
 function applyCanvasPayload(conversation, payload) {
   const doc = ensureCanvasDoc(conversation.id, payload);
   // Guardar el contenido como markdown plano (el textarea lo mostrará directamente)
@@ -1904,6 +1938,7 @@ function appendMessageElement(message) {
     // Comprobar si hay un canvas asociado a esta conversación
     const conversation = state.conversations[state.activeId];
     const canvasDoc = conversation ? getCanvasDoc(conversation.id) : null;
+    const scoreDoc = conversation ? getScoreDoc(conversation.id) : null;
 
     // Si hay canvas y el mensaje tiene indicadores de canvas creado
     if (canvasDoc && message.role === 'assistant' && message.canvasId === canvasDoc.id) {
@@ -1938,6 +1973,42 @@ function appendMessageElement(message) {
           content: canvasDoc.content,
           canvasId: canvasDoc.id,
           version: messageVersion
+        });
+      }
+    } else if (scoreDoc && message.role === 'assistant' && message.scoreId === scoreDoc.id) {
+      // Si hay partitura y el mensaje la referencia
+      const parts = message.content.split('[SCORE_ARTIFACT]');
+      const messageVersion = message.scoreVersion || scoreDoc.version || 1;
+
+      if (parts.length > 1) {
+        // Hay marcador de artifact
+        if (parts[0]) {
+          content += parseMarkdown(parts[0]);
+        }
+
+        // Insertar tarjeta de partitura con versión
+        content += createScoreArtifactCard({
+          title: scoreDoc.title,
+          scoreId: scoreDoc.id,
+          version: messageVersion,
+          meter: scoreDoc.meter,
+          key: scoreDoc.key,
+          tempo: scoreDoc.tempo
+        });
+
+        if (parts[1]) {
+          content += parseMarkdown(parts[1]);
+        }
+      } else {
+        // No hay marcador pero hay partitura, agregar al final
+        content += parseMarkdown(message.content);
+        content += createScoreArtifactCard({
+          title: scoreDoc.title,
+          scoreId: scoreDoc.id,
+          version: messageVersion,
+          meter: scoreDoc.meter,
+          key: scoreDoc.key,
+          tempo: scoreDoc.tempo
         });
       }
     } else {
@@ -2294,6 +2365,15 @@ function setActiveConversation(id) {
   renderCanvasPanel(id);
   const doc = getCanvasDoc(id);
   toggleCanvasVisibility(!!doc || canvasMode);
+  
+  // Gestionar canvas de partituras - mostrar si está en modo música O si hay partitura
+  const scoreDoc = getScoreDoc(id);
+  if (scoreDoc && (musicMode || window._musicModeActive)) {
+    renderScoreCanvasPanel(id);
+  } else {
+    toggleScoreCanvasPanel(false);
+  }
+  
   persistState();
 }
 
@@ -5193,23 +5273,50 @@ function setupCanvasEvents() {
   document.addEventListener('click', (e) => {
     const artifactCard = e.target.closest('.artifact-card');
     if (artifactCard) {
-      const canvasId = artifactCard.dataset.canvasId;
-      const versionNumber = parseInt(artifactCard.dataset.canvasVersion) || null;
+      // Verificar si es una tarjeta de partitura
+      if (artifactCard.classList.contains('score-artifact-card')) {
+        const scoreId = artifactCard.dataset.scoreId;
+        const versionNumber = parseInt(artifactCard.dataset.scoreVersion) || null;
 
-      if (canvasId) {
-        // Buscar el documento canvas en todas las conversaciones
-        Object.keys(state.conversations).forEach(convId => {
-          const doc = getCanvasDoc(convId);
-          if (doc && doc.id === canvasId) {
-            // Cambiar a la conversación si no es la activa
-            if (state.activeId !== convId) {
-              switchConversation(convId);
+        if (scoreId) {
+          // Buscar el documento de partitura en todas las conversaciones
+          Object.keys(state.conversations).forEach(convId => {
+            const doc = getScoreDoc(convId);
+            if (doc && doc.id === scoreId) {
+              // Cambiar a la conversación si no es la activa
+              if (state.activeId !== convId) {
+                setActiveConversation(convId);
+              }
+              // Activar modo música si no está activo
+              if (!musicMode && !window._musicModeActive) {
+                setChatMode('music');
+              }
+              // Mostrar la partitura con la versión específica
+              renderScoreCanvasPanel(convId, versionNumber);
+              scrollChatToBottom();
             }
-            // Mostrar el canvas con la versión específica
-            renderCanvasPanel(convId, versionNumber);
-            scrollChatToBottom();
-          }
-        });
+          });
+        }
+      } else {
+        // Es una tarjeta de canvas normal
+        const canvasId = artifactCard.dataset.canvasId;
+        const versionNumber = parseInt(artifactCard.dataset.canvasVersion) || null;
+
+        if (canvasId) {
+          // Buscar el documento canvas en todas las conversaciones
+          Object.keys(state.conversations).forEach(convId => {
+            const doc = getCanvasDoc(convId);
+            if (doc && doc.id === canvasId) {
+              // Cambiar a la conversación si no es la activa
+              if (state.activeId !== convId) {
+                setActiveConversation(convId);
+              }
+              // Mostrar el canvas con la versión específica
+              renderCanvasPanel(convId, versionNumber);
+              scrollChatToBottom();
+            }
+          });
+        }
       }
     }
   });
@@ -9420,9 +9527,12 @@ function setChatMode(mode) {
     toggleCanvasVisibility(false);
   }
 
-  // Ocultar panel de música cuando no está en modo música
-  if (!musicMode) {
-    toggleMusicPanel(false);
+  // Gestionar panel de música/partituras
+  if (musicMode && conversation) {
+    ensureScoreDoc(conversation.id);
+    renderScoreCanvasPanel(conversation.id);
+  } else {
+    toggleScoreCanvasPanel(false);
   }
 }
 
@@ -12131,6 +12241,9 @@ function processMusicResponse(conversation, assistantMessage, bubbleElement) {
   // Update or create score document
   updateScoreFromAI(conversation.id, scoreEdit);
 
+  // Get the updated score document to get its ID and version
+  const scoreDoc = getScoreDoc(conversation.id);
+
   // Show the Score Canvas panel (editable)
   toggleScoreCanvasPanel(true);
   renderScoreCanvasPanel(conversation.id);
@@ -12155,9 +12268,14 @@ function processMusicResponse(conversation, assistantMessage, bubbleElement) {
 
   let explanation = cleanContent || `He creado la partitura "${parsedMusic.title}".`;
 
-  // Store music data and update message
+  // Add score artifact marker for rendering
+  explanation = `[SCORE_ARTIFACT]\n\n${explanation}`;
+
+  // Store music data and update message with score reference
   assistantMessage.musicData = parsedMusic;
   assistantMessage.content = explanation;
+  assistantMessage.scoreId = scoreDoc?.id;
+  assistantMessage.scoreVersion = scoreDoc?.version || 1;
 
   // Update the bubble in the DOM
   let targetBubble = null;

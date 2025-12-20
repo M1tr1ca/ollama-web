@@ -7802,6 +7802,25 @@ body.canvas-visible #empty-state-header {
   height: 16px;
 }
 
+/* Score artifact card specific styles */
+.score-artifact-card .artifact-icon {
+  color: var(--theme-primary);
+}
+
+.score-metadata {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.score-metadata span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 
 .canvas-card-content {
   flex: 1;
