@@ -2589,10 +2589,29 @@ async function streamAssistantResponse(conversation, payloadMessages) {
   // Limitar a un máximo razonable
   const numCtx = Math.min(recommendedContext, 32768);
 
+  // Inyectar contexto de cita si existe
+  let messagesWithQuoteContext = [...payloadMessages];
+  if (window.pendingQuoteContext) {
+    // Insertar un mensaje de sistema con el contexto de la cita antes del último mensaje del usuario
+    const quoteSystemMessage = {
+      role: 'system',
+      content: window.pendingQuoteContext
+    };
+    // Encontrar el índice del último mensaje del usuario
+    const lastUserIdx = messagesWithQuoteContext.map(m => m.role).lastIndexOf('user');
+    if (lastUserIdx > 0) {
+      messagesWithQuoteContext.splice(lastUserIdx, 0, quoteSystemMessage);
+    } else {
+      messagesWithQuoteContext.unshift(quoteSystemMessage);
+    }
+    // Limpiar el contexto pendiente
+    window.pendingQuoteContext = null;
+  }
+
   const body = {
     model: state.currentModel,
     stream: true,
-    messages: payloadMessages,
+    messages: messagesWithQuoteContext,
     options: {
       num_ctx: numCtx // Ajustar el tamaño del contexto dinámicamente
     }
@@ -11166,3 +11185,226 @@ function updateDynamicContent(lang) {
     renderProjectsList();
   }
 }
+
+// ========================================
+// Text Selection Quote System
+// ========================================
+
+// State for the quote system
+const quoteSystemState = {
+  selectedText: '',
+  source: '', // PDF filename or empty for chat
+  isFromPdf: false
+};
+
+// Initialize the text selection quote system
+function initTextSelectionSystem() {
+  const tooltip = document.getElementById('selection-tooltip');
+  const quoteCard = document.getElementById('quote-card-inline');
+  const quoteClose = document.getElementById('quote-close-inline');
+
+  if (!tooltip) {
+    console.warn('Selection tooltip not found');
+    return;
+  }
+
+  // Hide tooltip on any click
+  document.addEventListener('click', () => {
+    tooltip.style.display = 'none';
+  });
+
+  // Listen for mouseup on chat messages and PDF viewer
+  document.addEventListener('mouseup', (e) => {
+    // Small delay to ensure selection is complete
+    setTimeout(() => {
+      handleTextSelection(e, tooltip);
+    }, 10);
+  });
+
+  // Handle tooltip action clicks
+  tooltip.querySelectorAll('.tooltip-action').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const action = btn.getAttribute('data-action');
+      handleTooltipAction(action);
+      tooltip.style.display = 'none';
+    });
+  });
+
+  // Handle quote card close
+  if (quoteClose) {
+    quoteClose.addEventListener('click', () => {
+      hideQuoteCard();
+    });
+  }
+
+  console.log('✅ Text selection quote system initialized');
+}
+
+// Handle text selection event
+function handleTextSelection(e, tooltip) {
+  const selection = window.getSelection();
+  const selectedText = selection.toString().trim();
+
+  // Need at least 5 characters to show tooltip
+  if (selectedText.length < 5) {
+    return;
+  }
+
+  // Check if selection is in a valid area (chat messages or PDF)
+  const range = selection.getRangeAt(0);
+  const container = range.commonAncestorContainer;
+  const parentElement = container.nodeType === 3 ? container.parentElement : container;
+
+  // Check if in chat message
+  const isInChat = parentElement.closest('.message-bubble, .message-content');
+  // Check if in PDF viewer
+  const isInPdf = parentElement.closest('.pdf-text-layer, .pdf-viewer-container');
+
+  if (!isInChat && !isInPdf) {
+    return;
+  }
+
+  // Determine source
+  quoteSystemState.selectedText = selectedText;
+  quoteSystemState.isFromPdf = !!isInPdf;
+
+  if (isInPdf) {
+    // Get the PDF filename from the viewer
+    const filenameEl = document.getElementById('pdf-viewer-filename');
+    quoteSystemState.source = filenameEl ? filenameEl.textContent : 'PDF';
+  } else {
+    quoteSystemState.source = '';
+  }
+
+  // Position tooltip near selection
+  const rect = range.getBoundingClientRect();
+  const tooltipX = rect.left + (rect.width / 2);
+  const tooltipY = rect.top - 10;
+
+  // Show tooltip
+  tooltip.style.display = 'flex';
+  tooltip.style.left = `${Math.max(10, tooltipX - 100)}px`;
+  tooltip.style.top = `${Math.max(10, tooltipY - 45)}px`;
+}
+
+// Handle tooltip action selection
+function handleTooltipAction(action) {
+  const quoteCard = document.getElementById('quote-card-inline');
+  const quoteText = document.getElementById('quote-text-inline');
+
+  if (action === 'follow-up') {
+    // Show quote card with selected text - user can write their own question
+    if (quoteCard && quoteText) {
+      quoteText.textContent = quoteSystemState.selectedText;
+      quoteCard.style.display = 'flex';
+      // Focus on the input so user can type their question
+      focusChatInput();
+    }
+  } else if (action === 'check-sources') {
+    // For check sources, directly send a message asking about sources
+    const prompt = quoteSystemState.isFromPdf
+      ? `Verifica las fuentes y la veracidad de esta afirmación del documento "${quoteSystemState.source}": "${quoteSystemState.selectedText}"`
+      : `Verifica las fuentes y la veracidad de esta afirmación: "${quoteSystemState.selectedText}"`;
+
+    sendQuoteMessage(prompt);
+  }
+
+  // Clear selection
+  window.getSelection().removeAllRanges();
+}
+
+// Focus on the chat input
+function focusChatInput() {
+  const chatState = document.getElementById('chat-state');
+  const isInChatState = chatState && chatState.style.display !== 'none';
+
+  const input = isInChatState
+    ? document.getElementById('prompt-input-inline')
+    : document.getElementById('prompt-input');
+
+  if (input) {
+    input.focus();
+  }
+}
+
+// Hide the quote card
+function hideQuoteCard() {
+  const quoteCard = document.getElementById('quote-card-inline');
+  if (quoteCard) {
+    quoteCard.style.display = 'none';
+  }
+  quoteSystemState.selectedText = '';
+  quoteSystemState.source = '';
+}
+
+// Get current quote context for message
+function getQuoteContext() {
+  if (!quoteSystemState.selectedText) return '';
+
+  if (quoteSystemState.isFromPdf) {
+    return `[Referencia del documento "${quoteSystemState.source}"]: "${quoteSystemState.selectedText}"\n\n`;
+  }
+  return `[Cita seleccionada]: "${quoteSystemState.selectedText}"\n\n`;
+}
+
+// Send a quote-based message
+function sendQuoteMessage(prompt) {
+  // Get the appropriate input element
+  const chatState = document.getElementById('chat-state');
+  const isInChatState = chatState && chatState.style.display !== 'none';
+
+  const input = isInChatState
+    ? document.getElementById('prompt-input-inline')
+    : document.getElementById('prompt-input');
+
+  const form = isInChatState
+    ? document.getElementById('chat-form-inline')
+    : document.getElementById('chat-form');
+
+  if (input && form) {
+    input.value = prompt;
+    // Trigger submit
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  }
+
+  // Hide quote card after sending
+  hideQuoteCard();
+}
+
+// Initialize on load
+setTimeout(() => {
+  initTextSelectionSystem();
+
+  // Intercept form submit to set pending quote context
+  const formInline = document.getElementById('chat-form-inline');
+  const formMain = document.getElementById('chat-form');
+
+  const setupQuoteContextHandler = (form) => {
+    if (!form) return;
+
+    form.addEventListener('submit', (e) => {
+      // Check if there's an active quote
+      if (quoteSystemState.selectedText) {
+        // Set the pending quote context (will be injected in streamAssistantResponse)
+        const quoteContext = quoteSystemState.isFromPdf
+          ? `El usuario está preguntando sobre el siguiente texto del documento "${quoteSystemState.source}". 
+Texto citado: "${quoteSystemState.selectedText}"
+Responde específicamente sobre este texto citado.`
+          : `El usuario está preguntando sobre el siguiente texto que ha seleccionado.
+Texto citado: "${quoteSystemState.selectedText}"
+Responde específicamente sobre este texto citado.`;
+
+        window.pendingQuoteContext = quoteContext;
+
+        // Hide quote card after processing
+        hideQuoteCard();
+      }
+    }, true); // Use capture to run before other handlers
+  };
+
+  setupQuoteContextHandler(formInline);
+  setupQuoteContextHandler(formMain);
+
+}, 1000);
+
