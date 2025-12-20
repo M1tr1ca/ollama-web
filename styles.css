@@ -8838,6 +8838,33 @@ body.score-canvas-visible #score-canvas-panel {
   padding: 6px 10px;
   font-size: 13px;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.score-metadata-item select:hover,
+.score-metadata-item input[type="number"]:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.score-metadata-item select:focus,
+.score-metadata-item input[type="number"]:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--theme-primary);
+}
+
+/* Dropdown options styling */
+.score-metadata-item select option {
+  background: #2a2a2a;
+  color: #f5f5f5;
+  padding: 8px;
+}
+
+.score-metadata-item select option:hover,
+.score-metadata-item select option:checked {
+  background: var(--theme-primary);
+  color: #000;
 }
 
 .score-metadata-item input[type="number"] {
