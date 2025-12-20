@@ -12388,26 +12388,6 @@ function initMusicMode() {
     elements.downloadBtn.addEventListener('click', downloadMusicAsImage);
   }
 
-  // Add music mode to chat mode toggles
-  const modeToggles = document.querySelectorAll('.chat-mode-toggle');
-  modeToggles.forEach(toggle => {
-    const musicBtn = toggle.querySelector('[data-mode="music"]');
-    if (musicBtn) {
-      musicBtn.addEventListener('click', () => {
-        musicMode = !musicBtn.classList.contains('active');
-
-        // Update all toggles
-        document.querySelectorAll('.chat-mode-toggle').forEach(t => {
-          t.querySelectorAll('.chat-mode-option').forEach(opt => {
-            opt.classList.remove('active');
-          });
-          const currentBtn = t.querySelector(`[data-mode="${musicMode ? 'music' : 'normal'}"]`);
-          if (currentBtn) currentBtn.classList.add('active');
-        });
-      });
-    }
-  });
-
   console.log('🎵 Music mode initialized');
 }
 

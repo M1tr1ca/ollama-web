@@ -4624,11 +4624,41 @@ input:checked+.slider:before {
   box-shadow: 0 0 0 1px var(--theme-primary-alpha-10);
 }
 
-/* Animación de pulso para el modo activo (Web, Deep o Study) */
+/* Animación de pulso para el modo activo (Web, Deep, Study, Canvas y Music) */
 .chat-mode-toggle[data-active-mode="web"] .chat-mode-option[data-mode="web"] .chat-mode-icon,
 .chat-mode-toggle[data-active-mode="deep"] .chat-mode-option[data-mode="deep"] .chat-mode-icon,
-.chat-mode-toggle[data-active-mode="study"] .chat-mode-option[data-mode="study"] .chat-mode-icon {
+.chat-mode-toggle[data-active-mode="study"] .chat-mode-option[data-mode="study"] .chat-mode-icon,
+.chat-mode-toggle[data-active-mode="canvas"] .chat-mode-option[data-mode="canvas"] .chat-mode-icon,
+.chat-mode-toggle[data-active-mode="music"] .chat-mode-option[data-mode="music"] .chat-mode-icon {
   animation: modePulse 2s ease-in-out infinite;
+}
+
+/* Estilos específicos para modo canvas activo */
+.chat-mode-toggle[data-active-mode="canvas"] {
+  border-color: var(--theme-primary-alpha-35);
+  box-shadow: 0 0 0 1px var(--theme-primary-alpha-10);
+}
+
+.chat-mode-option[data-mode="canvas"].active {
+  color: var(--theme-primary);
+}
+
+.chat-mode-option[data-mode="canvas"].active .chat-mode-icon {
+  filter: drop-shadow(0 0 4px var(--theme-primary-alpha-30));
+}
+
+/* Estilos específicos para modo música activo */
+.chat-mode-toggle[data-active-mode="music"] {
+  border-color: var(--theme-primary-alpha-35);
+  box-shadow: 0 0 0 1px var(--theme-primary-alpha-10);
+}
+
+.chat-mode-option[data-mode="music"].active {
+  color: var(--theme-primary);
+}
+
+.chat-mode-option[data-mode="music"].active .chat-mode-icon {
+  filter: drop-shadow(0 0 4px var(--theme-primary-alpha-30));
 }
 
 @keyframes modePulse {
@@ -8390,6 +8420,44 @@ body.music-visible #music-panel {
   display: flex;
 }
 
+body.music-visible #empty-state {
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  height: 100%;
+  min-height: 0;
+}
+
+body.music-visible #background-image {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  grid-column: unset;
+  grid-row: unset;
+}
+
+body.music-visible #empty-state-header {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  grid-column: unset;
+  grid-row: unset;
+}
+
+body.music-visible #chat-state {
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  height: 100%;
+  min-height: 0;
+  max-height: calc(100vh - 24px);
+}
+
 .music-panel {
   display: none;
   flex-direction: column;
@@ -8718,6 +8786,44 @@ body.score-canvas-visible .main-column {
 
 body.score-canvas-visible #score-canvas-panel {
   display: flex;
+}
+
+body.score-canvas-visible #empty-state {
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  height: 100%;
+  min-height: 0;
+}
+
+body.score-canvas-visible #background-image {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  grid-column: unset;
+  grid-row: unset;
+}
+
+body.score-canvas-visible #empty-state-header {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  grid-column: unset;
+  grid-row: unset;
+}
+
+body.score-canvas-visible #chat-state {
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  height: 100%;
+  min-height: 0;
+  max-height: calc(100vh - 24px);
 }
 
 .score-canvas-panel {
