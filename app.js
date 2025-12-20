@@ -1018,20 +1018,21 @@ async function renderPdfVisually(base64Data, container, textToHighlight) {
       // Add found banner
       const banner = document.createElement('div');
       banner.className = 'pdf-found-banner';
-      banner.innerHTML = `📍 Página ${pageNum} - Texto citado encontrado`;
+      banner.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -1px; margin-right: 4px; opacity: 0.9;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>Pág. ${pageNum} · Texto encontrado`;
       banner.style.cssText = `
         position: absolute;
         top: 0;
-        left: 0;
-        right: 0;
-        background: linear-gradient(135deg, #ff9800, #f57c00);
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--theme-primary, #ff9800);
         color: white;
-        padding: 12px 16px;
-        font-size: 14px;
-        font-weight: 600;
+        padding: 6px 14px;
+        font-size: 11px;
+        font-weight: 500;
         text-align: center;
         z-index: 100;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        border-radius: 0 0 8px 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
       `;
       pageDiv.appendChild(banner);
     }
@@ -1209,7 +1210,7 @@ async function highlightTextInPdf(container, searchText) {
       // Add visual indicator
       const indicator = document.createElement('div');
       indicator.className = 'pdf-highlight-indicator';
-      indicator.innerHTML = `<span class="highlight-pulse">📍 Texto encontrado en esta página</span>`;
+      indicator.innerHTML = `<span class="highlight-pulse"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>Texto encontrado en esta página</span>`;
       page.insertBefore(indicator, page.firstChild);
 
       // Remove indicator after animation
@@ -7998,17 +7999,22 @@ const MODEL_CONTEXT_DEFAULTS = {
   'llama3.2': 131072,
   'mistral': 32768,
   'mixtral': 32768,
+  'ministral': 262144, // 256K
+  'devstral': 131072,  // 128K
   'codellama': 16384,
   'deepseek-coder': 16384,
   'deepseek-r1': 65536,
   'qwen': 32768,
   'qwen2': 131072,
   'qwen2.5': 131072,
+  'qwen3': 131072,
   'phi': 2048,
   'phi3': 131072,
   'gemma': 8192,
   'gemma2': 8192,
   'llava': 4096,
+  'gpt-oss': 32768,
+  'mathstral': 32768,
   'default': 4096
 };
 

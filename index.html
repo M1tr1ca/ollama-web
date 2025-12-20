@@ -560,7 +560,16 @@
               <div class="context-info-card" id="project-context-info">
                 <div class="context-info-header">
                   <div class="context-model-info">
-                    <span class="context-model-icon">🤖</span>
+                    <span class="context-model-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                          d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z" />
+                        <circle cx="9" cy="13" r="1.5" fill="currentColor" />
+                        <circle cx="15" cy="13" r="1.5" fill="currentColor" />
+                        <path d="M9 17h6" />
+                      </svg>
+                    </span>
                     <div class="context-model-details">
                       <span class="context-model-name" id="context-model-name">Selecciona un modelo</span>
                       <span class="context-model-capacity" id="context-model-capacity">-- tokens disponibles</span>
@@ -589,17 +598,37 @@
                 <!-- Desglose de tokens -->
                 <div class="context-breakdown" id="context-breakdown">
                   <div class="context-breakdown-item">
-                    <span class="breakdown-icon">📝</span>
+                    <span class="breakdown-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <path d="M14 2v6h6" />
+                        <path d="M16 13H8" />
+                        <path d="M16 17H8" />
+                        <path d="M10 9H8" />
+                      </svg>
+                    </span>
                     <span class="breakdown-label">Instrucciones:</span>
                     <span class="breakdown-value" id="breakdown-instructions">0 tokens</span>
                   </div>
                   <div class="context-breakdown-item">
-                    <span class="breakdown-icon">📄</span>
+                    <span class="breakdown-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    </span>
                     <span class="breakdown-label">Documentos:</span>
                     <span class="breakdown-value" id="breakdown-documents">0 tokens</span>
                   </div>
                   <div class="context-breakdown-item">
-                    <span class="breakdown-icon">💬</span>
+                    <span class="breakdown-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      </svg>
+                    </span>
                     <span class="breakdown-label">Reserva para chat:</span>
                     <span class="breakdown-value" id="breakdown-chat">~2000 tokens</span>
                   </div>
@@ -1068,7 +1097,14 @@
       <div id="pdf-viewer-panel" class="pdf-viewer-panel" style="display: none;">
         <header class="pdf-viewer-header">
           <div class="pdf-viewer-title">
-            <span class="pdf-icon">📄</span>
+            <span class="pdf-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+            </span>
             <span id="pdf-viewer-filename">documento.pdf</span>
           </div>
           <div class="pdf-viewer-actions">
@@ -1081,7 +1117,13 @@
           </div>
         </header>
         <div class="pdf-highlight-info" id="pdf-viewer-highlight-info">
-          <span class="highlight-label">📍 Texto citado:</span>
+          <span class="highlight-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
+              <path
+                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" />
+            </svg>
+            Texto citado:
+          </span>
           <span id="pdf-highlight-text" class="highlight-text"></span>
         </div>
         <div id="pdf-viewer-container" class="pdf-viewer-container"></div>

@@ -1905,7 +1905,8 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
 
 .model-select-dropdown {
   position: absolute;
-  top: calc(100% + 6px);
+  bottom: calc(100% + 6px);
+  top: auto;
   left: 0;
   right: 0;
   min-width: 220px;
@@ -1914,7 +1915,7 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.35),
+    0 -8px 40px rgba(0, 0, 0, 0.35),
     0 0 0 1px rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
