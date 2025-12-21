@@ -42,7 +42,21 @@
         Nueva conversación
       </button>
 
+      <button id="discover-news-btn" class="new-conversation-button discover-button">
+        <svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path
+            d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2">
+          </path>
+          <path d="M18 14h-8"></path>
+          <path d="M15 18h-5"></path>
+          <path d="M10 6h8v4h-8V6Z"></path>
+        </svg>
+        <span data-i18n="sidebar.discover">Descubrir</span>
+      </button>
+
       <!-- Sección de Proyectos -->
+
       <section class="projects-section" aria-label="Proyectos">
         <header class="projects-header">
           <h2 data-i18n="sidebar.projects">Proyectos</h2>
@@ -907,9 +921,127 @@
 
       </div>
 
+      <!-- Panel de Noticias / Discover -->
+      <div id="news-panel" class="news-panel" style="display: none;">
+        <!-- News Header con clima y fecha -->
+        <header class="news-header">
+          <div class="news-header-content">
+            <div class="news-title-section">
+              <h1 class="news-main-title">Discover</h1>
+              <div class="news-tabs">
+                <button class="news-tab active" data-tab="para-ti">Para ti</button>
+                <button class="news-tab" data-tab="mejor">Mejor</button>
+                <button class="news-tab" data-tab="temas">Temas ▼</button>
+              </div>
+            </div>
+            <div class="weather-widget" id="weather-widget">
+              <div class="weather-current">
+                <span class="weather-icon" id="weather-icon">☀️</span>
+                <span class="weather-temp" id="weather-temp">--°</span>
+                <span class="weather-condition" id="weather-condition">Cargando...</span>
+              </div>
+              <div class="weather-location" id="weather-location">
+                <span class="location-icon">📍</span>
+                <span class="location-name" id="location-name">Obteniendo ubicación...</span>
+              </div>
+              <div class="weather-forecast" id="weather-forecast">
+                <!-- Se llenará dinámicamente -->
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- Grid de noticias -->
+        <main class="news-grid-container">
+          <div class="news-grid" id="news-grid">
+            <!-- Las tarjetas de noticias se insertan aquí dinámicamente -->
+            <div class="news-loading" id="news-loading">
+              <div class="news-loading-spinner"></div>
+              <span>Cargando noticias...</span>
+            </div>
+          </div>
+        </main>
+
+        <!-- Vista de detalle de noticia -->
+        <div class="news-detail" id="news-detail" style="display: none;">
+          <header class="news-detail-header">
+            <button class="news-back-btn" id="news-back-btn">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              Volver
+            </button>
+            <a class="news-external-link" id="news-external-link" href="#" target="_blank" rel="noopener">
+              Abrir original
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+              </svg>
+            </a>
+          </header>
+          <article class="news-detail-content" id="news-detail-content">
+            <!-- Contenido de noticia se inserta aquí -->
+          </article>
+        </div>
+
+        <!-- Weather Detail Modal -->
+        <div class="weather-modal" id="weather-modal" style="display: none;">
+          <div class="weather-modal-content">
+            <header class="weather-modal-header">
+              <button class="weather-modal-close" id="weather-modal-close">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+              <h2 class="weather-modal-title" id="weather-modal-location">Clima</h2>
+            </header>
+            <div class="weather-modal-body" id="weather-modal-body">
+              <!-- Weather content will be inserted here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel de mercados (lateral derecho, opcional) -->
+        <aside class="news-markets-panel" id="news-markets-panel">
+          <h3 class="markets-title">Perspectiva del Mercado</h3>
+          <div class="markets-list" id="markets-list">
+            <div class="market-item">
+              <span class="market-name">S&P Fut.</span>
+              <span class="market-value">6897,25</span>
+              <span class="market-change positive">+56,75 ↑0,83%</span>
+            </div>
+            <div class="market-item">
+              <span class="market-name">NASDAQ</span>
+              <span class="market-value">25.574,75</span>
+              <span class="market-change positive">+311,86 ↑1,24%</span>
+            </div>
+            <div class="market-item">
+              <span class="market-name">Bitcoin</span>
+              <span class="market-value">88.285,77 US$</span>
+              <span class="market-change negative">-38,23 ↓0,04%</span>
+            </div>
+          </div>
+          <h4 class="trending-title">Empresas en tendencia</h4>
+          <div class="trending-list" id="trending-list">
+            <div class="trending-item">
+              <span class="trending-logo">🟢</span>
+              <span class="trending-name">NVIDIA Corporation</span>
+              <span class="trending-value">180,99 US$</span>
+              <span class="trending-change positive">+3,93%</span>
+            </div>
+            <div class="trending-item">
+              <span class="trending-logo">🔴</span>
+              <span class="trending-name">Broadcom Inc.</span>
+              <span class="trending-value">340,36 US$</span>
+              <span class="trending-change positive">+3,18%</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+
       <div id="chat-state" class="chat-state" style="display: none;">
         <header class="chat-header">
           <div class="chat-header-left">
+
             <!-- Etiqueta de proyecto activo -->
             <div id="project-badge" class="project-badge" style="display: none;">
               <span class="project-badge-icon">📂</span>

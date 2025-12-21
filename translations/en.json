@@ -1,6 +1,7 @@
 {
     "app.title": "Ollama Web",
     "sidebar.newConversation": "New Conversation",
+    "sidebar.discover": "Discover",
     "sidebar.projects": "Projects",
     "sidebar.recent": "Recent",
     "sidebar.settings": "Settings",

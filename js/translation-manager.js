@@ -6,6 +6,7 @@ class TranslationManager {
             'es': {
                 "app.title": "Ollama Web",
                 "sidebar.newConversation": "Nueva conversación",
+                "sidebar.discover": "Descubrir",
                 "sidebar.projects": "Proyectos",
                 "sidebar.recent": "Recientes",
                 "sidebar.settings": "Configuración",

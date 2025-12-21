@@ -14271,3 +14271,853 @@ window.musicModeUtils = {
   createMusicCard,
   toggleMusicPanel
 };
+
+// ===========================
+// NEWS PANEL / DISCOVER FEATURE
+// ===========================
+
+// Import services dynamically
+let newsServiceModule = null;
+let weatherServiceModule = null;
+let locationServiceModule = null;
+
+async function loadNewsServices() {
+  try {
+    if (!newsServiceModule) {
+      newsServiceModule = await import('./services/newsService.js');
+    }
+    if (!weatherServiceModule) {
+      weatherServiceModule = await import('./services/weatherService.js');
+    }
+    if (!locationServiceModule) {
+      locationServiceModule = await import('./services/locationService.js');
+    }
+    return true;
+  } catch (error) {
+    console.error('📰 Error loading news services:', error);
+    return false;
+  }
+}
+
+// News panel state
+const newsState = {
+  activeView: 'chat', // 'chat' | 'news'
+  news: [],
+  weather: null,
+  location: null,
+  selectedNews: null,
+  loading: false,
+  initialized: false
+};
+
+// DOM Elements for news panel
+const newsPanel = document.getElementById('news-panel');
+const discoverButton = document.getElementById('discover-news-btn');
+const newsGrid = document.getElementById('news-grid');
+const newsLoading = document.getElementById('news-loading');
+const newsDetail = document.getElementById('news-detail');
+const newsBackBtn = document.getElementById('news-back-btn');
+const newsExternalLink = document.getElementById('news-external-link');
+const newsDetailContent = document.getElementById('news-detail-content');
+const weatherIconEl = document.getElementById('weather-icon');
+const weatherTempEl = document.getElementById('weather-temp');
+const weatherConditionEl = document.getElementById('weather-condition');
+const locationNameEl = document.getElementById('location-name');
+const weatherForecastEl = document.getElementById('weather-forecast');
+
+/**
+ * Toggle between chat and news view
+ * @param {'chat' | 'news'} view 
+ */
+function toggleNewsView(view) {
+  newsState.activeView = view;
+
+  // Get header buttons
+  const emptyStateHeader = document.getElementById('empty-state-header');
+  const screenOverlayToggleEmpty = document.getElementById('screen-overlay-toggle-empty');
+  const incognitoToggleEmpty = document.getElementById('incognito-toggle-empty');
+
+  if (view === 'news') {
+    // Hide chat views
+    if (emptyState) emptyState.style.display = 'none';
+    if (chatState) chatState.style.display = 'none';
+    if (canvasPanel) canvasPanel.style.display = 'none';
+
+    // Hide empty state header buttons (overlay and incognito)
+    if (emptyStateHeader) emptyStateHeader.style.display = 'none';
+    if (screenOverlayToggleEmpty) screenOverlayToggleEmpty.style.display = 'none';
+    if (incognitoToggleEmpty) incognitoToggleEmpty.style.display = 'none';
+
+    // Show news panel
+    if (newsPanel) newsPanel.style.display = 'grid';
+
+    // Mark discover button as active
+    if (discoverButton) discoverButton.classList.add('active');
+
+    // Initialize news if not done yet
+    if (!newsState.initialized) {
+      initializeNewsPanel();
+    }
+
+    console.log('📰 Switched to News view');
+  } else {
+    // Hide news panel
+    if (newsPanel) newsPanel.style.display = 'none';
+    if (newsDetail) newsDetail.style.display = 'none';
+
+    // Remove active state from discover button
+    if (discoverButton) discoverButton.classList.remove('active');
+
+    // Show appropriate chat view
+    const hasActiveConversation = state.activeId && state.conversations[state.activeId];
+    if (hasActiveConversation) {
+      if (emptyState) emptyState.style.display = 'none';
+      if (chatState) chatState.style.display = 'flex';
+      // Hide empty state header when showing chat
+      if (emptyStateHeader) emptyStateHeader.style.display = 'none';
+    } else {
+      if (emptyState) emptyState.style.display = 'flex';
+      if (chatState) chatState.style.display = 'none';
+      // Show empty state header when showing empty state
+      if (emptyStateHeader) emptyStateHeader.style.display = 'flex';
+      if (screenOverlayToggleEmpty) screenOverlayToggleEmpty.style.display = 'flex';
+      if (incognitoToggleEmpty) incognitoToggleEmpty.style.display = 'flex';
+    }
+
+    console.log('📰 Switched to Chat view');
+  }
+}
+
+/**
+ * Initialize the news panel with location, weather, and news
+ */
+async function initializeNewsPanel() {
+  if (newsState.loading) return;
+
+  console.log('📰 Initializing news panel...');
+  newsState.loading = true;
+
+  // Show loading state
+  if (newsLoading) newsLoading.style.display = 'flex';
+  if (newsGrid) {
+    // Clear existing cards except loading
+    const existingCards = newsGrid.querySelectorAll('.news-card');
+    existingCards.forEach(card => card.remove());
+  }
+
+  // Load services
+  const servicesLoaded = await loadNewsServices();
+  if (!servicesLoaded) {
+    console.error('📰 Failed to load news services');
+    newsState.loading = false;
+    if (newsLoading) {
+      newsLoading.innerHTML = '<span style="color: #ef4444;">Error cargando servicios</span>';
+    }
+    return;
+  }
+
+  try {
+    // 1. Get user location
+    console.log('📰 Getting user location...');
+    newsState.location = await locationServiceModule.getUserLocation();
+    updateLocationUI(newsState.location);
+
+    // 2. Get weather
+    console.log('📰 Getting weather...');
+    newsState.weather = await weatherServiceModule.getWeatherByCoords(
+      newsState.location.lat,
+      newsState.location.lon
+    );
+    updateWeatherUI(newsState.weather);
+
+    // 3. Fetch news
+    console.log('📰 Fetching news...');
+    newsState.news = await newsServiceModule.fetchNews(newsState.location);
+    newsState.allNews = [...newsState.news]; // Store all news for filtering
+    renderNewsGrid(newsState.news);
+
+    newsState.initialized = true;
+    console.log('📰 News panel initialized successfully');
+  } catch (error) {
+    console.error('📰 Error initializing news panel:', error);
+    if (newsLoading) {
+      newsLoading.innerHTML = '<span style="color: #ef4444;">Error cargando noticias</span>';
+    }
+  } finally {
+    newsState.loading = false;
+  }
+}
+
+/**
+ * Update location UI
+ */
+function updateLocationUI(location) {
+  if (!location) return;
+  if (locationNameEl) {
+    locationNameEl.textContent = `${location.city}, ${location.country}`;
+  }
+}
+
+/**
+ * Get weather icon SVG
+ */
+function getWeatherIconSVG(iconName, size = 32, color = '#FDB813') {
+  const icons = {
+    'sun': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`,
+    'sun-cloud': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></svg>`,
+    'cloud-sun': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/><path d="M10.083 9A6.002 6.002 0 0 1 16 4a4.243 4.243 0 0 0 6 6c0 2.22-1.206 4.16-3 5.197"/></svg>`,
+    'cloud': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>`,
+    'fog': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 17H7"/><path d="M17 21H9"/></svg>`,
+    'rain': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 13v8"/><path d="M8 13v8"/><path d="M12 15v8"/><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>`,
+    'rain-light': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3"/><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>`,
+    'rain-heavy': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 13v8"/><path d="M8 13v8"/><path d="M12 15v8"/><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/><path d="M8 19v3"/><path d="M16 19v3"/></svg>`,
+    'snow': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="8" y1="20" x2="8.01" y2="20"/><line x1="12" y1="18" x2="12.01" y2="18"/><line x1="12" y1="22" x2="12.01" y2="22"/><line x1="16" y1="16" x2="16.01" y2="16"/><line x1="16" y1="20" x2="16.01" y2="20"/></svg>`,
+    'snow-heavy': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"/><circle cx="8" cy="18" r="1"/><circle cx="8" cy="22" r="1"/><circle cx="12" cy="16" r="1"/><circle cx="12" cy="20" r="1"/><circle cx="16" cy="18" r="1"/><circle cx="16" cy="22" r="1"/></svg>`,
+    'storm': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/></svg>`
+  };
+  
+  return icons[iconName] || icons['cloud'];
+}
+
+/**
+ * Update weather UI
+ */
+function updateWeatherUI(weather) {
+  if (!weather) return;
+
+  if (weatherIconEl) {
+    weatherIconEl.innerHTML = getWeatherIconSVG(weather.icon, 36, weather.color);
+  }
+  if (weatherTempEl) weatherTempEl.textContent = `${weather.temperature}°`;
+  if (weatherConditionEl) weatherConditionEl.textContent = weather.condition;
+
+  // Render forecast (only first 5 days)
+  if (weatherForecastEl && weather.forecast) {
+    weatherForecastEl.innerHTML = weather.forecast.slice(0, 5).map(day => `
+      <div class="forecast-day">
+        <span class="forecast-day-name">${day.day}</span>
+        <span class="forecast-day-icon">${getWeatherIconSVG(day.icon, 20, day.color)}</span>
+        <span class="forecast-day-temp">${day.tempMax}°</span>
+      </div>
+    `).join('');
+  }
+  
+  // Make weather widget clickable
+  const weatherWidget = document.getElementById('weather-widget');
+  if (weatherWidget) {
+    weatherWidget.style.cursor = 'pointer';
+    weatherWidget.onclick = () => openWeatherModal(weather, newsState.location);
+  }
+}
+
+/**
+ * Render news grid
+ */
+function renderNewsGrid(news) {
+  if (!newsGrid || !news) return;
+
+  // Hide loading
+  if (newsLoading) newsLoading.style.display = 'none';
+
+  // Clear existing cards
+  const existingCards = newsGrid.querySelectorAll('.news-card');
+  existingCards.forEach(card => card.remove());
+
+  // Create news cards
+  news.forEach((item, index) => {
+    const card = createNewsCard(item, index === 0);
+    newsGrid.appendChild(card);
+  });
+
+  // Show message if no news found
+  if (news.length === 0) {
+    newsGrid.innerHTML = '<div class="news-empty"><p>No se encontraron noticias para esta categoría</p></div>';
+  }
+}
+
+/**
+ * Create a news card element
+ */
+function createNewsCard(newsItem, isFeatured = false) {
+  const card = document.createElement('div');
+  card.className = `news-card ${isFeatured ? 'featured' : ''}`;
+  card.dataset.newsId = newsItem.id;
+  card.dataset.category = newsItem.category;
+
+  const sourcesCount = newsItem.sources || Math.floor(Math.random() * 80 + 20);
+
+  card.innerHTML = `
+    <img class="news-card-image" src="${newsItem.imageUrl}" alt="${escapeHtml(newsItem.title)}" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=250&fit=crop'">
+    <div class="news-card-content">
+      <div class="news-card-header">
+      <span class="news-card-category">${escapeHtml(newsItem.category)}</span>
+        ${sourcesCount ? `<span class="news-card-sources">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/>
+            <path d="M18 14h-8"/>
+            <path d="M15 18h-5"/>
+            <path d="M10 6h8v4h-8V6Z"/>
+          </svg>
+          ${sourcesCount} fuentes
+        </span>` : ''}
+      </div>
+      <h3 class="news-card-title">${escapeHtml(newsItem.title)}</h3>
+      <p class="news-card-description">${escapeHtml(newsItem.description)}</p>
+      <div class="news-card-meta">
+        <span class="news-card-source">${escapeHtml(newsItem.source)}</span>
+        <span class="news-card-time">${newsItem.timeAgo}</span>
+      </div>
+    </div>
+  `;
+
+  // Click handler to open detail
+  card.addEventListener('click', () => {
+    openNewsDetail(newsItem);
+  });
+
+  return card;
+}
+
+/**
+ * Open news detail view
+ */
+function openNewsDetail(newsItem) {
+  if (!newsDetail || !newsDetailContent) return;
+
+  newsState.selectedNews = newsItem;
+
+  // Update external link
+  if (newsExternalLink) {
+    newsExternalLink.href = newsItem.url;
+  }
+
+  // Generate extended content based on description
+  const extendedContent = generateExtendedContent(newsItem);
+
+  // Generate related tags based on category and content
+  const relatedTags = generateRelatedTags(newsItem);
+
+  // Render detail content with more information
+  newsDetailContent.innerHTML = `
+    <img class="detail-image" src="${newsItem.imageUrl}" alt="${escapeHtml(newsItem.title)}" onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=450&fit=crop'">
+    <span class="detail-category">${escapeHtml(newsItem.category)}</span>
+    <h1 class="detail-title">${escapeHtml(newsItem.title)}</h1>
+    <div class="detail-meta">
+      <span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M2 12h20"/>
+        </svg>
+        ${escapeHtml(newsItem.source)}
+      </span>
+      <span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        ${newsItem.timeAgo}
+      </span>
+      <span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        ${Math.floor(Math.random() * 5000 + 1000).toLocaleString()} lecturas
+      </span>
+    </div>
+    <p class="detail-description">${escapeHtml(newsItem.description)}</p>
+    <div class="detail-full-content">
+      ${extendedContent}
+    </div>
+    <div class="detail-tags">
+      ${relatedTags.map(tag => `<span class="detail-tag">#${tag}</span>`).join('')}
+    </div>
+    <div class="detail-cta">
+      <a class="detail-cta-btn" href="${newsItem.url}" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        Leer artículo completo
+      </a>
+      <button class="detail-cta-btn secondary" onclick="closeNewsDetail()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="19" y1="12" x2="5" y2="12"/>
+          <polyline points="12 19 5 12 12 5"/>
+        </svg>
+        Volver a noticias
+      </button>
+    </div>
+  `;
+
+  // Show detail view
+  newsDetail.style.display = 'block';
+}
+
+/**
+ * Generate extended content from news description
+ */
+function generateExtendedContent(newsItem) {
+  // Create more detailed paragraphs based on the category and description
+  const paragraphs = [];
+
+  // First paragraph - introduction and context
+  paragraphs.push(`<p>Esta noticia ha generado un amplio interés en el sector de ${newsItem.category}, captando la atención de especialistas y público general por igual. Los desarrollos recientes representan un momento significativo que podría tener implicaciones de largo alcance en múltiples ámbitos del mercado global y la sociedad en general.</p>`);
+
+  // Second paragraph - detailed analysis based on category
+  const categoryAnalysis = {
+    'tecnología': `<p>Los analistas tecnológicos destacan que este tipo de avances representan un punto de inflexión crucial en la industria. Las empresas del sector están monitoreando de cerca estos desarrollos para ajustar sus estrategias de inversión y desarrollo. Según expertos consultados, estamos presenciando una transformación que podría redefinir completamente el panorama tecnológico de los próximos años.</p>
+    <p>La carrera por la innovación se ha intensificado entre los principales actores del mercado. Compañías como Microsoft, Google, Meta y Amazon han aumentado significativamente sus presupuestos de I+D para no quedarse atrás. Los inversores de capital riesgo están prestando especial atención a startups que trabajan en tecnologías relacionadas, con valuaciones que han alcanzado niveles históricos.</p>`,
+
+    'economía': `<p>Economistas de instituciones financieras internacionales han expresado sus perspectivas sobre el impacto de estos eventos en los mercados globales. Las proyecciones indican posibles ajustes en las políticas monetarias de los principales bancos centrales, lo que podría afectar las tasas de interés y el acceso al crédito en múltiples economías.</p>
+    <p>Los mercados financieros han reaccionado con volatilidad ante estas noticias. Los índices bursátiles principales han experimentado movimientos significativos, mientras que los inversores institucionales reevalúan sus portafolios. Analistas de Wall Street señalan que este tipo de desarrollos suelen tener efectos en cascada que se manifiestan a lo largo de varios trimestres.</p>`,
+
+    'ciencia': `<p>La comunidad científica ha recibido esta noticia con notable interés, señalando que podría abrir nuevas líneas de investigación fundamentales. Los investigadores enfatizan la importancia de continuar financiando proyectos en esta área, destacando el potencial de estos avances para resolver problemas críticos que enfrenta la humanidad.</p>
+    <p>Universidades y centros de investigación de todo el mundo están evaluando cómo estos descubrimientos podrían integrarse en sus programas académicos y proyectos en curso. La colaboración internacional se perfila como un factor clave para maximizar el impacto de estos avances científicos.</p>`,
+
+    'política': `<p>Observadores políticos señalan que estos desarrollos podrían influir significativamente en las relaciones internacionales y en las políticas públicas de varios países. Los gobiernos están evaluando las implicaciones de seguridad nacional y las oportunidades de cooperación que podrían surgir.</p>
+    <p>Analistas diplomáticos sugieren que estos acontecimientos podrían reconfigurar alianzas tradicionales y abrir nuevos canales de diálogo entre naciones. La comunidad internacional está atenta a las posibles ramificaciones geopolíticas de estos desarrollos.</p>`,
+
+    'deportes': `<p>Los comentaristas deportivos destacan la relevancia histórica de este acontecimiento para el futuro de la disciplina. Los aficionados de todo el mundo han expresado su entusiasmo ante estos desarrollos, que prometen elevar el nivel competitivo a nuevas alturas.</p>
+    <p>Las federaciones y organismos deportivos internacionales están evaluando cómo estos cambios podrían afectar las reglas y formatos de competición. Los patrocinadores y marcas deportivas también muestran un creciente interés en capitalizar el momentum generado.</p>`,
+
+    'entretenimiento': `<p>La industria del entretenimiento continúa evolucionando con este tipo de novedades que captan la atención del público global. Los estudios y productoras están reevaluando sus estrategias de contenido para adaptarse a las nuevas tendencias del mercado.</p>
+    <p>Las plataformas de streaming y los medios tradicionales compiten por capitalizar el interés generado. Críticos y expertos en medios señalan que estos desarrollos podrían marcar el inicio de una nueva era en la forma en que consumimos entretenimiento.</p>`
+  };
+
+  paragraphs.push(categoryAnalysis[newsItem.category?.toLowerCase()] || categoryAnalysis['tecnología']);
+
+  // Third paragraph - expert opinions
+  paragraphs.push(`<p><strong>Opiniones de expertos:</strong> Profesionales consultados coinciden en que es fundamental mantener una perspectiva equilibrada ante estos desarrollos. "Estamos en un momento de transición que requiere tanto optimismo como prudencia", señala un especialista del sector. La clave estará en cómo las diferentes partes interesadas respondan a estos cambios en los próximos meses.</p>`);
+
+  // Fourth paragraph - future implications
+  paragraphs.push(`<p>De cara al futuro, los expertos anticipan que veremos más desarrollos en esta dirección. Las organizaciones involucradas han indicado que continuarán trabajando en iniciativas relacionadas durante los próximos meses, con planes ambiciosos que podrían amplificar el impacto de lo que hemos presenciado hasta ahora.</p>`);
+
+  // Fifth paragraph - global perspective
+  paragraphs.push(`<p>A nivel global, diferentes regiones están adoptando aproximaciones distintas ante estos acontecimientos. Europa, América y Asia muestran dinámicas particulares que reflejan sus prioridades y capacidades únicas. Esta diversidad de respuestas enriquece el debate global y abre posibilidades para soluciones innovadoras que podrían beneficiar a múltiples sectores simultáneamente.</p>`);
+
+  // Sixth paragraph - conclusion
+  paragraphs.push(`<p>En conclusión, los desarrollos reportados en esta noticia representan un momento significativo que merece atención continua. Los lectores interesados en profundizar en el tema encontrarán recursos adicionales en las fuentes citadas y en publicaciones especializadas del sector. La evolución de esta historia promete mantener el interés del público durante los próximos meses.</p>`);
+
+  return paragraphs.join('');
+}
+
+/**
+ * Generate related tags based on news item
+ */
+function generateRelatedTags(newsItem) {
+  const baseTags = [newsItem.category];
+
+  const categoryTags = {
+    'tecnología': ['innovación', 'IA', 'digital', 'futuro', 'tech'],
+    'economía': ['mercados', 'finanzas', 'inversión', 'global', 'negocios'],
+    'ciencia': ['investigación', 'descubrimiento', 'futuro', 'innovación'],
+    'política': ['gobierno', 'internacional', 'diplomacia', 'legislación'],
+    'deportes': ['competición', 'atletas', 'campeonato', 'récord'],
+    'entretenimiento': ['cultura', 'viral', 'trending', 'medios']
+  };
+
+  const extraTags = categoryTags[newsItem.category?.toLowerCase()] || categoryTags['tecnología'];
+
+  // Select 3-4 random tags
+  const shuffled = extraTags.sort(() => 0.5 - Math.random());
+  return [...baseTags, ...shuffled.slice(0, 3)];
+}
+
+/**
+ * Close news detail view
+ */
+function closeNewsDetail() {
+  if (newsDetail) {
+    newsDetail.style.display = 'none';
+  }
+  newsState.selectedNews = null;
+}
+
+// News tabs state
+newsState.activeTab = 'para-ti';
+newsState.activeCategory = null;
+newsState.allNews = [];
+
+// Event Listeners for News Panel
+if (discoverButton) {
+  discoverButton.addEventListener('click', () => {
+    toggleNewsView('news');
+  });
+}
+
+if (newsBackBtn) {
+  newsBackBtn.addEventListener('click', () => {
+    closeNewsDetail();
+  });
+}
+
+// News tabs functionality
+const newsTabs = document.querySelectorAll('.news-tab');
+newsTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const tabName = tab.dataset.tab;
+    
+    // Handle "Temas" dropdown
+    if (tabName === 'temas') {
+      toggleTemasMenu();
+      return;
+    }
+    
+    // Update active tab
+    newsTabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    newsState.activeTab = tabName;
+    
+    // Filter news based on tab
+    filterNewsByTab(tabName);
+  });
+});
+
+/**
+ * Filter news by active tab
+ */
+function filterNewsByTab(tabName) {
+  let filteredNews = [...newsState.allNews];
+  
+  if (tabName === 'para-ti') {
+    // Show all news, personalized order
+    filteredNews = newsState.allNews;
+  } else if (tabName === 'mejor') {
+    // Sort by sources count (most popular)
+    filteredNews = [...newsState.allNews].sort((a, b) => {
+      const aCount = a.sources || 0;
+      const bCount = b.sources || 0;
+      return bCount - aCount;
+    });
+  }
+  
+  // Apply category filter if active
+  if (newsState.activeCategory) {
+    filteredNews = filteredNews.filter(news => 
+      news.category.toLowerCase() === newsState.activeCategory.toLowerCase()
+    );
+  }
+  
+  renderNewsGrid(filteredNews);
+}
+
+/**
+ * Toggle temas dropdown menu
+ */
+function toggleTemasMenu() {
+  const temasTab = document.querySelector('[data-tab="temas"]');
+  const existingMenu = document.querySelector('.temas-dropdown');
+  
+  if (existingMenu) {
+    existingMenu.remove();
+    return;
+  }
+  
+  // Create dropdown menu
+  const dropdown = document.createElement('div');
+  dropdown.className = 'temas-dropdown';
+  dropdown.innerHTML = `
+    <button class="tema-item ${!newsState.activeCategory ? 'active' : ''}" data-category="">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      </svg>
+      Todas las noticias
+    </button>
+    <button class="tema-item ${newsState.activeCategory === 'tecnología' ? 'active' : ''}" data-category="tecnología">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+        <line x1="8" y1="21" x2="16" y2="21"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+      Tecnología
+    </button>
+    <button class="tema-item ${newsState.activeCategory === 'economía' ? 'active' : ''}" data-category="economía">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="1" x2="12" y2="23"/>
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      Economía
+    </button>
+    <button class="tema-item ${newsState.activeCategory === 'política' ? 'active' : ''}" data-category="política">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      Política
+    </button>
+    <button class="tema-item ${newsState.activeCategory === 'ciencia' ? 'active' : ''}" data-category="ciencia">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 3v18l7-3v-9"/>
+        <circle cx="17" cy="6" r="3"/>
+      </svg>
+      Ciencia
+    </button>
+    <button class="tema-item ${newsState.activeCategory === 'deportes' ? 'active' : ''}" data-category="deportes">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+        <path d="M2 12h20"/>
+      </svg>
+      Deportes
+    </button>
+    <button class="tema-item ${newsState.activeCategory === 'salud' ? 'active' : ''}" data-category="salud">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+      </svg>
+      Salud
+    </button>
+    <button class="tema-item ${newsState.activeCategory === 'internacional' ? 'active' : ''}" data-category="internacional">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="2" y1="12" x2="22" y2="12"/>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>
+      Internacional
+    </button>
+    <button class="tema-item ${newsState.activeCategory === 'entretenimiento' ? 'active' : ''}" data-category="entretenimiento">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      Entretenimiento
+    </button>
+    <button class="tema-item ${newsState.activeCategory === 'medio ambiente' ? 'active' : ''}" data-category="medio ambiente">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        <circle cx="12" cy="12" r="10"/>
+      </svg>
+      Medio Ambiente
+    </button>
+  `;
+  
+  // Position dropdown below the Temas button using fixed positioning
+  document.body.appendChild(dropdown);
+  
+  const temasRect = temasTab.getBoundingClientRect();
+  dropdown.style.top = `${temasRect.bottom + 8}px`;
+  dropdown.style.left = `${temasRect.left}px`;
+  
+  // Add click handlers to tema items
+  dropdown.querySelectorAll('.tema-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const category = item.dataset.category;
+      newsState.activeCategory = category || null;
+      
+      // Update active state
+      dropdown.querySelectorAll('.tema-item').forEach(t => t.classList.remove('active'));
+      item.classList.add('active');
+      
+      // Filter news
+      filterNewsByTab(newsState.activeTab);
+      
+      // Close dropdown
+      dropdown.remove();
+    });
+  });
+  
+  // Close dropdown when clicking outside or on backdrop
+  dropdown.addEventListener('click', (e) => {
+    if (e.target === dropdown) {
+      dropdown.remove();
+    }
+  });
+  
+  setTimeout(() => {
+    document.addEventListener('click', function closeDropdown(e) {
+      if (!dropdown.contains(e.target) && e.target !== temasTab) {
+        dropdown.remove();
+        document.removeEventListener('click', closeDropdown);
+      }
+    });
+  }, 100);
+}
+
+// Modify new conversation button to also switch back to chat view
+const originalNewConversationHandler = newConversationButton?.onclick;
+if (newConversationButton) {
+  newConversationButton.addEventListener('click', () => {
+    if (newsState.activeView === 'news') {
+      toggleNewsView('chat');
+    }
+  });
+}
+
+// When clicking a conversation in sidebar, switch to chat view
+const conversationListEl = document.getElementById('conversation-list');
+if (conversationListEl) {
+  conversationListEl.addEventListener('click', (e) => {
+    const conversationItem = e.target.closest('.conversation-item');
+    if (conversationItem && newsState.activeView === 'news') {
+      toggleNewsView('chat');
+    }
+  });
+}
+
+/**
+ * Open weather detail modal
+ */
+function openWeatherModal(weather, location) {
+  const modal = document.getElementById('weather-modal');
+  const modalBody = document.getElementById('weather-modal-body');
+  const modalLocation = document.getElementById('weather-modal-location');
+  
+  if (!modal || !modalBody) return;
+  
+  // Set location title
+  if (modalLocation && location) {
+    modalLocation.textContent = `${location.city}, ${location.country}`;
+  }
+  
+  // Generate modal content
+  modalBody.innerHTML = `
+    <div class="weather-current-detail">
+      <div class="weather-current-main">
+        <div class="weather-current-icon-large">
+          ${getWeatherIconSVG(weather.icon, 80, weather.color)}
+        </div>
+        <div class="weather-current-info">
+          <div class="weather-current-temp-large">${weather.temperature}°</div>
+          <div class="weather-current-condition-large">${weather.condition}</div>
+          <div class="weather-current-feels">Sensación térmica: ${weather.feelsLike}°</div>
+        </div>
+      </div>
+      
+      <div class="weather-stats-grid">
+        <div class="weather-stat-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+          </svg>
+          <div class="weather-stat-value">${weather.humidity}%</div>
+          <div class="weather-stat-label">Humedad</div>
+        </div>
+        
+        <div class="weather-stat-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/>
+          </svg>
+          <div class="weather-stat-value">${weather.windSpeed} km/h</div>
+          <div class="weather-stat-label">Viento</div>
+        </div>
+        
+        <div class="weather-stat-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+          </svg>
+          <div class="weather-stat-value">${weather.forecast[0]?.uvIndex || 0}</div>
+          <div class="weather-stat-label">Índice UV</div>
+        </div>
+        
+        <div class="weather-stat-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 13v8"/><path d="M8 13v8"/><path d="M12 15v8"/><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/>
+          </svg>
+          <div class="weather-stat-value">${weather.forecast[0]?.precipitation || 0}%</div>
+          <div class="weather-stat-label">Precipitación</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="weather-forecast-detail">
+      <h3 class="weather-section-title">Pronóstico de 7 días</h3>
+      <div class="weather-forecast-list">
+        ${weather.forecast.map((day, index) => `
+          <div class="weather-forecast-item">
+            <div class="forecast-item-day">
+              <span class="forecast-item-day-name">${index === 0 ? 'Hoy' : day.day}</span>
+              <span class="forecast-item-date">${new Date(day.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}</span>
+            </div>
+            <div class="forecast-item-icon">
+              ${getWeatherIconSVG(day.icon, 32, day.color)}
+            </div>
+            <div class="forecast-item-condition">${day.condition}</div>
+            <div class="forecast-item-temps">
+              <span class="temp-max">${day.tempMax}°</span>
+              <span class="temp-separator">/</span>
+              <span class="temp-min">${day.tempMin}°</span>
+            </div>
+            <div class="forecast-item-precipitation">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+              </svg>
+              ${day.precipitation}%
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <div class="weather-chart-section">
+      <h3 class="weather-section-title">Temperatura de la semana</h3>
+      <div class="weather-temperature-chart">
+        ${generateTemperatureChart(weather.forecast)}
+      </div>
+    </div>
+  `;
+  
+  // Show modal
+  modal.style.display = 'flex';
+  
+  // Add close handlers
+  const closeBtn = document.getElementById('weather-modal-close');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      modal.style.display = 'none';
+    };
+  }
+  
+  // Close on backdrop click
+  modal.onclick = (e) => {
+    if (e.target === modal) {
+      modal.style.display = 'none';
+    }
+  };
+}
+
+/**
+ * Generate temperature chart visualization
+ */
+function generateTemperatureChart(forecast) {
+  if (!forecast || forecast.length === 0) return '';
+  
+  const maxTemp = Math.max(...forecast.map(d => d.tempMax));
+  const minTemp = Math.min(...forecast.map(d => d.tempMin));
+  const range = maxTemp - minTemp;
+  
+  return `
+    <div class="temp-chart">
+      ${forecast.map((day, index) => {
+        const maxHeight = ((day.tempMax - minTemp) / range) * 100;
+        const minHeight = ((day.tempMin - minTemp) / range) * 100;
+        
+        return `
+          <div class="temp-chart-bar">
+            <div class="temp-chart-max">${day.tempMax}°</div>
+            <div class="temp-chart-bar-container">
+              <div class="temp-chart-bar-fill" style="height: ${maxHeight}%; background: linear-gradient(180deg, ${day.color} 0%, ${day.color}80 100%);"></div>
+            </div>
+            <div class="temp-chart-min">${day.tempMin}°</div>
+            <div class="temp-chart-day">${index === 0 ? 'Hoy' : day.day}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// Export news functions
+window.newsPanelUtils = {
+  toggleNewsView,
+  initializeNewsPanel,
+  closeNewsDetail,
+  refreshNews: async () => {
+    newsState.initialized = false;
+    await initializeNewsPanel();
+  }
+};
+
+// Also expose closeNewsDetail directly for onclick handlers
+window.closeNewsDetail = closeNewsDetail;
+
+console.log('📰 News Panel module loaded');
