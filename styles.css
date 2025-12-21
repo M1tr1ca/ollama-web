@@ -9209,10 +9209,12 @@ body.score-canvas-visible #chat-state {
     opacity: 0.6;
     transform: scale(0.95);
   }
+
   50% {
     opacity: 1;
     transform: scale(1.08);
   }
+
   100% {
     opacity: 1;
     transform: scale(1);
@@ -9417,4 +9419,745 @@ body.score-canvas-visible #chat-state {
 .modal-content-large {
   max-width: 900px;
   width: 90%;
+}
+
+/* ========================================
+   Panel de Informe de Investigación (PDF)
+   ======================================== */
+.research-report-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 50%;
+  max-width: 800px;
+  height: 100vh;
+  background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  animation: slideInFromRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.research-report-panel.closing {
+  animation: slideOutToRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideOutToRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.research-report-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.research-report-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.research-report-title svg {
+  color: var(--theme-primary);
+}
+
+.research-report-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.research-action-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.research-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.95);
+  transform: translateY(-1px);
+}
+
+.research-action-btn:active {
+  transform: translateY(0);
+}
+
+#download-research-pdf:hover {
+  background: var(--theme-primary-alpha-15);
+  border-color: var(--theme-primary-alpha-30);
+  color: var(--theme-primary);
+}
+
+.research-report-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.research-report-meta span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.research-report-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: #0f0f0f;
+}
+
+.research-pdf-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: white;
+}
+
+/* Ajustar layout cuando el panel PDF está visible - SPLIT VIEW */
+body.research-report-visible .layout {
+  grid-template-columns: 260px 1fr !important;
+}
+
+body.research-report-visible.sidebar-minimized .layout {
+  grid-template-columns: 60px 1fr !important;
+}
+
+/* Reducir el ancho del contenedor principal cuando el PDF está visible */
+body.research-report-visible .main-column {
+  width: 50% !important;
+  max-width: 50% !important;
+  transition: all 0.3s ease;
+}
+
+body.research-report-visible .chat-wrapper {
+  max-width: 100% !important;
+}
+
+body.research-report-visible .message-container {
+  max-width: 100% !important;
+  padding-right: 20px;
+}
+
+/* El panel ocupa el 50% restante */
+body.research-report-visible .research-report-panel {
+  width: 50% !important;
+  max-width: 50% !important;
+}
+
+/* Estado de carga del informe */
+.research-report-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
+  gap: 20px;
+}
+
+.research-report-loading .loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--theme-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.research-report-loading-text {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.research-report-loading-subtext {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: -12px;
+}
+
+/* Indicador de progreso para la generación de PDF */
+.research-pdf-progress {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 12px;
+  padding: 16px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.research-pdf-progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.research-pdf-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--theme-primary), var(--theme-primary-light));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.research-pdf-progress-text {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Estilos para búsqueda web en Deep Research */
+.research-web-search-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 20px;
+  font-size: 11px;
+  color: #60a5fa;
+  margin-left: 8px;
+}
+
+.research-web-search-indicator svg {
+  width: 12px;
+  height: 12px;
+}
+
+.research-web-search-indicator.active {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 12px 4px rgba(96, 165, 250, 0.2);
+  }
+}
+
+/* Fuentes encontradas en la investigación */
+.research-sources-list {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.research-source-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.research-source-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.research-source-item:first-child {
+  padding-top: 0;
+}
+
+.research-source-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.research-source-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.research-source-title {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.research-source-url {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Mobile responsive */
+@media (max-width: 1200px) {
+  .research-report-panel {
+    width: 60%;
+  }
+}
+
+@media (max-width: 900px) {
+  .research-report-panel {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+/* Botón de generar informe en el resultado */
+.generate-report-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-dark));
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 16px;
+}
+
+.generate-report-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px var(--theme-primary-shadow);
+}
+
+.generate-report-btn:active {
+  transform: translateY(0);
+}
+
+.generate-report-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.generate-report-btn.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.generate-report-btn .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ========================================
+   Grid de Fuentes Web para Deep Research
+   ======================================== */
+.deep-research-sources-grid {
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+}
+
+.sources-grid-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.sources-grid-header svg {
+  color: #60a5fa;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.sources-count {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+}
+
+.sources-grid-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.source-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  animation: sourceCardAppear 0.3s ease forwards;
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+}
+
+@keyframes sourceCardAppear {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.source-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(96, 165, 250, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.source-card-favicon {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.source-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.source-card-domain {
+  font-size: 12px;
+  font-weight: 500;
+  color: #60a5fa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source-card-title {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Panel de Razonamiento en Vivo */
+.deep-research-reasoning {
+  margin-top: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.05));
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 12px;
+}
+
+.reasoning-section {
+  animation: fadeIn 0.3s ease;
+}
+
+.reasoning-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.reasoning-section-header svg {
+  color: #a78bfa;
+  animation: spin 3s linear infinite;
+}
+
+.reasoning-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #a78bfa;
+}
+
+.reasoning-content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: pre-wrap;
+}
+
+/* Animación de pulso para iconos activos */
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Estado de búsqueda activa en pasos */
+.deep-research-step.searching {
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(96, 165, 250, 0.05);
+}
+
+.deep-research-step.searching .deep-research-step-icon {
+  color: #60a5fa;
+  animation: spin 1.5s linear infinite;
+}
+
+/* Indicador de web search en la descripción */
+.step-web-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(96, 165, 250, 0.15);
+  border-radius: 12px;
+  font-size: 10px;
+  color: #60a5fa;
+  margin-left: 8px;
+}
+
+.step-web-indicator svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Panel de Pensamiento de la IA - Rediseñado */
+.deep-research-thinking {
+  margin-top: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(var(--theme-primary-rgb), 0.08), rgba(var(--theme-primary-rgb), 0.03));
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.2);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--theme-primary);
+}
+
+.thinking-header svg {
+  color: var(--theme-primary);
+}
+
+.thinking-cycle-count {
+  font-weight: 400;
+  color: rgba(var(--theme-primary-rgb), 0.7);
+  font-size: 12px;
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.thinking-content-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-item {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  border-left: 3px solid var(--theme-primary);
+  position: relative;
+}
+
+.thinking-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.thinking-cycle-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--theme-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(var(--theme-primary-rgb), 0.15);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.thinking-item-content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Efecto de escritura dinámico */
+.thinking-item {
+  animation: thinkingFadeIn 0.3s ease forwards;
+}
+
+.thinking-item.fading-out {
+  animation: thinkingFadeOut 0.3s ease forwards;
+}
+
+@keyframes thinkingFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes thinkingFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* Indicador de escritura (typing dots) */
+.thinking-typing-indicator {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 8px;
+  align-items: center;
+}
+
+.thinking-typing-indicator span {
+  width: 5px;
+  height: 5px;
+  background: var(--theme-primary);
+  border-radius: 50%;
+  animation: typingBounce 1.2s ease-in-out infinite;
+}
+
+.thinking-typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+/* Estilo mientras está escribiendo */
+.thinking-item.typing {
+  border-left-color: var(--theme-primary);
+  box-shadow: 0 0 20px rgba(var(--theme-primary-rgb), 0.15);
+}
+
+.thinking-item.typing .thinking-item-content {
+  min-height: 60px;
+}
+
+/* Cursor parpadeante al final del texto */
+.thinking-item.typing .thinking-item-content::after {
+  content: '▊';
+  animation: blinkCursor 0.6s step-end infinite;
+  color: var(--theme-primary);
+  font-weight: normal;
+  margin-left: 2px;
+}
+
+@keyframes blinkCursor {
+  50% {
+    opacity: 0;
+  }
 }

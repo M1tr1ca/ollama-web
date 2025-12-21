@@ -1925,8 +1925,34 @@ function appendMessageElement(message) {
       </div>
     `;
     content += parseMarkdown(message.content);
+  } else if (message.role === 'assistant' && message.webResearchData && message.webResearchData.pdfGenerated && message.content) {
+    // Es un mensaje de investigación web con PDF completado - mostrar con botón de PDF
+    const webData = message.webResearchData;
+    content += `
+      <div class="deep-research-report">
+        <div class="deep-research-report-header">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          Investigación web profunda • ${webData.findings?.length || 0} temas • ${webData.sources?.length || 0} fuentes
+        </div>
+      </div>
+    `;
+    content += parseMarkdown(message.content);
+    content += `
+      <button class="generate-report-btn" onclick="event.stopPropagation(); regenerateAndShowPDF('${message.id}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        Ver informe PDF completo
+      </button>
+    `;
   } else if (message.role === 'assistant' && message.webSearchData && message.content) {
-    // Es un mensaje de búsqueda web completado - reconstruir la UI
+    // Es un mensaje de búsqueda web normal completado - reconstruir la UI
     const webData = message.webSearchData;
     content += createWebSearchUIForRestore(webData);
     content += '<div style="height: 1px; background: rgba(255,255,255,0.1); margin: 16px 0;"></div>';
@@ -2365,7 +2391,7 @@ function setActiveConversation(id) {
   renderCanvasPanel(id);
   const doc = getCanvasDoc(id);
   toggleCanvasVisibility(!!doc || canvasMode);
-  
+
   // Gestionar canvas de partituras - mostrar si está en modo música O si hay partitura
   const scoreDoc = getScoreDoc(id);
   if (scoreDoc && (musicMode || window._musicModeActive)) {
@@ -2373,7 +2399,7 @@ function setActiveConversation(id) {
   } else {
     toggleScoreCanvasPanel(false);
   }
-  
+
   persistState();
 }
 
@@ -9558,7 +9584,7 @@ function initDeepResearch() {
   updateChatModeTogglesVisibility();
 }
 
-// Crear elemento de progreso de Deep Think
+// Crear elemento de progreso de Deep Research con diseño visual mejorado
 function createDeepResearchProgressElement() {
   const container = document.createElement('div');
   container.className = 'deep-research-container';
@@ -9566,38 +9592,218 @@ function createDeepResearchProgressElement() {
     <div class="deep-research-header">
       <div class="deep-research-title">
         <svg class="deep-research-title-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path class="spinner-ring" d="M12 2C7.58 2 4 5.58 4 10c0 2.5 1.2 4.7 3 6.2V19c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-2.8c1.8-1.5 3-3.7 3-6.2 0-4.42-3.58-8-8-8z" stroke="currentColor" stroke-width="1.6" fill="none"/>
-          <path d="M9 13v2M12 11v4M15 13v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        Pensamiento profundo
+        <span>Investigación web profunda</span>
       </div>
       <div class="deep-research-header-right">
-        <span class="deep-research-status">Iniciando análisis...</span>
+        <span class="deep-research-status">Preparando investigación...</span>
       </div>
     </div>
+    
     <div class="deep-research-progress">
       <div class="deep-research-progress-bar">
         <div class="deep-research-progress-fill" style="width: 0%"></div>
       </div>
       <span class="deep-research-progress-percent">0%</span>
     </div>
+    
+    <!-- Panel de razonamiento en vivo -->
+    <div class="deep-research-reasoning" style="display: none;">
+      <div class="reasoning-section active">
+        <div class="reasoning-section-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+          <span class="reasoning-title">Analizando consulta</span>
+        </div>
+        <div class="reasoning-content"></div>
+      </div>
+    </div>
+    
+    <!-- Pasos de búsqueda -->
     <div class="deep-research-steps"></div>
-      <div class="deep-research-findings" style="display: none;">
+    
+    <!-- Grid de fuentes web encontradas -->
+    <div class="deep-research-sources-grid" style="display: none;">
+      <div class="sources-grid-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <span>Investigando sitios web</span>
+        <span class="sources-count">(0 fuentes)</span>
+      </div>
+      <div class="sources-grid-content"></div>
+    </div>
+    
+    <!-- Hallazgos clave -->
+    <div class="deep-research-findings" style="display: none;">
       <div class="deep-research-findings-title">
         <svg class="findings-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <circle cx="5" cy="7" r="1.5" fill="currentColor" />
-          <path d="M9 7h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          <circle cx="5" cy="12" r="1.5" fill="currentColor" />
-          <path d="M9 12h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          <circle cx="5" cy="17" r="1.5" fill="currentColor" />
-          <path d="M9 17h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <polyline points="22 4 12 14.01 9 11.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         Hallazgos clave
       </div>
       <div class="deep-research-findings-list"></div>
     </div>
+    
+    <!-- Panel de pensamiento de la IA -->
+    <div class="deep-research-thinking" style="display: none;">
+      <div class="thinking-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M12 2C7.58 2 4 5.58 4 10c0 2.5 1.2 4.7 3 6.2V19c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-2.8c1.8-1.5 3-3.7 3-6.2 0-4.42-3.58-8-8-8z"/>
+          <path d="M9 13v2M12 11v4M15 13v2"/>
+        </svg>
+        <span>Análisis de la IA</span>
+        <span class="thinking-cycle-count">(Ciclo 1)</span>
+      </div>
+      <div class="thinking-content-list"></div>
+    </div>
   `;
   return container;
+}
+
+// Añadir fuente web al grid visual
+function addWebSourceToGrid(container, source, index) {
+  const sourcesGrid = container.querySelector('.deep-research-sources-grid');
+  const gridContent = container.querySelector('.sources-grid-content');
+  const sourcesCount = container.querySelector('.sources-count');
+
+  if (!sourcesGrid || !gridContent) return;
+
+  // Mostrar el grid si está oculto
+  sourcesGrid.style.display = 'block';
+
+  // Obtener dominio y favicon
+  let domain = 'web';
+  let faviconUrl = '';
+  try {
+    const url = new URL(source.link);
+    domain = url.hostname.replace('www.', '');
+    faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  } catch (e) { }
+
+  // Crear tarjeta de fuente
+  const sourceCard = document.createElement('a');
+  sourceCard.className = 'source-card';
+  sourceCard.href = source.link;
+  sourceCard.target = '_blank';
+  sourceCard.rel = 'noopener noreferrer';
+  sourceCard.style.animationDelay = `${index * 0.05}s`;
+
+  sourceCard.innerHTML = `
+    <img class="source-card-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">
+    <div class="source-card-info">
+      <span class="source-card-domain">${escapeHtml(domain)}</span>
+      <span class="source-card-title">${escapeHtml((source.title || '').substring(0, 50))}</span>
+    </div>
+  `;
+
+  gridContent.appendChild(sourceCard);
+
+  // Actualizar contador
+  const currentCount = gridContent.children.length;
+  if (sourcesCount) {
+    sourcesCount.textContent = `(${currentCount} fuentes)`;
+  }
+}
+
+// Actualizar razonamiento en vivo
+function updateReasoningPanel(container, title, content) {
+  const reasoningPanel = container.querySelector('.deep-research-reasoning');
+  const reasoningSection = container.querySelector('.reasoning-section');
+  const reasoningTitle = container.querySelector('.reasoning-title');
+  const reasoningContent = container.querySelector('.reasoning-content');
+
+  if (!reasoningPanel) return;
+
+  reasoningPanel.style.display = 'block';
+  if (reasoningTitle) reasoningTitle.textContent = title;
+  if (reasoningContent) reasoningContent.textContent = content;
+}
+
+// Añadir pensamiento de la IA al panel - VERSIÓN DINÁMICA
+let currentTypingInterval = null;
+let currentThinkingCycle = 0;
+
+function addAIThinking(container, cycle, thinking) {
+  const thinkingPanel = container.querySelector('.deep-research-thinking');
+  const thinkingList = container.querySelector('.thinking-content-list');
+  const cycleCount = container.querySelector('.thinking-cycle-count');
+
+  if (!thinkingPanel || !thinkingList) return;
+
+  // Mostrar el panel
+  thinkingPanel.style.display = 'block';
+
+  // Actualizar contador de ciclos
+  currentThinkingCycle = cycle;
+  if (cycleCount) {
+    cycleCount.textContent = `(Ciclo ${cycle})`;
+  }
+
+  // Limpiar markdown
+  let cleanThinking = thinking
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/`/g, '')
+    .trim();
+
+  // NO truncar - mostrar todo el texto
+
+  // Cancelar cualquier escritura en progreso
+  if (currentTypingInterval) {
+    clearInterval(currentTypingInterval);
+    currentTypingInterval = null;
+  }
+
+  // Hacer fade out del contenido anterior
+  const existingItems = thinkingList.querySelectorAll('.thinking-item');
+  existingItems.forEach(item => {
+    item.classList.add('fading-out');
+    setTimeout(() => item.remove(), 300);
+  });
+
+  // Crear nuevo elemento de pensamiento después de un pequeño delay
+  setTimeout(() => {
+    const thinkingItem = document.createElement('div');
+    thinkingItem.className = 'thinking-item typing';
+    thinkingItem.innerHTML = `
+      <div class="thinking-item-header">
+        <span class="thinking-cycle-label">Ciclo ${cycle}</span>
+        <span class="thinking-typing-indicator">
+          <span></span><span></span><span></span>
+        </span>
+      </div>
+      <div class="thinking-item-content"></div>
+    `;
+
+    thinkingList.appendChild(thinkingItem);
+
+    // Efecto de escritura - velocidad más rápida
+    const contentEl = thinkingItem.querySelector('.thinking-item-content');
+    const typingIndicator = thinkingItem.querySelector('.thinking-typing-indicator');
+    let charIndex = 0;
+    const charsPerTick = 8; // Velocidad de escritura (más rápida)
+
+    currentTypingInterval = setInterval(() => {
+      if (charIndex < cleanThinking.length) {
+        charIndex += charsPerTick;
+        contentEl.textContent = cleanThinking.substring(0, charIndex);
+      } else {
+        // Escritura completada
+        clearInterval(currentTypingInterval);
+        currentTypingInterval = null;
+        thinkingItem.classList.remove('typing');
+        if (typingIndicator) typingIndicator.style.display = 'none';
+      }
+    }, 10);
+
+  }, existingItems.length > 0 ? 300 : 0);
 }
 
 // Actualizar progreso visual
@@ -9828,44 +10034,57 @@ function addFinding(container, finding) {
     findingsContainer.style.display = 'block';
     const findingElement = document.createElement('div');
     findingElement.className = 'deep-research-finding';
+
+    // Limpiar markdown del texto (quitar **, *, etc.)
+    let cleanFinding = finding
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/`/g, '')
+      .trim();
+
     findingElement.innerHTML = `
       <svg class="finding-item-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" stroke="currentColor" stroke-width="1.2"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div class="finding-text">${escapeHtml(finding)}</div>
+      <div class="finding-text">${escapeHtml(cleanFinding)}</div>
     `;
     findingsList.appendChild(findingElement);
   }
 }
 
-// Generar plan de investigación usando el modelo
+// Generar plan de investigación INTELIGENTE usando el modelo
 async function generateResearchPlan(userQuery, signal = null) {
   console.log('🔬 Generando plan de investigación para:', userQuery);
 
-  const planPrompt = `Eres un asistente de investigación experto. El usuario quiere investigar: "${userQuery}"
+  const planPrompt = `Eres un asistente de investigación web experto. El usuario quiere investigar: "${userQuery}"
 
-Tu tarea es crear un plan de investigación estructurado. Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicaciones) con esta estructura exacta:
+IMPORTANTE: Tu tarea es crear un plan de BÚSQUEDAS WEB específicas para encontrar la información que necesita el usuario.
+
+Analiza la consulta del usuario y genera búsquedas de Google optimizadas. Por ejemplo:
+- Si busca vuelos: genera búsquedas como "vuelos Madrid Marsella enero 2025 precios", "ofertas vuelos baratos Madrid MRS", etc.
+- Si busca productos: genera búsquedas de comparativas, reviews, precios
+- Si busca información: genera búsquedas específicas del tema
+
+Responde ÚNICAMENTE con un JSON válido (sin markdown, sin \`\`\`):
 {
-  "mainQuestion": "La pregunta principal reformulada de forma clara",
-  "subQuestions": [
+  "mainQuestion": "Reformulación clara del objetivo del usuario",
+  "searchPlan": [
     {
-      "id": "q1",
-      "question": "Primera sub-pregunta específica",
-      "purpose": "Por qué esta pregunta es importante"
-    },
-    {
-      "id": "q2", 
-      "question": "Segunda sub-pregunta específica",
-      "purpose": "Por qué esta pregunta es importante"
-    },
-    {
-      "id": "q3",
-      "question": "Tercera sub-pregunta específica",
-      "purpose": "Por qué esta pregunta es importante"
+      "id": "s1",
+      "searchQuery": "términos de búsqueda optimizados para Google",
+      "purpose": "Qué información se espera encontrar",
+      "category": "precios|comparativa|información|reviews|ofertas"
     }
   ],
-  "approach": "Breve descripción del enfoque de investigación"
+  "approach": "Estrategia de la investigación"
 }
 
-Genera exactamente 3 sub-preguntas que cubran los aspectos más importantes del tema.`;
+REGLAS:
+1. Genera entre 3-5 búsquedas específicas y distintas
+2. Las búsquedas deben ser términos que usarías en Google
+3. Cada búsqueda debe aportar información diferente
+4. Adapta las búsquedas al contexto (fechas, lugares, productos mencionados)
+5. Si hay fechas específicas, inclúyelas en las búsquedas
+6. Prioriza búsquedas que den resultados útiles y actuales`;
 
   try {
     const response = await fetch(`${API_BASE}/api/chat`, {
@@ -9875,7 +10094,7 @@ Genera exactamente 3 sub-preguntas que cubran los aspectos más importantes del 
         model: state.currentModel,
         stream: false,
         messages: [{ role: 'user', content: planPrompt }],
-        options: { temperature: 0.3 }
+        options: { temperature: 0.3, num_ctx: 4096 }
       }),
       signal
     });
@@ -9890,21 +10109,63 @@ Genera exactamente 3 sub-preguntas que cubran los aspectos más importantes del 
     if (jsonMatch) {
       const plan = JSON.parse(jsonMatch[0]);
       console.log('📋 Plan de investigación generado:', plan);
+
+      // Convertir searchPlan a subQuestions para compatibilidad
+      if (plan.searchPlan && !plan.subQuestions) {
+        plan.subQuestions = plan.searchPlan.map(s => ({
+          id: s.id,
+          question: s.searchQuery,
+          purpose: s.purpose,
+          category: s.category
+        }));
+      }
+
       return plan;
     }
 
     throw new Error('No se pudo parsear el plan');
   } catch (error) {
     console.error('Error generando plan:', error);
-    // Plan de fallback
+    // Plan de fallback INTELIGENTE basado en la consulta
+    const queryLower = userQuery.toLowerCase();
+    let fallbackSearches = [];
+
+    // Detectar tipo de consulta y generar búsquedas apropiadas
+    if (queryLower.includes('vuelo') || queryLower.includes('avión') || queryLower.includes('volar')) {
+      // Extraer ciudades y fechas si es posible
+      const words = userQuery.split(' ');
+      fallbackSearches = [
+        { id: 's1', question: `${userQuery} precios comparativa`, purpose: 'Encontrar precios y comparativas' },
+        { id: 's2', question: `ofertas vuelos baratos ${userQuery}`, purpose: 'Buscar ofertas y descuentos' },
+        { id: 's3', question: `mejores aerolíneas ${userQuery} opiniones`, purpose: 'Evaluar aerolíneas disponibles' },
+        { id: 's4', question: `consejos reservar vuelo barato ${userQuery}`, purpose: 'Tips para conseguir mejor precio' }
+      ];
+    } else if (queryLower.includes('hotel') || queryLower.includes('alojamiento')) {
+      fallbackSearches = [
+        { id: 's1', question: `${userQuery} mejores opciones`, purpose: 'Encontrar mejores opciones' },
+        { id: 's2', question: `${userQuery} precios baratos`, purpose: 'Comparar precios' },
+        { id: 's3', question: `${userQuery} opiniones reseñas`, purpose: 'Ver valoraciones de usuarios' }
+      ];
+    } else if (queryLower.includes('precio') || queryLower.includes('comprar') || queryLower.includes('barato')) {
+      fallbackSearches = [
+        { id: 's1', question: `${userQuery} comparativa precios`, purpose: 'Comparar precios' },
+        { id: 's2', question: `${userQuery} mejores ofertas`, purpose: 'Encontrar ofertas' },
+        { id: 's3', question: `${userQuery} opiniones 2024`, purpose: 'Ver opiniones recientes' }
+      ];
+    } else {
+      // Búsquedas genéricas pero útiles
+      fallbackSearches = [
+        { id: 's1', question: `${userQuery} guía completa`, purpose: 'Información general detallada' },
+        { id: 's2', question: `${userQuery} mejores opciones 2024`, purpose: 'Opciones actualizadas' },
+        { id: 's3', question: `${userQuery} consejos expertos`, purpose: 'Recomendaciones de expertos' },
+        { id: 's4', question: `${userQuery} comparativa análisis`, purpose: 'Análisis comparativo' }
+      ];
+    }
+
     return {
       mainQuestion: userQuery,
-      subQuestions: [
-        { id: 'q1', question: `¿Cuáles son los conceptos fundamentales de ${userQuery}?`, purpose: 'Establecer base' },
-        { id: 'q2', question: `¿Cuáles son las aplicaciones prácticas o ejemplos de ${userQuery}?`, purpose: 'Aplicación práctica' },
-        { id: 'q3', question: `¿Cuáles son los desafíos o limitaciones de ${userQuery}?`, purpose: 'Análisis crítico' }
-      ],
-      approach: 'Investigación estructurada en tres fases'
+      subQuestions: fallbackSearches,
+      approach: 'Búsqueda web exhaustiva de múltiples fuentes'
     };
   }
 }
@@ -10447,6 +10708,800 @@ async function executeDeepResearch(userQuery, conversation) {
 // Modificar el handleSubmit original para soportar Deep Research, Modo Estudio y Modo Web
 const originalHandleSubmit = handleSubmit;
 
+// ========================================
+// Sistema de Investigación Web con PDF
+// ========================================
+let webResearchCurrentPdfUrl = null;
+let webResearchAllSources = [];
+const MAX_WEB_SEARCH_ITERATIONS = 3; // Iteraciones de búsqueda por sub-pregunta
+
+// Investigar una sub-pregunta CON BÚSQUEDA WEB ITERATIVA
+async function investigateSubQuestionWithWeb(question, previousFindings = [], signal = null, progressCallback = null) {
+  console.log('🔍🌐 Investigando con búsqueda web:', question);
+
+  let allWebResults = [];
+  let accumulatedContext = '';
+  let currentAnswer = '';
+
+  // Construir contexto de hallazgos previos
+  let contextFromFindings = '';
+  if (previousFindings.length > 0) {
+    contextFromFindings = `\n\nContexto de hallazgos previos:\n${previousFindings.map((f, i) => `${i + 1}. ${f}`).join('\n')}`;
+  }
+
+  // CICLO ITERATIVO: Buscar → Razonar → ¿Necesita más? → Buscar...
+  for (let iteration = 0; iteration < MAX_WEB_SEARCH_ITERATIONS; iteration++) {
+    if (signal?.aborted) throw new DOMException('Cancelado', 'AbortError');
+
+    // Determinar qué buscar
+    let searchQuery = question;
+    if (iteration > 0 && currentAnswer) {
+      // En iteraciones posteriores, generar una búsqueda más específica
+      const refinePrompt = `Basándote en esta información parcial sobre "${question}":
+${currentAnswer.substring(0, 500)}...
+
+¿Qué término de búsqueda específico ayudaría a completar o profundizar esta investigación? 
+Responde SOLO con el término de búsqueda, sin explicaciones.`;
+
+      try {
+        const refineResponse = await fetch(`${API_BASE}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: state.currentModel,
+            stream: false,
+            messages: [{ role: 'user', content: refinePrompt }],
+            options: { temperature: 0.3, num_ctx: 2048 }
+          }),
+          signal
+        });
+        if (refineResponse.ok) {
+          const refineData = await refineResponse.json();
+          const refinedQuery = refineData.message?.content?.trim();
+          if (refinedQuery && refinedQuery.length < 100) {
+            searchQuery = refinedQuery;
+          }
+        }
+      } catch (e) {
+        console.log('Usando búsqueda original');
+      }
+    }
+
+    // Notificar progreso
+    if (progressCallback) {
+      progressCallback(`🌐 Buscando: "${searchQuery.substring(0, 50)}..."`);
+    }
+
+    // PASO 1: Buscar en la web
+    console.log(`🔍 Iteración ${iteration + 1}: Buscando "${searchQuery}"`);
+    const searchResults = await searchWeb(searchQuery);
+
+    if (searchResults && searchResults.organic) {
+      // Guardar resultados para las fuentes
+      const newSources = [];
+      searchResults.organic.forEach(result => {
+        if (!allWebResults.find(r => r.link === result.link)) {
+          allWebResults.push(result);
+          newSources.push(result);
+        }
+      });
+
+      // Notificar nuevas fuentes encontradas para mostrar visualmente
+      if (progressCallback && newSources.length > 0) {
+        progressCallback(`🌐 Encontradas ${newSources.length} fuentes nuevas`, { sources: newSources });
+      }
+
+      // Formatear contexto de búsqueda
+      const webContext = formatSearchResults(searchResults);
+      accumulatedContext += `\n\n--- Búsqueda ${iteration + 1}: "${searchQuery}" ---\n${webContext}`;
+    }
+
+    // PASO 2: Razonar con el contexto acumulado
+    if (progressCallback) {
+      progressCallback(`🧠 Analizando resultados (iteración ${iteration + 1}/${MAX_WEB_SEARCH_ITERATIONS})...`);
+    }
+
+    const investigatePrompt = `Eres un investigador experto. Investiga la siguiente pregunta usando la información de búsqueda web proporcionada:
+
+PREGUNTA: "${question}"
+${contextFromFindings}
+
+INFORMACIÓN DE BÚSQUEDA WEB:
+${accumulatedContext}
+
+INSTRUCCIONES:
+1. Analiza cuidadosamente toda la información de las fuentes web
+2. Proporciona una respuesta COMPLETA y bien fundamentada
+3. Incluye datos específicos, estadísticas o ejemplos de las fuentes
+4. Si la información es sobre precios, incluye rangos de precios encontrados
+5. Cita las fuentes cuando sea relevante
+6. Estructura tu respuesta de forma clara
+
+Proporciona tu análisis completo:`;
+
+    try {
+      const response = await fetch(`${API_BASE}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: state.currentModel,
+          stream: false,
+          messages: [{ role: 'user', content: investigatePrompt }],
+          options: { temperature: 0.4, num_ctx: 16384 }
+        }),
+        signal
+      });
+
+      if (!response.ok) throw new Error('Error en investigación');
+
+      const data = await response.json();
+      currentAnswer = data.message?.content || '';
+
+      // Notificar el pensamiento de la IA para mostrar en el panel
+      if (progressCallback && currentAnswer) {
+        progressCallback(`🧠 Análisis completado`, { thinking: currentAnswer, cycle: iteration + 1 });
+      }
+
+    } catch (error) {
+      if (error.name === 'AbortError') throw error;
+      console.error('Error investigando:', error);
+    }
+  }
+
+  return {
+    question: question,
+    answer: currentAnswer,
+    keyPoints: extractKeyPoints(currentAnswer),
+    sources: allWebResults.slice(0, 8), // Máximo 8 fuentes por pregunta
+    webSearchPerformed: true
+  };
+}
+
+// Generar informe PDF profesional
+async function generateResearchPDF(query, findings, synthesis, allSources) {
+  console.log('📄 Generando informe PDF...');
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  const contentWidth = pageWidth - (margin * 2);
+  let yPos = margin;
+
+  // Función auxiliar para añadir nueva página si es necesario
+  const checkNewPage = (requiredSpace = 20) => {
+    if (yPos + requiredSpace > pageHeight - margin) {
+      doc.addPage();
+      yPos = margin;
+      return true;
+    }
+    return false;
+  };
+
+  // Función para añadir texto con wrap automático
+  const addWrappedText = (text, fontSize, isBold = false, color = [51, 51, 51]) => {
+    doc.setFontSize(fontSize);
+    doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+    doc.setTextColor(...color);
+
+    const lines = doc.splitTextToSize(text, contentWidth);
+    lines.forEach(line => {
+      checkNewPage();
+      doc.text(line, margin, yPos);
+      yPos += fontSize * 0.4;
+    });
+    yPos += 2;
+  };
+
+  // ===== PORTADA =====
+  // Fondo de cabecera
+  doc.setFillColor(45, 55, 72);
+  doc.rect(0, 0, pageWidth, 80, 'F');
+
+  // Título principal
+  doc.setFontSize(28);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  const titleLines = doc.splitTextToSize('INFORME DE INVESTIGACIÓN', contentWidth);
+  doc.text(titleLines, pageWidth / 2, 35, { align: 'center' });
+
+  // Tema de investigación
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(200, 200, 200);
+  const queryLines = doc.splitTextToSize(query, contentWidth - 20);
+  doc.text(queryLines, pageWidth / 2, 55, { align: 'center' });
+
+  // Fecha
+  doc.setFontSize(10);
+  doc.setTextColor(180, 180, 180);
+  const dateStr = new Date().toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  doc.text(`Generado: ${dateStr}`, pageWidth / 2, 70, { align: 'center' });
+
+  // Estadísticas
+  yPos = 95;
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin, yPos - 5, contentWidth, 25, 3, 3, 'F');
+
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`${findings.length} temas investigados`, margin + 10, yPos + 5);
+  doc.text(`${allSources.length} fuentes web consultadas`, margin + 70, yPos + 5);
+  doc.text(`Informe completo`, margin + 145, yPos + 5);
+
+  yPos = 130;
+
+  // ===== RESUMEN EJECUTIVO =====
+  doc.setFillColor(59, 130, 246);
+  doc.rect(margin, yPos, 4, 20, 'F');
+
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 58, 138);
+  doc.text('Resumen Ejecutivo', margin + 10, yPos + 7);
+  yPos += 15;
+
+  // Extraer primeras líneas de la síntesis como resumen
+  const summaryText = synthesis.split('\n').slice(0, 5).join(' ').substring(0, 500) + '...';
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(60, 60, 60);
+  const summaryLines = doc.splitTextToSize(summaryText, contentWidth - 10);
+  summaryLines.forEach(line => {
+    checkNewPage();
+    doc.text(line, margin + 10, yPos);
+    yPos += 5;
+  });
+
+  yPos += 10;
+
+  // ===== HALLAZGOS DETALLADOS =====
+  findings.forEach((finding, index) => {
+    checkNewPage(40);
+
+    // Cabecera de sección
+    doc.setFillColor(249, 250, 251);
+    doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(55, 65, 81);
+    doc.text(`${index + 1}. ${finding.question.substring(0, 80)}`, margin + 5, yPos + 8);
+    yPos += 18;
+
+    // Contenido del hallazgo
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(75, 85, 99);
+
+    // Limpiar markdown del answer
+    let cleanAnswer = finding.answer
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/`/g, '')
+      .replace(/\n\n+/g, '\n');
+
+    // Limitar longitud
+    if (cleanAnswer.length > 1500) {
+      cleanAnswer = cleanAnswer.substring(0, 1500) + '...';
+    }
+
+    const answerLines = doc.splitTextToSize(cleanAnswer, contentWidth - 5);
+    answerLines.forEach(line => {
+      if (checkNewPage()) {
+        // Añadir indicador de continuación
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text('(continuación)', margin, yPos - 5);
+        doc.setFontSize(10);
+        doc.setTextColor(75, 85, 99);
+      }
+      doc.text(line, margin + 5, yPos);
+      yPos += 4.5;
+    });
+
+    // Fuentes de este hallazgo
+    if (finding.sources && finding.sources.length > 0) {
+      yPos += 3;
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Fuentes:', margin + 5, yPos);
+      yPos += 4;
+
+      finding.sources.slice(0, 3).forEach(source => {
+        checkNewPage();
+        let domain = 'web';
+        try { domain = new URL(source.link).hostname; } catch (e) { }
+        doc.setTextColor(59, 130, 246);
+        doc.text(`• ${domain}`, margin + 8, yPos);
+        yPos += 3.5;
+      });
+    }
+
+    yPos += 8;
+  });
+
+  // ===== SÍNTESIS COMPLETA =====
+  doc.addPage();
+  yPos = margin;
+
+  doc.setFillColor(16, 185, 129);
+  doc.rect(margin, yPos, 4, 15, 'F');
+
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(6, 78, 59);
+  doc.text('Síntesis y Conclusiones', margin + 10, yPos + 10);
+  yPos += 25;
+
+  // Limpiar y añadir síntesis
+  let cleanSynthesis = synthesis
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/`/g, '');
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(55, 65, 81);
+
+  const synthesisLines = doc.splitTextToSize(cleanSynthesis, contentWidth - 5);
+  synthesisLines.forEach(line => {
+    checkNewPage();
+    doc.text(line, margin + 5, yPos);
+    yPos += 4.5;
+  });
+
+  // ===== FUENTES BIBLIOGRÁFICAS =====
+  doc.addPage();
+  yPos = margin;
+
+  doc.setFillColor(139, 92, 246);
+  doc.rect(margin, yPos, 4, 15, 'F');
+
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(91, 33, 182);
+  doc.text('Fuentes Consultadas', margin + 10, yPos + 10);
+  yPos += 25;
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+
+  // Eliminar duplicados de fuentes
+  const uniqueSources = [];
+  const seenLinks = new Set();
+  allSources.forEach(source => {
+    if (!seenLinks.has(source.link)) {
+      seenLinks.add(source.link);
+      uniqueSources.push(source);
+    }
+  });
+
+  uniqueSources.forEach((source, index) => {
+    checkNewPage(15);
+
+    let domain = 'web';
+    try { domain = new URL(source.link).hostname; } catch (e) { }
+
+    // Número
+    doc.setTextColor(139, 92, 246);
+    doc.text(`[${index + 1}]`, margin, yPos);
+
+    // Título
+    doc.setTextColor(30, 41, 59);
+    doc.setFont('helvetica', 'bold');
+    const titleText = (source.title || 'Sin título').substring(0, 70);
+    doc.text(titleText, margin + 10, yPos);
+    yPos += 4;
+
+    // Dominio
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text(domain, margin + 10, yPos);
+    yPos += 4;
+
+    // URL (truncada)
+    doc.setTextColor(59, 130, 246);
+    doc.setFontSize(8);
+    const urlText = source.link.length > 80 ? source.link.substring(0, 77) + '...' : source.link;
+    doc.text(urlText, margin + 10, yPos);
+    doc.setFontSize(9);
+    yPos += 7;
+  });
+
+  // ===== PIE DE PÁGINA =====
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.text('Generado con Ollama Web - Investigación Profunda', margin, pageHeight - 10);
+  }
+
+  // Generar URL del PDF
+  const pdfBlob = doc.output('blob');
+  const pdfUrl = URL.createObjectURL(pdfBlob);
+
+  // Guardar referencia para descarga
+  webResearchCurrentPdfUrl = pdfUrl;
+
+  return pdfUrl;
+}
+
+// Mostrar panel de informe PDF
+function showResearchReportPanel(pdfUrl, query, sourcesCount) {
+  const panel = document.getElementById('research-report-panel');
+  const iframe = document.getElementById('research-pdf-viewer');
+  const titleText = document.getElementById('research-report-title-text');
+  const dateSpan = document.getElementById('research-report-date');
+  const sourcesSpan = document.getElementById('research-report-sources-count');
+
+  if (!panel || !iframe) return;
+
+  // Actualizar título y metadata
+  if (titleText) titleText.textContent = query.length > 40 ? query.substring(0, 40) + '...' : query;
+  if (dateSpan) dateSpan.textContent = `📅 ${new Date().toLocaleDateString('es-ES')}`;
+  if (sourcesSpan) sourcesSpan.textContent = `🌐 ${sourcesCount} fuentes`;
+
+  // Cargar PDF
+  iframe.src = pdfUrl;
+
+  // Mostrar panel
+  panel.style.display = 'flex';
+  document.body.classList.add('research-report-visible');
+
+  // Configurar eventos
+  document.getElementById('close-research-report')?.addEventListener('click', closeResearchReportPanel);
+  document.getElementById('download-research-pdf')?.addEventListener('click', downloadResearchPDF);
+}
+
+// Cerrar panel de informe
+function closeResearchReportPanel() {
+  const panel = document.getElementById('research-report-panel');
+  if (panel) {
+    panel.classList.add('closing');
+    setTimeout(() => {
+      panel.style.display = 'none';
+      panel.classList.remove('closing');
+      document.body.classList.remove('research-report-visible');
+    }, 300);
+  }
+}
+
+// Descargar PDF
+function downloadResearchPDF() {
+  if (!webResearchCurrentPdfUrl) return;
+
+  const link = document.createElement('a');
+  link.href = webResearchCurrentPdfUrl;
+  link.download = `informe-investigacion-${new Date().toISOString().split('T')[0]}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// Regenerar y mostrar PDF desde datos guardados (para cuando se cambia de chat)
+window.regenerateAndShowPDF = function (messageId) {
+  // Buscar el mensaje en la conversación actual
+  const conversation = state.conversations[state.activeId];
+  if (!conversation) return;
+
+  const message = conversation.messages.find(m => m.id === messageId);
+  if (!message || !message.webResearchData) {
+    console.error('No se encontraron datos de investigación para regenerar el PDF');
+    return;
+  }
+
+  const data = message.webResearchData;
+
+  // Regenerar el PDF
+  try {
+    const pdfUrl = generateResearchPDF(data.query, data.findings, data.synthesisContent, data.sources);
+    showResearchReportPanel(pdfUrl, data.query, data.sources.length);
+  } catch (error) {
+    console.error('Error al regenerar el PDF:', error);
+  }
+};
+
+// Función principal de investigación web con generación de PDF
+async function executeWebResearchWithPDF(userQuery, conversation) {
+  console.log('🔬🌐 Iniciando Investigación Web Profunda:', userQuery);
+
+  // Resetear fuentes
+  webResearchAllSources = [];
+
+  // Configurar control de cancelación
+  deepResearchAbortController = new AbortController();
+  deepResearchActiveConversationId = conversation.id;
+  deepResearchStartTime = Date.now();
+  deepResearchStepTimes = [];
+  deepResearchStepsData = [];
+  deepResearchFindingsData = [];
+  const signal = deepResearchAbortController.signal;
+
+  // Bloquear inputs
+  lockInputsDuringResearch();
+
+  const checkCancelled = () => {
+    if (signal.aborted) {
+      throw new DOMException('Investigación web cancelada', 'AbortError');
+    }
+  };
+
+  // Crear mensaje del usuario
+  const userMessage = createMessage('user', `🔬🌐 Investigación web: ${userQuery}`);
+  conversation.messages.push(userMessage);
+  touchConversation(conversation.id);
+
+  showChatState();
+  appendMessageElement(userMessage);
+  updateConversationTitleFromContent(conversation);
+
+  // Crear mensaje del asistente con progreso
+  const assistantMessage = createMessage('assistant', '');
+  assistantMessage.isDeepResearchInProgress = true;
+  conversation.messages.push(assistantMessage);
+
+  deepResearchMessageId = assistantMessage.id;
+  const { bubble } = appendMessageElement(assistantMessage);
+
+  // Crear contenedor de progreso
+  const progressContainer = createDeepResearchProgressElement();
+  bubble.innerHTML = '';
+  bubble.appendChild(progressContainer);
+
+  deepResearchCurrentContainer = progressContainer;
+
+  const findings = [];
+
+  try {
+    checkCancelled();
+
+    // Fase 1: Generar plan de investigación
+    updateDeepResearchProgress(progressContainer, 5, '📋 Generando plan de investigación...');
+    const plan = await generateResearchPlan(userQuery, signal);
+
+    checkCancelled();
+
+    // Mostrar pasos del plan
+    updateDeepResearchProgress(progressContainer, 10, `🎯 Investigando: ${plan.mainQuestion}`);
+
+    plan.subQuestions.forEach((q, i) => {
+      addResearchStep(progressContainer, {
+        id: q.id,
+        number: i + 1,
+        title: q.question,
+        description: `🌐 Buscará en la web`
+      }, i === 0, false);
+    });
+
+    // Fase 2: Investigar cada sub-pregunta CON BÚSQUEDA WEB
+    const totalSteps = plan.subQuestions.length;
+
+    for (let i = 0; i < plan.subQuestions.length; i++) {
+      checkCancelled();
+
+      const subQ = plan.subQuestions[i];
+      const stepStartTime = Date.now();
+
+      updateResearchStep(progressContainer, subQ.id, { isActive: true });
+      const currentProgress = 10 + ((i + 1) / totalSteps) * 60;
+
+      // Contador de fuentes para animación
+      let sourceIndex = 0;
+      let thinkingCycle = 0;
+
+      // Callback de progreso para mostrar estado de búsqueda, fuentes y pensamiento
+      const progressCallback = (status, data) => {
+        updateDeepResearchProgress(progressContainer, currentProgress, status);
+
+        // Si hay fuentes nuevas, añadirlas al grid visual
+        if (data && data.sources) {
+          data.sources.forEach(source => {
+            addWebSourceToGrid(progressContainer, source, sourceIndex++);
+          });
+          scrollChatToBottom();
+        }
+
+        // Si hay pensamiento de la IA, añadirlo al panel
+        if (data && data.thinking) {
+          thinkingCycle++;
+          addAIThinking(progressContainer, thinkingCycle, data.thinking);
+          scrollChatToBottom();
+        }
+      };
+
+      progressCallback(`🌐 Investigando con web: ${subQ.question.substring(0, 40)}...`);
+
+      // Investigar CON BÚSQUEDA WEB ITERATIVA
+      const result = await investigateSubQuestionWithWeb(
+        subQ.question,
+        findings.map(f => f.keyPoints).flat(),
+        signal,
+        progressCallback
+      );
+
+      // Registrar tiempo
+      deepResearchStepTimes.push(Date.now() - stepStartTime);
+
+      checkCancelled();
+
+      findings.push(result);
+
+      // Acumular fuentes
+      if (result.sources) {
+        webResearchAllSources.push(...result.sources);
+      }
+
+      // Mostrar hallazgos clave
+      result.keyPoints.slice(0, 2).forEach(point => {
+        addFinding(progressContainer, point);
+      });
+
+      updateResearchStep(progressContainer, subQ.id, {
+        isActive: false,
+        isCompleted: true,
+        description: `✅ ${result.sources?.length || 0} fuentes consultadas`
+      });
+
+      scrollChatToBottom();
+    }
+
+    // Fase 3: Sintetizar hallazgos
+    updateDeepResearchProgress(progressContainer, 85, '📝 Sintetizando hallazgos...');
+    checkCancelled();
+
+    const finalReport = await synthesizeFindings(userQuery, findings, signal);
+
+    // Fase 4: Generar PDF
+    updateDeepResearchProgress(progressContainer, 95, '📄 Generando informe PDF...');
+    checkCancelled();
+
+    const pdfUrl = await generateResearchPDF(userQuery, findings, finalReport, webResearchAllSources);
+
+    // Completar
+    updateDeepResearchProgress(progressContainer, 100, '✅ ¡Investigación completada!');
+
+    // Guardar resultado con datos para regenerar PDF
+    assistantMessage.content = finalReport;
+    assistantMessage.isDeepResearchInProgress = false;
+    assistantMessage.webResearchData = {
+      query: userQuery,
+      findings: findings,
+      sources: webResearchAllSources,
+      pdfGenerated: true,
+      synthesisContent: finalReport
+    };
+    persistState();
+
+    // Renderizar informe final
+    setTimeout(() => {
+      // Quitar flag de progreso
+      assistantMessage.isDeepResearchInProgress = false;
+
+      bubble.innerHTML = `
+        <div class="deep-research-report">
+          <div class="deep-research-report-header">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            Investigación web profunda • ${findings.length} temas • ${webResearchAllSources.length} fuentes
+          </div>
+        </div>
+        ${parseMarkdown(finalReport)}
+        <button class="generate-report-btn" onclick="event.stopPropagation(); regenerateAndShowPDF('${assistantMessage.id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          Ver informe PDF completo
+        </button>
+      `;
+
+      // Abrir panel de PDF automáticamente
+      showResearchReportPanel(pdfUrl, userQuery, webResearchAllSources.length);
+
+      // Añadir botón de copiar
+      const copyContainer = document.createElement('div');
+      copyContainer.className = 'copy-message-container';
+
+      const copyButton = document.createElement('button');
+      copyButton.className = 'copy-message-btn';
+      copyButton.title = 'Copiar informe';
+      copyButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+      copyButton.addEventListener('click', async () => {
+        await copyToClipboard(finalReport, copyButton);
+      });
+
+      const timeElement = document.createElement('span');
+      timeElement.className = 'message-time';
+      timeElement.textContent = formatTime(Date.now());
+
+      copyContainer.appendChild(copyButton);
+      copyContainer.appendChild(timeElement);
+      bubble.appendChild(copyContainer);
+
+      // Renderizar matemáticas
+      if (typeof renderMathInElement !== 'undefined') {
+        renderMathInElement(bubble, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false }
+          ],
+          throwOnError: false
+        });
+      }
+
+      renderConversationList();
+      scrollChatToBottom();
+    }, 1000);
+
+  } catch (error) {
+    assistantMessage.isDeepResearchInProgress = false;
+
+    if (error.name === 'AbortError') {
+      console.log('🛑 Investigación web cancelada');
+      assistantMessage.content = `⚠️ Investigación cancelada`;
+      if (bubble && document.body.contains(bubble)) {
+        bubble.innerHTML = parseMarkdown(assistantMessage.content);
+      }
+    } else {
+      console.error('Error en investigación web:', error);
+      assistantMessage.content = `⚠️ Error durante la investigación: ${error.message}`;
+      if (bubble && document.body.contains(bubble)) {
+        bubble.innerHTML = parseMarkdown(assistantMessage.content);
+      }
+    }
+    persistState();
+  } finally {
+    // Limpiar estado
+    deepResearchAbortController = null;
+    deepResearchActiveConversationId = null;
+    deepResearchStartTime = null;
+    deepResearchStepTimes = [];
+    deepResearchProgressState = null;
+    deepResearchMessageId = null;
+    deepResearchCurrentContainer = null;
+    deepResearchStepsData = [];
+    deepResearchFindingsData = [];
+    unlockInputsDuringResearch();
+
+    document.querySelectorAll('.research-indicator').forEach(el => el.remove());
+    const banner = document.getElementById('research-progress-banner');
+    if (banner) banner.remove();
+  }
+
+  // Desactivar modo después de completar
+  if (deepResearchMode) {
+    toggleDeepResearch();
+  }
+
+  return findings;
+}
+
+// Hacer funciones globales para el onclick
+window.showResearchReportPanel = showResearchReportPanel;
+window.closeResearchReportPanel = closeResearchReportPanel;
+window.downloadResearchPDF = downloadResearchPDF;
+
 async function handleSubmitWithDeepResearch(event) {
   event.preventDefault();
   if (state.loading) return;
@@ -10467,7 +11522,7 @@ async function handleSubmitWithDeepResearch(event) {
     autoResizeTextarea(activeInput);
 
     try {
-      await executeDeepResearch(prompt, conversation);
+      await executeWebResearchWithPDF(prompt, conversation);
     } catch (error) {
       console.error('Error en Deep Research:', error);
     } finally {
@@ -12626,7 +13681,7 @@ function initScoreCanvas() {
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    
+
     // Set canvas size to scaled dimensions
     canvas.width = svgWidth * scale;
     canvas.height = svgHeight * scale;
@@ -12635,7 +13690,7 @@ function initScoreCanvas() {
     const svgClone = svg.cloneNode(true);
     svgClone.setAttribute('width', svgWidth * scale);
     svgClone.setAttribute('height', svgHeight * scale);
-    
+
     const svgData = new XMLSerializer().serializeToString(svgClone);
     const img = new Image();
 
@@ -12643,11 +13698,11 @@ function initScoreCanvas() {
       // Fill white background
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       // Enable smooth rendering
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      
+
       // Draw the image
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
@@ -12833,7 +13888,7 @@ async function playScore() {
     if (!existingSvg || !currentVisualObj) {
       // Get actual width after layout
       const containerWidth = previewContainer.clientWidth || 400;
-      
+
       // Need to render - use the SAME options as renderScorePreview to avoid visual bugs
       currentVisualObj = ABCJS.renderAbc(previewContainer, doc.abc, {
         responsive: 'resize',
@@ -12847,7 +13902,7 @@ async function playScore() {
         foregroundColor: '#000000',
         selectionColor: '#ff7744'
       })[0];
-      
+
       // Force solid colors on SVG elements
       const svg = previewContainer.querySelector('svg');
       if (svg) {
