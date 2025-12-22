@@ -2608,6 +2608,32 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   font-style: italic;
 }
 
+/* Badge de investigación web */
+.web-research-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.1));
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(147, 197, 253, 0.95);
+  margin-bottom: 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.web-research-badge svg {
+  color: rgba(96, 165, 250, 0.9);
+  flex-shrink: 0;
+}
+
+.web-research-badge span {
+  letter-spacing: 0.02em;
+}
+
 /* Contenedor de botón de copiar y hora */
 .copy-message-container {
   margin-top: 8px;

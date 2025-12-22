@@ -2038,6 +2038,20 @@ function appendMessageElement(message) {
         });
       }
     } else {
+      // Si es un mensaje del usuario con investigación web, añadir badge
+      if (message.role === 'user' && message.isWebResearch) {
+        content += `
+          <div class="web-research-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="10" cy="10" r="6" />
+              <path d="M14.5 14.5L20 20" stroke-linecap="round" />
+              <circle cx="12" cy="12" r="10" opacity="0.3"/>
+              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" opacity="0.3"/>
+            </svg>
+            <span>Investigación Web Profunda</span>
+          </div>
+        `;
+      }
       content += parseMarkdown(message.content);
     }
   }
@@ -11321,8 +11335,9 @@ async function executeWebResearchWithPDF(userQuery, conversation) {
     }
   };
 
-  // Crear mensaje del usuario
-  const userMessage = createMessage('user', `🔬🌐 Investigación web: ${userQuery}`);
+  // Crear mensaje del usuario con badge de investigación web
+  const userMessage = createMessage('user', userQuery);
+  userMessage.isWebResearch = true; // Marcar como investigación web
   conversation.messages.push(userMessage);
   touchConversation(conversation.id);
 
