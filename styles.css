@@ -2397,6 +2397,9 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   line-height: 1.7;
   color: rgba(255, 255, 255, 0.9);
   word-wrap: break-word;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  box-sizing: border-box;
 }
 
 .message-bubble h1,
@@ -4698,6 +4701,9 @@ input:checked+.slider:before {
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .deep-research-header {
@@ -9433,11 +9439,14 @@ body.score-canvas-visible #chat-state {
   height: 100vh;
   background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
   border-left: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
+  display: none;
   flex-direction: column;
   z-index: 1000;
-  animation: slideInFromRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5);
+}
+
+.research-report-panel[style*="display: flex"] {
+  animation: slideInFromRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes slideInFromRight {
@@ -9560,19 +9569,40 @@ body.score-canvas-visible #chat-state {
 }
 
 /* Ajustar layout cuando el panel PDF está visible - SPLIT VIEW */
-body.research-report-visible .layout {
-  grid-template-columns: 260px 1fr !important;
+body.research-report-visible {
+  overflow: hidden;
 }
 
-body.research-report-visible.sidebar-minimized .layout {
-  grid-template-columns: 60px 1fr !important;
+body.research-report-visible .sidebar {
+  width: 260px;
+  max-width: 260px;
+}
+
+body.research-report-visible.sidebar-minimized .sidebar {
+  width: 60px;
+  max-width: 60px;
+}
+
+body.research-report-visible .layout {
+  width: 50vw;
+  max-width: 50vw;
+  transition: all 0.3s ease;
 }
 
 /* Reducir el ancho del contenedor principal cuando el PDF está visible */
 body.research-report-visible .main-column {
-  width: 50% !important;
-  max-width: 50% !important;
+  width: 100% !important;
+  max-width: 100% !important;
   transition: all 0.3s ease;
+  margin-right: 0 !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body.research-report-visible .chat-area {
+  max-width: 100% !important;
+  overflow-x: hidden;
+  padding-right: 16px;
 }
 
 body.research-report-visible .chat-wrapper {
@@ -9584,10 +9614,27 @@ body.research-report-visible .message-container {
   padding-right: 20px;
 }
 
+body.research-report-visible .message-bubble {
+  max-width: 100% !important;
+  overflow-x: hidden;
+}
+
+body.research-report-visible #chat-state,
+body.research-report-visible #empty-state {
+  width: 100%;
+  max-width: 100%;
+}
+
 /* El panel ocupa el 50% restante */
 body.research-report-visible .research-report-panel {
-  width: 50% !important;
-  max-width: 50% !important;
+  width: 50vw !important;
+  max-width: 50vw !important;
+  position: fixed !important;
+  right: 0 !important;
+  left: auto !important;
+  top: 0 !important;
+  height: 100vh;
+  z-index: 999;
 }
 
 /* Estado de carga del informe */
@@ -9998,6 +10045,9 @@ body.research-report-visible .research-report-panel {
   border: 1px solid rgba(var(--theme-primary-rgb), 0.2);
   border-radius: 12px;
   backdrop-filter: blur(8px);
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .thinking-header {
@@ -10029,6 +10079,8 @@ body.research-report-visible .research-report-panel {
   gap: 12px;
   max-height: 400px;
   overflow-y: auto;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .thinking-item {
@@ -10037,6 +10089,9 @@ body.research-report-visible .research-report-panel {
   border-radius: 10px;
   border-left: 3px solid var(--theme-primary);
   position: relative;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .thinking-item-header {

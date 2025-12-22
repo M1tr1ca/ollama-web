@@ -10858,15 +10858,22 @@ Proporciona tu análisis completo:`;
 }
 
 // Generar informe PDF profesional
-async function generateResearchPDF(query, findings, synthesis, allSources) {
+function generateResearchPDF(query, findings, synthesis, allSources) {
   console.log('📄 Generando informe PDF...');
+  
+  try {
+    if (!window.jspdf) {
+      throw new Error('jsPDF no está cargado');
+    }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4'
-  });
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+    
+    console.log('✅ jsPDF inicializado correctamente');
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -11133,41 +11140,93 @@ async function generateResearchPDF(query, findings, synthesis, allSources) {
     doc.text('Generado con Ollama Web - Investigación Profunda', margin, pageHeight - 10);
   }
 
-  // Generar URL del PDF
-  const pdfBlob = doc.output('blob');
-  const pdfUrl = URL.createObjectURL(pdfBlob);
+    // Generar URL del PDF
+    console.log('📦 Generando blob del PDF...');
+    const pdfBlob = doc.output('blob');
+    console.log('✅ Blob generado:', pdfBlob.size, 'bytes');
+    
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    console.log('✅ URL del PDF creada:', pdfUrl);
 
-  // Guardar referencia para descarga
-  webResearchCurrentPdfUrl = pdfUrl;
+    // Guardar referencia para descarga
+    webResearchCurrentPdfUrl = pdfUrl;
 
-  return pdfUrl;
+    return pdfUrl;
+  } catch (error) {
+    console.error('❌ Error al generar PDF:', error);
+    throw error;
+  }
 }
 
 // Mostrar panel de informe PDF
 function showResearchReportPanel(pdfUrl, query, sourcesCount) {
+  console.log('📄 Mostrando panel de informe PDF');
+  
   const panel = document.getElementById('research-report-panel');
   const iframe = document.getElementById('research-pdf-viewer');
   const titleText = document.getElementById('research-report-title-text');
   const dateSpan = document.getElementById('research-report-date');
   const sourcesSpan = document.getElementById('research-report-sources-count');
 
-  if (!panel || !iframe) return;
+  if (!panel) {
+    console.error('❌ No se encontró el elemento research-report-panel');
+    return;
+  }
+  
+  if (!iframe) {
+    console.error('❌ No se encontró el elemento research-pdf-viewer');
+    return;
+  }
+
+  // Si el panel ya está visible con el mismo PDF, no hacer nada
+  if (panel.style.display === 'flex' && iframe.src === pdfUrl) {
+    console.log('ℹ️ El panel ya está mostrando este PDF');
+    return;
+  }
 
   // Actualizar título y metadata
   if (titleText) titleText.textContent = query.length > 40 ? query.substring(0, 40) + '...' : query;
   if (dateSpan) dateSpan.textContent = `📅 ${new Date().toLocaleDateString('es-ES')}`;
   if (sourcesSpan) sourcesSpan.textContent = `🌐 ${sourcesCount} fuentes`;
 
+  // Guardar URL del PDF actual
+  webResearchCurrentPdfUrl = pdfUrl;
+
+  // Añadir listener de carga del iframe
+  iframe.onload = function() {
+    console.log('✅ PDF cargado correctamente en el iframe');
+  };
+  
+  iframe.onerror = function(error) {
+    console.error('❌ Error al cargar el PDF en el iframe:', error);
+  };
+
   // Cargar PDF
+  console.log('📥 Cargando PDF en iframe:', pdfUrl);
   iframe.src = pdfUrl;
 
   // Mostrar panel
   panel.style.display = 'flex';
   document.body.classList.add('research-report-visible');
+  console.log('✅ Panel mostrado, clase añadida al body');
 
-  // Configurar eventos
-  document.getElementById('close-research-report')?.addEventListener('click', closeResearchReportPanel);
-  document.getElementById('download-research-pdf')?.addEventListener('click', downloadResearchPDF);
+  // Remover listeners anteriores para evitar duplicados
+  const closeBtn = document.getElementById('close-research-report');
+  const downloadBtn = document.getElementById('download-research-pdf');
+  
+  if (closeBtn) {
+    const newCloseBtn = closeBtn.cloneNode(true);
+    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+    newCloseBtn.addEventListener('click', closeResearchReportPanel);
+    console.log('✅ Botón de cerrar configurado');
+  }
+  
+  if (downloadBtn) {
+    const newDownloadBtn = downloadBtn.cloneNode(true);
+    downloadBtn.parentNode.replaceChild(newDownloadBtn, downloadBtn);
+    newDownloadBtn.addEventListener('click', downloadResearchPDF);
+    console.log('✅ Botón de descarga configurado');
+  }
 }
 
 // Cerrar panel de informe
@@ -11197,24 +11256,43 @@ function downloadResearchPDF() {
 
 // Regenerar y mostrar PDF desde datos guardados (para cuando se cambia de chat)
 window.regenerateAndShowPDF = function (messageId) {
+  console.log('🔄 Regenerando PDF para mensaje:', messageId);
+  
   // Buscar el mensaje en la conversación actual
   const conversation = state.conversations[state.activeId];
-  if (!conversation) return;
+  if (!conversation) {
+    console.error('No se encontró la conversación activa');
+    return;
+  }
 
   const message = conversation.messages.find(m => m.id === messageId);
-  if (!message || !message.webResearchData) {
-    console.error('No se encontraron datos de investigación para regenerar el PDF');
+  if (!message) {
+    console.error('No se encontró el mensaje con ID:', messageId);
+    return;
+  }
+  
+  if (!message.webResearchData) {
+    console.error('El mensaje no tiene datos de investigación:', message);
     return;
   }
 
   const data = message.webResearchData;
+  console.log('📊 Datos de investigación encontrados:', {
+    query: data.query,
+    findings: data.findings?.length || 0,
+    sources: data.sources?.length || 0
+  });
 
-  // Regenerar el PDF
   try {
+    // Generar el PDF
     const pdfUrl = generateResearchPDF(data.query, data.findings, data.synthesisContent, data.sources);
+    console.log('✅ PDF generado correctamente:', pdfUrl);
+    
+    // Mostrar el panel
     showResearchReportPanel(pdfUrl, data.query, data.sources.length);
   } catch (error) {
-    console.error('Error al regenerar el PDF:', error);
+    console.error('❌ Error al regenerar el PDF:', error);
+    alert('Error al generar el PDF: ' + error.message);
   }
 };
 
