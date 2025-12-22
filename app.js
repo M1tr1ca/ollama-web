@@ -6252,7 +6252,6 @@ function applyDyslexicFont(enabled) {
 
 function updateGreeting() {
   const greetingElement = document.getElementById('greeting-text');
-  const subtitleElement = document.getElementById('greeting-subtitle');
 
   if (!greetingElement) return;
 
@@ -6272,18 +6271,12 @@ function updateGreeting() {
     }
 
     const translated = window.translationManager.translate(greetingKey, { name: firstName });
-    greetingElement.innerHTML = translated;
-
-    if (subtitleElement) {
-      subtitleElement.textContent = window.translationManager.translate('greeting.subtitle');
-    }
+    // Wrap with logo image and proper structure
+    greetingElement.innerHTML = `<img src="/assets/Logo.png" alt="" class="greeting-logo" /><span class="greeting-message">${translated}</span>`;
   } else {
     // Fallback
-    const { greeting, subtitle } = getGreetingMessage();
-    greetingElement.innerHTML = `${greeting}, <span class="user-name">${firstName}</span>`;
-    if (subtitleElement) {
-      subtitleElement.textContent = subtitle;
-    }
+    const { greeting } = getGreetingMessage();
+    greetingElement.innerHTML = `<img src="/assets/Logo.png" alt="" class="greeting-logo" /><span class="greeting-message">${greeting}, </span><span class="user-name">${firstName}</span>`;
   }
 }
 
@@ -10874,7 +10867,7 @@ Proporciona tu análisis completo:`;
 // Generar informe PDF profesional
 function generateResearchPDF(query, findings, synthesis, allSources) {
   console.log('📄 Generando informe PDF...');
-  
+
   try {
     if (!window.jspdf) {
       throw new Error('jsPDF no está cargado');
@@ -10886,279 +10879,279 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
       unit: 'mm',
       format: 'a4'
     });
-    
+
     console.log('✅ jsPDF inicializado correctamente');
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 20;
-  const contentWidth = pageWidth - (margin * 2);
-  let yPos = margin;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const contentWidth = pageWidth - (margin * 2);
+    let yPos = margin;
 
-  // Función auxiliar para añadir nueva página si es necesario
-  const checkNewPage = (requiredSpace = 20) => {
-    if (yPos + requiredSpace > pageHeight - margin) {
-      doc.addPage();
-      yPos = margin;
-      return true;
-    }
-    return false;
-  };
+    // Función auxiliar para añadir nueva página si es necesario
+    const checkNewPage = (requiredSpace = 20) => {
+      if (yPos + requiredSpace > pageHeight - margin) {
+        doc.addPage();
+        yPos = margin;
+        return true;
+      }
+      return false;
+    };
 
-  // Función para añadir texto con wrap automático
-  const addWrappedText = (text, fontSize, isBold = false, color = [51, 51, 51]) => {
-    doc.setFontSize(fontSize);
-    doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-    doc.setTextColor(...color);
+    // Función para añadir texto con wrap automático
+    const addWrappedText = (text, fontSize, isBold = false, color = [51, 51, 51]) => {
+      doc.setFontSize(fontSize);
+      doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+      doc.setTextColor(...color);
 
-    const lines = doc.splitTextToSize(text, contentWidth);
-    lines.forEach(line => {
-      checkNewPage();
-      doc.text(line, margin, yPos);
-      yPos += fontSize * 0.4;
-    });
-    yPos += 2;
-  };
+      const lines = doc.splitTextToSize(text, contentWidth);
+      lines.forEach(line => {
+        checkNewPage();
+        doc.text(line, margin, yPos);
+        yPos += fontSize * 0.4;
+      });
+      yPos += 2;
+    };
 
-  // ===== PORTADA =====
-  // Fondo de cabecera
-  doc.setFillColor(45, 55, 72);
-  doc.rect(0, 0, pageWidth, 80, 'F');
+    // ===== PORTADA =====
+    // Fondo de cabecera
+    doc.setFillColor(45, 55, 72);
+    doc.rect(0, 0, pageWidth, 80, 'F');
 
-  // Título principal
-  doc.setFontSize(28);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  const titleLines = doc.splitTextToSize('INFORME DE INVESTIGACIÓN', contentWidth);
-  doc.text(titleLines, pageWidth / 2, 35, { align: 'center' });
-
-  // Tema de investigación
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(200, 200, 200);
-  const queryLines = doc.splitTextToSize(query, contentWidth - 20);
-  doc.text(queryLines, pageWidth / 2, 55, { align: 'center' });
-
-  // Fecha
-  doc.setFontSize(10);
-  doc.setTextColor(180, 180, 180);
-  const dateStr = new Date().toLocaleDateString('es-ES', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-  doc.text(`Generado: ${dateStr}`, pageWidth / 2, 70, { align: 'center' });
-
-  // Estadísticas
-  yPos = 95;
-  doc.setFillColor(248, 250, 252);
-  doc.roundedRect(margin, yPos - 5, contentWidth, 25, 3, 3, 'F');
-
-  doc.setFontSize(10);
-  doc.setTextColor(100, 100, 100);
-  doc.text(`${findings.length} temas investigados`, margin + 10, yPos + 5);
-  doc.text(`${allSources.length} fuentes web consultadas`, margin + 70, yPos + 5);
-  doc.text(`Informe completo`, margin + 145, yPos + 5);
-
-  yPos = 130;
-
-  // ===== RESUMEN EJECUTIVO =====
-  doc.setFillColor(59, 130, 246);
-  doc.rect(margin, yPos, 4, 20, 'F');
-
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 58, 138);
-  doc.text('Resumen Ejecutivo', margin + 10, yPos + 7);
-  yPos += 15;
-
-  // Extraer primeras líneas de la síntesis como resumen
-  const summaryText = synthesis.split('\n').slice(0, 5).join(' ').substring(0, 500) + '...';
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(60, 60, 60);
-  const summaryLines = doc.splitTextToSize(summaryText, contentWidth - 10);
-  summaryLines.forEach(line => {
-    checkNewPage();
-    doc.text(line, margin + 10, yPos);
-    yPos += 5;
-  });
-
-  yPos += 10;
-
-  // ===== HALLAZGOS DETALLADOS =====
-  findings.forEach((finding, index) => {
-    checkNewPage(40);
-
-    // Cabecera de sección
-    doc.setFillColor(249, 250, 251);
-    doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
-
-    doc.setFontSize(12);
+    // Título principal
+    doc.setFontSize(28);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(55, 65, 81);
-    doc.text(`${index + 1}. ${finding.question.substring(0, 80)}`, margin + 5, yPos + 8);
-    yPos += 18;
+    doc.setTextColor(255, 255, 255);
+    const titleLines = doc.splitTextToSize('INFORME DE INVESTIGACIÓN', contentWidth);
+    doc.text(titleLines, pageWidth / 2, 35, { align: 'center' });
 
-    // Contenido del hallazgo
-    doc.setFontSize(10);
+    // Tema de investigación
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(75, 85, 99);
+    doc.setTextColor(200, 200, 200);
+    const queryLines = doc.splitTextToSize(query, contentWidth - 20);
+    doc.text(queryLines, pageWidth / 2, 55, { align: 'center' });
 
-    // Limpiar markdown del answer
-    let cleanAnswer = finding.answer
+    // Fecha
+    doc.setFontSize(10);
+    doc.setTextColor(180, 180, 180);
+    const dateStr = new Date().toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    doc.text(`Generado: ${dateStr}`, pageWidth / 2, 70, { align: 'center' });
+
+    // Estadísticas
+    yPos = 95;
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, yPos - 5, contentWidth, 25, 3, 3, 'F');
+
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`${findings.length} temas investigados`, margin + 10, yPos + 5);
+    doc.text(`${allSources.length} fuentes web consultadas`, margin + 70, yPos + 5);
+    doc.text(`Informe completo`, margin + 145, yPos + 5);
+
+    yPos = 130;
+
+    // ===== RESUMEN EJECUTIVO =====
+    doc.setFillColor(59, 130, 246);
+    doc.rect(margin, yPos, 4, 20, 'F');
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 58, 138);
+    doc.text('Resumen Ejecutivo', margin + 10, yPos + 7);
+    yPos += 15;
+
+    // Extraer primeras líneas de la síntesis como resumen
+    const summaryText = synthesis.split('\n').slice(0, 5).join(' ').substring(0, 500) + '...';
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    const summaryLines = doc.splitTextToSize(summaryText, contentWidth - 10);
+    summaryLines.forEach(line => {
+      checkNewPage();
+      doc.text(line, margin + 10, yPos);
+      yPos += 5;
+    });
+
+    yPos += 10;
+
+    // ===== HALLAZGOS DETALLADOS =====
+    findings.forEach((finding, index) => {
+      checkNewPage(40);
+
+      // Cabecera de sección
+      doc.setFillColor(249, 250, 251);
+      doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(55, 65, 81);
+      doc.text(`${index + 1}. ${finding.question.substring(0, 80)}`, margin + 5, yPos + 8);
+      yPos += 18;
+
+      // Contenido del hallazgo
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(75, 85, 99);
+
+      // Limpiar markdown del answer
+      let cleanAnswer = finding.answer
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/`/g, '')
+        .replace(/\n\n+/g, '\n');
+
+      // Limitar longitud
+      if (cleanAnswer.length > 1500) {
+        cleanAnswer = cleanAnswer.substring(0, 1500) + '...';
+      }
+
+      const answerLines = doc.splitTextToSize(cleanAnswer, contentWidth - 5);
+      answerLines.forEach(line => {
+        if (checkNewPage()) {
+          // Añadir indicador de continuación
+          doc.setFontSize(8);
+          doc.setTextColor(150, 150, 150);
+          doc.text('(continuación)', margin, yPos - 5);
+          doc.setFontSize(10);
+          doc.setTextColor(75, 85, 99);
+        }
+        doc.text(line, margin + 5, yPos);
+        yPos += 4.5;
+      });
+
+      // Fuentes de este hallazgo
+      if (finding.sources && finding.sources.length > 0) {
+        yPos += 3;
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text('Fuentes:', margin + 5, yPos);
+        yPos += 4;
+
+        finding.sources.slice(0, 3).forEach(source => {
+          checkNewPage();
+          let domain = 'web';
+          try { domain = new URL(source.link).hostname; } catch (e) { }
+          doc.setTextColor(59, 130, 246);
+          doc.text(`• ${domain}`, margin + 8, yPos);
+          yPos += 3.5;
+        });
+      }
+
+      yPos += 8;
+    });
+
+    // ===== SÍNTESIS COMPLETA =====
+    doc.addPage();
+    yPos = margin;
+
+    doc.setFillColor(16, 185, 129);
+    doc.rect(margin, yPos, 4, 15, 'F');
+
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(6, 78, 59);
+    doc.text('Síntesis y Conclusiones', margin + 10, yPos + 10);
+    yPos += 25;
+
+    // Limpiar y añadir síntesis
+    let cleanSynthesis = synthesis
       .replace(/#{1,6}\s/g, '')
       .replace(/\*\*/g, '')
       .replace(/\*/g, '')
-      .replace(/`/g, '')
-      .replace(/\n\n+/g, '\n');
+      .replace(/`/g, '');
 
-    // Limitar longitud
-    if (cleanAnswer.length > 1500) {
-      cleanAnswer = cleanAnswer.substring(0, 1500) + '...';
-    }
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(55, 65, 81);
 
-    const answerLines = doc.splitTextToSize(cleanAnswer, contentWidth - 5);
-    answerLines.forEach(line => {
-      if (checkNewPage()) {
-        // Añadir indicador de continuación
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text('(continuación)', margin, yPos - 5);
-        doc.setFontSize(10);
-        doc.setTextColor(75, 85, 99);
-      }
+    const synthesisLines = doc.splitTextToSize(cleanSynthesis, contentWidth - 5);
+    synthesisLines.forEach(line => {
+      checkNewPage();
       doc.text(line, margin + 5, yPos);
       yPos += 4.5;
     });
 
-    // Fuentes de este hallazgo
-    if (finding.sources && finding.sources.length > 0) {
-      yPos += 3;
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text('Fuentes:', margin + 5, yPos);
+    // ===== FUENTES BIBLIOGRÁFICAS =====
+    doc.addPage();
+    yPos = margin;
+
+    doc.setFillColor(139, 92, 246);
+    doc.rect(margin, yPos, 4, 15, 'F');
+
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(91, 33, 182);
+    doc.text('Fuentes Consultadas', margin + 10, yPos + 10);
+    yPos += 25;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+
+    // Eliminar duplicados de fuentes
+    const uniqueSources = [];
+    const seenLinks = new Set();
+    allSources.forEach(source => {
+      if (!seenLinks.has(source.link)) {
+        seenLinks.add(source.link);
+        uniqueSources.push(source);
+      }
+    });
+
+    uniqueSources.forEach((source, index) => {
+      checkNewPage(15);
+
+      let domain = 'web';
+      try { domain = new URL(source.link).hostname; } catch (e) { }
+
+      // Número
+      doc.setTextColor(139, 92, 246);
+      doc.text(`[${index + 1}]`, margin, yPos);
+
+      // Título
+      doc.setTextColor(30, 41, 59);
+      doc.setFont('helvetica', 'bold');
+      const titleText = (source.title || 'Sin título').substring(0, 70);
+      doc.text(titleText, margin + 10, yPos);
       yPos += 4;
 
-      finding.sources.slice(0, 3).forEach(source => {
-        checkNewPage();
-        let domain = 'web';
-        try { domain = new URL(source.link).hostname; } catch (e) { }
-        doc.setTextColor(59, 130, 246);
-        doc.text(`• ${domain}`, margin + 8, yPos);
-        yPos += 3.5;
-      });
+      // Dominio
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text(domain, margin + 10, yPos);
+      yPos += 4;
+
+      // URL (truncada)
+      doc.setTextColor(59, 130, 246);
+      doc.setFontSize(8);
+      const urlText = source.link.length > 80 ? source.link.substring(0, 77) + '...' : source.link;
+      doc.text(urlText, margin + 10, yPos);
+      doc.setFontSize(9);
+      yPos += 7;
+    });
+
+    // ===== PIE DE PÁGINA =====
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      doc.text('Generado con Ollama Web - Investigación Profunda', margin, pageHeight - 10);
     }
-
-    yPos += 8;
-  });
-
-  // ===== SÍNTESIS COMPLETA =====
-  doc.addPage();
-  yPos = margin;
-
-  doc.setFillColor(16, 185, 129);
-  doc.rect(margin, yPos, 4, 15, 'F');
-
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(6, 78, 59);
-  doc.text('Síntesis y Conclusiones', margin + 10, yPos + 10);
-  yPos += 25;
-
-  // Limpiar y añadir síntesis
-  let cleanSynthesis = synthesis
-    .replace(/#{1,6}\s/g, '')
-    .replace(/\*\*/g, '')
-    .replace(/\*/g, '')
-    .replace(/`/g, '');
-
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(55, 65, 81);
-
-  const synthesisLines = doc.splitTextToSize(cleanSynthesis, contentWidth - 5);
-  synthesisLines.forEach(line => {
-    checkNewPage();
-    doc.text(line, margin + 5, yPos);
-    yPos += 4.5;
-  });
-
-  // ===== FUENTES BIBLIOGRÁFICAS =====
-  doc.addPage();
-  yPos = margin;
-
-  doc.setFillColor(139, 92, 246);
-  doc.rect(margin, yPos, 4, 15, 'F');
-
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(91, 33, 182);
-  doc.text('Fuentes Consultadas', margin + 10, yPos + 10);
-  yPos += 25;
-
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-
-  // Eliminar duplicados de fuentes
-  const uniqueSources = [];
-  const seenLinks = new Set();
-  allSources.forEach(source => {
-    if (!seenLinks.has(source.link)) {
-      seenLinks.add(source.link);
-      uniqueSources.push(source);
-    }
-  });
-
-  uniqueSources.forEach((source, index) => {
-    checkNewPage(15);
-
-    let domain = 'web';
-    try { domain = new URL(source.link).hostname; } catch (e) { }
-
-    // Número
-    doc.setTextColor(139, 92, 246);
-    doc.text(`[${index + 1}]`, margin, yPos);
-
-    // Título
-    doc.setTextColor(30, 41, 59);
-    doc.setFont('helvetica', 'bold');
-    const titleText = (source.title || 'Sin título').substring(0, 70);
-    doc.text(titleText, margin + 10, yPos);
-    yPos += 4;
-
-    // Dominio
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 116, 139);
-    doc.text(domain, margin + 10, yPos);
-    yPos += 4;
-
-    // URL (truncada)
-    doc.setTextColor(59, 130, 246);
-    doc.setFontSize(8);
-    const urlText = source.link.length > 80 ? source.link.substring(0, 77) + '...' : source.link;
-    doc.text(urlText, margin + 10, yPos);
-    doc.setFontSize(9);
-    yPos += 7;
-  });
-
-  // ===== PIE DE PÁGINA =====
-  const totalPages = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-    doc.text('Generado con Ollama Web - Investigación Profunda', margin, pageHeight - 10);
-  }
 
     // Generar URL del PDF
     console.log('📦 Generando blob del PDF...');
     const pdfBlob = doc.output('blob');
     console.log('✅ Blob generado:', pdfBlob.size, 'bytes');
-    
+
     const pdfUrl = URL.createObjectURL(pdfBlob);
     console.log('✅ URL del PDF creada:', pdfUrl);
 
@@ -11175,7 +11168,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
 // Mostrar panel de informe PDF
 function showResearchReportPanel(pdfUrl, query, sourcesCount) {
   console.log('📄 Mostrando panel de informe PDF');
-  
+
   const panel = document.getElementById('research-report-panel');
   const iframe = document.getElementById('research-pdf-viewer');
   const titleText = document.getElementById('research-report-title-text');
@@ -11186,7 +11179,7 @@ function showResearchReportPanel(pdfUrl, query, sourcesCount) {
     console.error('❌ No se encontró el elemento research-report-panel');
     return;
   }
-  
+
   if (!iframe) {
     console.error('❌ No se encontró el elemento research-pdf-viewer');
     return;
@@ -11207,11 +11200,11 @@ function showResearchReportPanel(pdfUrl, query, sourcesCount) {
   webResearchCurrentPdfUrl = pdfUrl;
 
   // Añadir listener de carga del iframe
-  iframe.onload = function() {
+  iframe.onload = function () {
     console.log('✅ PDF cargado correctamente en el iframe');
   };
-  
-  iframe.onerror = function(error) {
+
+  iframe.onerror = function (error) {
     console.error('❌ Error al cargar el PDF en el iframe:', error);
   };
 
@@ -11227,14 +11220,14 @@ function showResearchReportPanel(pdfUrl, query, sourcesCount) {
   // Remover listeners anteriores para evitar duplicados
   const closeBtn = document.getElementById('close-research-report');
   const downloadBtn = document.getElementById('download-research-pdf');
-  
+
   if (closeBtn) {
     const newCloseBtn = closeBtn.cloneNode(true);
     closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
     newCloseBtn.addEventListener('click', closeResearchReportPanel);
     console.log('✅ Botón de cerrar configurado');
   }
-  
+
   if (downloadBtn) {
     const newDownloadBtn = downloadBtn.cloneNode(true);
     downloadBtn.parentNode.replaceChild(newDownloadBtn, downloadBtn);
@@ -11271,7 +11264,7 @@ function downloadResearchPDF() {
 // Regenerar y mostrar PDF desde datos guardados (para cuando se cambia de chat)
 window.regenerateAndShowPDF = function (messageId) {
   console.log('🔄 Regenerando PDF para mensaje:', messageId);
-  
+
   // Buscar el mensaje en la conversación actual
   const conversation = state.conversations[state.activeId];
   if (!conversation) {
@@ -11284,7 +11277,7 @@ window.regenerateAndShowPDF = function (messageId) {
     console.error('No se encontró el mensaje con ID:', messageId);
     return;
   }
-  
+
   if (!message.webResearchData) {
     console.error('El mensaje no tiene datos de investigación:', message);
     return;
@@ -11301,7 +11294,7 @@ window.regenerateAndShowPDF = function (messageId) {
     // Generar el PDF
     const pdfUrl = generateResearchPDF(data.query, data.findings, data.synthesisContent, data.sources);
     console.log('✅ PDF generado correctamente:', pdfUrl);
-    
+
     // Mostrar el panel
     showResearchReportPanel(pdfUrl, data.query, data.sources.length);
   } catch (error) {
@@ -14568,7 +14561,7 @@ function getWeatherIconSVG(iconName, size = 32, color = '#FDB813') {
     'snow-heavy': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"/><circle cx="8" cy="18" r="1"/><circle cx="8" cy="22" r="1"/><circle cx="12" cy="16" r="1"/><circle cx="12" cy="20" r="1"/><circle cx="16" cy="18" r="1"/><circle cx="16" cy="22" r="1"/></svg>`,
     'storm': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/></svg>`
   };
-  
+
   return icons[iconName] || icons['cloud'];
 }
 
@@ -14594,7 +14587,7 @@ function updateWeatherUI(weather) {
       </div>
     `).join('');
   }
-  
+
   // Make weather widget clickable
   const weatherWidget = document.getElementById('weather-widget');
   if (weatherWidget) {
@@ -14851,18 +14844,18 @@ const newsTabs = document.querySelectorAll('.news-tab');
 newsTabs.forEach(tab => {
   tab.addEventListener('click', () => {
     const tabName = tab.dataset.tab;
-    
+
     // Handle "Temas" dropdown
     if (tabName === 'temas') {
       toggleTemasMenu();
       return;
     }
-    
+
     // Update active tab
     newsTabs.forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     newsState.activeTab = tabName;
-    
+
     // Filter news based on tab
     filterNewsByTab(tabName);
   });
@@ -14873,7 +14866,7 @@ newsTabs.forEach(tab => {
  */
 function filterNewsByTab(tabName) {
   let filteredNews = [...newsState.allNews];
-  
+
   if (tabName === 'para-ti') {
     // Show all news, personalized order
     filteredNews = newsState.allNews;
@@ -14885,14 +14878,14 @@ function filterNewsByTab(tabName) {
       return bCount - aCount;
     });
   }
-  
+
   // Apply category filter if active
   if (newsState.activeCategory) {
-    filteredNews = filteredNews.filter(news => 
+    filteredNews = filteredNews.filter(news =>
       news.category.toLowerCase() === newsState.activeCategory.toLowerCase()
     );
   }
-  
+
   renderNewsGrid(filteredNews);
 }
 
@@ -14902,12 +14895,12 @@ function filterNewsByTab(tabName) {
 function toggleTemasMenu() {
   const temasTab = document.querySelector('[data-tab="temas"]');
   const existingMenu = document.querySelector('.temas-dropdown');
-  
+
   if (existingMenu) {
     existingMenu.remove();
     return;
   }
-  
+
   // Create dropdown menu
   const dropdown = document.createElement('div');
   dropdown.className = 'temas-dropdown';
@@ -14983,40 +14976,40 @@ function toggleTemasMenu() {
       Medio Ambiente
     </button>
   `;
-  
+
   // Position dropdown below the Temas button using fixed positioning
   document.body.appendChild(dropdown);
-  
+
   const temasRect = temasTab.getBoundingClientRect();
   dropdown.style.top = `${temasRect.bottom + 8}px`;
   dropdown.style.left = `${temasRect.left}px`;
-  
+
   // Add click handlers to tema items
   dropdown.querySelectorAll('.tema-item').forEach(item => {
     item.addEventListener('click', (e) => {
       e.stopPropagation();
       const category = item.dataset.category;
       newsState.activeCategory = category || null;
-      
+
       // Update active state
       dropdown.querySelectorAll('.tema-item').forEach(t => t.classList.remove('active'));
       item.classList.add('active');
-      
+
       // Filter news
       filterNewsByTab(newsState.activeTab);
-      
+
       // Close dropdown
       dropdown.remove();
     });
   });
-  
+
   // Close dropdown when clicking outside or on backdrop
   dropdown.addEventListener('click', (e) => {
     if (e.target === dropdown) {
       dropdown.remove();
     }
   });
-  
+
   setTimeout(() => {
     document.addEventListener('click', function closeDropdown(e) {
       if (!dropdown.contains(e.target) && e.target !== temasTab) {
@@ -15055,14 +15048,14 @@ function openWeatherModal(weather, location) {
   const modal = document.getElementById('weather-modal');
   const modalBody = document.getElementById('weather-modal-body');
   const modalLocation = document.getElementById('weather-modal-location');
-  
+
   if (!modal || !modalBody) return;
-  
+
   // Set location title
   if (modalLocation && location) {
     modalLocation.textContent = `${location.city}, ${location.country}`;
   }
-  
+
   // Generate modal content
   modalBody.innerHTML = `
     <div class="weather-current-detail">
@@ -15148,10 +15141,10 @@ function openWeatherModal(weather, location) {
       </div>
     </div>
   `;
-  
+
   // Show modal
   modal.style.display = 'flex';
-  
+
   // Add close handlers
   const closeBtn = document.getElementById('weather-modal-close');
   if (closeBtn) {
@@ -15159,7 +15152,7 @@ function openWeatherModal(weather, location) {
       modal.style.display = 'none';
     };
   }
-  
+
   // Close on backdrop click
   modal.onclick = (e) => {
     if (e.target === modal) {
@@ -15173,18 +15166,18 @@ function openWeatherModal(weather, location) {
  */
 function generateTemperatureChart(forecast) {
   if (!forecast || forecast.length === 0) return '';
-  
+
   const maxTemp = Math.max(...forecast.map(d => d.tempMax));
   const minTemp = Math.min(...forecast.map(d => d.tempMin));
   const range = maxTemp - minTemp;
-  
+
   return `
     <div class="temp-chart">
       ${forecast.map((day, index) => {
-        const maxHeight = ((day.tempMax - minTemp) / range) * 100;
-        const minHeight = ((day.tempMin - minTemp) / range) * 100;
-        
-        return `
+    const maxHeight = ((day.tempMax - minTemp) / range) * 100;
+    const minHeight = ((day.tempMin - minTemp) / range) * 100;
+
+    return `
           <div class="temp-chart-bar">
             <div class="temp-chart-max">${day.tempMax}°</div>
             <div class="temp-chart-bar-container">
@@ -15194,7 +15187,7 @@ function generateTemperatureChart(forecast) {
             <div class="temp-chart-day">${index === 0 ? 'Hoy' : day.day}</div>
           </div>
         `;
-      }).join('')}
+  }).join('')}
     </div>
   `;
 }

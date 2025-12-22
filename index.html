@@ -5,7 +5,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ollama Web</title>
-  <link rel="icon" type="image/png" href="/assets/Fondo.png" />
+  <link rel="icon" type="image/png" href="/assets/Logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="/styles.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
     integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
@@ -819,8 +824,10 @@
         </div>
 
         <div class="greeting">
-          <h1 id="greeting-text">Buenas noches, <span class="user-name">Default</span></h1>
-          <p id="greeting-subtitle" class="subtitle">¿Cómo puedo ayudarle hoy?</p>
+          <h1 id="greeting-text" class="greeting-title">
+            <img src="/assets/Logo.png" alt="" class="greeting-logo" />
+            <span class="greeting-message">Buenas tardes, </span><span class="user-name">Default</span>
+          </h1>
         </div>
 
         <div class="main-composer">
@@ -989,7 +996,8 @@
             <header class="weather-modal-header">
               <button class="weather-modal-close" id="weather-modal-close">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
               <h2 class="weather-modal-title" id="weather-modal-location">Clima</h2>
