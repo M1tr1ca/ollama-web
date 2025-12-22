@@ -3893,7 +3893,7 @@ async function regenerateResponse(messageId) {
     memoryContext = buildMemoryContext() || '';
   }
 
-  if (isFirstMessage || shouldIncludeProjectContext) {
+  if (isFirstMessage || shouldIncludeProjectContext || window._studyModeActive || window._webSearchModeActive) {
     let systemContent = '';
 
     if (projectContext) {
@@ -3924,6 +3924,44 @@ async function regenerateResponse(messageId) {
     const responseStyle = getAIResponseStyle();
     const styleInstructions = getStyleInstructions(responseStyle);
 
+    // Instrucciones especiales para modo estudio
+    const studyModeInstructions = window._studyModeActive ? `
+IMPORTANTE: Estás en MODO TUTOR SOCRÁTICO. Aplica estas reglas en tu respuesta:
+
+Tu forma de enseñar:
+- Responde con MÁXIMO 200 palabras
+- NO des la respuesta completa directamente
+- Guía al estudiante con preguntas que le hagan pensar
+- Da una breve introducción al concepto (2-3 frases máximo)
+- Termina SIEMPRE con preguntas que inviten a reflexionar
+
+Estructura tu respuesta así:
+1. Explicación breve del **concepto clave** 
+2. Una analogía o ejemplo si ayuda
+3. Termina con 1-2 preguntas para que el estudiante explore por su cuenta
+
+NO expliques estas instrucciones al usuario. Simplemente responde siguiendo este método.
+
+Ejemplo: Si te preguntan sobre regularización, explica brevemente qué es el **sobreajuste**, luego pregunta: "¿Qué camino prefieres: entender el problema primero, ver las soluciones técnicas, o explorar la intuición detrás del concepto?"
+` : '';
+
+    // Instrucciones y contexto para modo búsqueda web
+    const webSearchInstructions = window._webSearchModeActive && window._webSearchContext ? `
+🌐 MODO BÚSQUEDA WEB ACTIVADO
+
+He realizado una búsqueda en internet sobre la consulta del usuario. Aquí están los resultados que encontré:
+
+${window._webSearchContext}
+
+INSTRUCCIONES:
+1. Usa esta información de internet para responder la pregunta del usuario de manera completa y precisa.
+2. Sintetiza la información de múltiples fuentes cuando sea relevante.
+3. Si citas información específica, menciona de qué fuente proviene.
+4. Si la información parece desactualizada o contradictoria, indícalo.
+5. Complementa con tu conocimiento cuando sea apropiado.
+6. Al final, puedes sugerir búsquedas adicionales si el usuario quiere profundizar.
+` : '';
+
     let instructions = '';
     const hasDocuments = textFiles.length > 0 || shouldIncludeProjectContext;
     const hasPersonalContext = personalInfo.trim() || memoryContext;
@@ -3934,10 +3972,29 @@ async function regenerateResponse(messageId) {
       instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas.';
     }
 
-    if (systemContent || styleInstructions || instructions) {
+    if (systemContent || styleInstructions || instructions || studyModeInstructions || webSearchInstructions) {
       let finalContent = systemContent;
 
-      if (styleInstructions) {
+      // Añadir contexto de búsqueda web primero (máxima prioridad)
+      if (webSearchInstructions) {
+        if (finalContent) {
+          finalContent += '\n\n';
+        }
+        finalContent += webSearchInstructions;
+        console.log('🌐 Modo Web activado - Añadiendo resultados de búsqueda');
+      }
+
+      // Añadir instrucciones del modo estudio (alta prioridad)
+      if (studyModeInstructions) {
+        if (finalContent) {
+          finalContent += '\n\n';
+        }
+        finalContent += studyModeInstructions;
+        console.log('📚 Modo Estudio activado - Añadiendo instrucciones de tutor');
+      }
+
+      if (styleInstructions && !studyModeInstructions) {
+        // Solo añadir estilo si no está en modo estudio (el modo estudio tiene su propio estilo)
         if (finalContent) finalContent += '\n';
         finalContent += `Instrucciones de estilo de respuesta: ${styleInstructions}`;
       }
@@ -4138,8 +4195,8 @@ let handleSubmit = async function handleSubmitOriginal(event) {
     memoryContext = buildMemoryContext() || '';
   }
 
-  // Si es el primer mensaje O hay un proyecto activo, construir el mensaje del sistema
-  if (isFirstMessage || shouldIncludeProjectContext) {
+  // Si es el primer mensaje O hay un proyecto activo O el modo estudio está activo, construir el mensaje del sistema
+  if (isFirstMessage || shouldIncludeProjectContext || window._studyModeActive || window._webSearchModeActive) {
     let systemContent = '';
 
     // PRIMERO: Agregar contexto del proyecto (máxima prioridad) - SIEMPRE si hay proyecto
@@ -4179,30 +4236,23 @@ let handleSubmit = async function handleSubmitOriginal(event) {
 
     // Instrucciones especiales para modo estudio
     const studyModeInstructions = window._studyModeActive ? `
-MODO ESTUDIO ACTIVADO - Eres un tutor educativo experto. Tu rol es:
+IMPORTANTE: Estás en MODO TUTOR SOCRÁTICO. Aplica estas reglas en tu respuesta:
 
-1. **Explicar paso a paso**: Desglosa conceptos complejos en partes simples y manejables.
+Tu forma de enseñar:
+- Responde con MÁXIMO 200 palabras
+- NO des la respuesta completa directamente
+- Guía al estudiante con preguntas que le hagan pensar
+- Da una breve introducción al concepto (2-3 frases máximo)
+- Termina SIEMPRE con preguntas que inviten a reflexionar
 
-2. **Hacer preguntas**: En lugar de dar respuestas directas, guía al estudiante con preguntas que le ayuden a descubrir la respuesta por sí mismo.
+Estructura tu respuesta así:
+1. Explicación breve del **concepto clave** 
+2. Una analogía o ejemplo si ayuda
+3. Termina con 1-2 preguntas para que el estudiante explore por su cuenta
 
-3. **Proporcionar ejemplos**: Usa analogías y ejemplos del mundo real para ilustrar conceptos.
+NO expliques estas instrucciones al usuario. Simplemente responde siguiendo este método.
 
-4. **Verificar comprensión**: Después de explicar algo, pregunta si el estudiante ha entendido y ofrece ejercicios de práctica.
-
-5. **Fomentar el pensamiento crítico**: Invita a reflexionar sobre por qué algo funciona de cierta manera.
-
-6. **Adaptar el nivel**: Ajusta la complejidad según las respuestas del estudiante.
-
-7. **Usar formato claro**: 
-   - Utiliza viñetas y numeración
-   - Resalta conceptos clave en **negrita**
-   - Incluye ejemplos de código con explicaciones
-
-8. **Al final de cada respuesta**: Sugiere el siguiente paso de aprendizaje o un ejercicio para practicar.
-
-9. **Al final del todo haz 2 preguntas al usuario relacionados con el tema, que va a tener que responder, para mejorar su comprensión. Para que compruebes que tal lo ha entendido el usuario
-
-Responde de manera paciente, alentadora y didáctica. Tu objetivo es que el estudiante realmente ENTIENDA el tema, no solo memorice información.
+Ejemplo: Si te preguntan sobre regularización, explica brevemente qué es el **sobreajuste**, luego pregunta: "¿Qué camino prefieres: entender el problema primero, ver las soluciones técnicas, o explorar la intuición detrás del concepto?"
 ` : '';
 
     // Instrucciones y contexto para modo búsqueda web
@@ -10327,19 +10377,56 @@ async function synthesizeFindings(originalQuery, findings, signal = null) {
     `## Investigación ${i + 1}: ${f.question}\n\n${f.answer}`
   ).join('\n\n---\n\n');
 
-  const synthesisPrompt = `Eres un experto sintetizando investigaciones. Se realizó una investigación profunda sobre: "${originalQuery}"
+  // Detectar tipo de consulta para adaptar el formato
+  const queryLower = originalQuery.toLowerCase();
+  const isTravel = queryLower.includes('vuelo') || queryLower.includes('hotel') || queryLower.includes('viaje') || queryLower.includes('billete');
+  const isProduct = queryLower.includes('comprar') || queryLower.includes('precio') || queryLower.includes('mejor') || queryLower.includes('comparar');
+
+  let formatInstructions = '';
+  if (isTravel) {
+    formatInstructions = `
+FORMATO ESPECÍFICO PARA VIAJES:
+1. **METODOLOGÍA DE BÚSQUEDA**: Explica brevemente cómo se realizó la investigación
+2. **TABLA COMPARATIVA**: Crea una tabla markdown con columnas para: Opción, Aerolínea/Proveedor, Precio, Horarios, Duración, Observaciones
+   - Incluye SIEMPRE datos específicos encontrados (precios reales, horarios, etc.)
+   - Formato de tabla: | Columna1 | Columna2 | Columna3 |
+3. **ANÁLISIS DETALLADO**: Para las 2-3 mejores opciones, explica pros y contras
+4. **RECOMENDACIÓN FINAL**: Da UNA recomendación clara y justificada
+5. **CONSEJOS ADICIONALES**: Tips para conseguir mejor precio o alternativas`;
+  } else if (isProduct) {
+    formatInstructions = `
+FORMATO ESPECÍFICO PARA PRODUCTOS/COMPARATIVAS:
+1. **METODOLOGÍA**: Criterios de evaluación utilizados
+2. **TABLA COMPARATIVA**: Crea una tabla markdown con las opciones encontradas
+   - Incluye: Producto, Precio, Características clave, Puntuación/Rating
+   - Formato de tabla: | Columna1 | Columna2 | Columna3 |
+3. **ANÁLISIS**: Ventajas y desventajas de cada opción
+4. **MEJOR OPCIÓN**: Recomendación clara con justificación
+5. **ALTERNATIVAS**: Otras opciones a considerar`;
+  } else {
+    formatInstructions = `
+FORMATO GENERAL:
+1. **RESUMEN EJECUTIVO**: Síntesis de los puntos más importantes
+2. **ANÁLISIS DETALLADO**: Información estructurada por temas
+3. **DATOS CLAVE**: Si hay datos comparables, inclúyelos en una tabla markdown
+4. **CONCLUSIONES**: Puntos principales y recomendaciones`;
+  }
+
+  const synthesisPrompt = `Eres un experto analista que crea informes profesionales. Se realizó una investigación profunda sobre: "${originalQuery}"
 
 Hallazgos de la investigación:
 ${findingsSummary}
 
-Tu tarea es crear un INFORME FINAL COMPLETO que:
-1. Tenga una introducción clara del tema
-2. Presente los hallazgos más importantes de forma estructurada
-3. Incluya una sección de conclusiones
-4. Destaque los puntos más relevantes
+Tu tarea es crear un INFORME FINAL PROFESIONAL siguiendo este formato:
+${formatInstructions}
 
-Usa formato Markdown con encabezados, listas y énfasis donde sea apropiado.
-El informe debe ser comprensivo pero conciso.`;
+REGLAS IMPORTANTES:
+- Usa formato Markdown con tablas cuando sea apropiado (| col1 | col2 |)
+- Incluye DATOS ESPECÍFICOS encontrados (precios, fechas, nombres, etc.)
+- Sé concreto y útil, no genérico
+- Si hay varias opciones, compáralas visualmente en una tabla
+- Termina SIEMPRE con una recomendación clara y accionable
+- El informe debe ser comprehensivo pero directo al punto`;
 
   try {
     const response = await fetch(`${API_BASE}/api/chat`, {
@@ -10864,9 +10951,9 @@ Proporciona tu análisis completo:`;
   };
 }
 
-// Generar informe PDF profesional
+// Generar informe PDF profesional con diseño mejorado
 function generateResearchPDF(query, findings, synthesis, allSources) {
-  console.log('📄 Generando informe PDF...');
+  console.log('📄 Generando informe PDF profesional...');
 
   try {
     if (!window.jspdf) {
@@ -10898,82 +10985,235 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
       return false;
     };
 
-    // Función para añadir texto con wrap automático
-    const addWrappedText = (text, fontSize, isBold = false, color = [51, 51, 51]) => {
-      doc.setFontSize(fontSize);
-      doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-      doc.setTextColor(...color);
+    // Función para parsear tablas markdown de la síntesis
+    const parseMarkdownTables = (text) => {
+      const tables = [];
+      const lines = text.split('\n');
+      let currentTable = null;
+      let headerFound = false;
 
-      const lines = doc.splitTextToSize(text, contentWidth);
-      lines.forEach(line => {
-        checkNewPage();
-        doc.text(line, margin, yPos);
-        yPos += fontSize * 0.4;
-      });
-      yPos += 2;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        // Detectar línea de tabla (empieza y termina con |)
+        if (line.startsWith('|') && line.endsWith('|')) {
+          // Detectar separador de cabecera (|---|---|)
+          if (line.match(/^\|[\s\-:|]+\|$/)) {
+            headerFound = true;
+            continue;
+          }
+
+          // Parsear celdas
+          const cells = line.split('|').slice(1, -1).map(c => c.trim());
+
+          if (!currentTable) {
+            currentTable = { headers: cells, rows: [] };
+          } else if (!headerFound) {
+            // Si aún no tenemos separador, esto podría ser la cabecera
+            currentTable.headers = cells;
+          } else {
+            currentTable.rows.push(cells);
+          }
+        } else if (currentTable && currentTable.rows.length > 0) {
+          // Fin de tabla
+          tables.push(currentTable);
+          currentTable = null;
+          headerFound = false;
+        } else if (currentTable && line === '') {
+          // Reset si hay línea vacía sin rows
+          currentTable = null;
+          headerFound = false;
+        }
+      }
+
+      // Añadir última tabla si existe
+      if (currentTable && currentTable.rows.length > 0) {
+        tables.push(currentTable);
+      }
+
+      return tables;
     };
 
-    // ===== PORTADA =====
-    // Fondo de cabecera
-    doc.setFillColor(45, 55, 72);
-    doc.rect(0, 0, pageWidth, 80, 'F');
+    // Función para extraer secciones del contenido
+    const extractSections = (text) => {
+      const sections = {
+        methodology: '',
+        comparison: '',
+        analysis: '',
+        recommendation: '',
+        tips: '',
+        tables: []
+      };
 
-    // Título principal
-    doc.setFontSize(28);
+      // Extraer tablas
+      sections.tables = parseMarkdownTables(text);
+
+      // Buscar secciones por títulos
+      const lines = text.split('\n');
+      let currentSection = '';
+      let sectionContent = [];
+
+      const sectionKeywords = {
+        methodology: ['metodología', 'metodologia', 'búsqueda', 'busqueda', 'cómo se realizó'],
+        comparison: ['tabla comparativa', 'comparativa', 'comparación', 'opciones encontradas'],
+        analysis: ['análisis', 'analisis', 'detallado', 'pros y contras', 'ventajas'],
+        recommendation: ['recomendación', 'recomendacion', 'mejor opción', 'conclusión', 'conclusion'],
+        tips: ['consejos', 'tips', 'adicional', 'alternativas']
+      };
+
+      for (const line of lines) {
+        const lineLower = line.toLowerCase();
+        let foundSection = '';
+
+        for (const [section, keywords] of Object.entries(sectionKeywords)) {
+          if (keywords.some(kw => lineLower.includes(kw))) {
+            foundSection = section;
+            break;
+          }
+        }
+
+        if (foundSection && foundSection !== currentSection) {
+          if (currentSection && sectionContent.length > 0) {
+            sections[currentSection] = sectionContent.join('\n');
+          }
+          currentSection = foundSection;
+          sectionContent = [];
+        } else if (currentSection) {
+          sectionContent.push(line);
+        }
+      }
+
+      if (currentSection && sectionContent.length > 0) {
+        sections[currentSection] = sectionContent.join('\n');
+      }
+
+      return sections;
+    };
+
+    // ===== PORTADA CON LOGO =====
+    // Diseño limpio sin barra de color
+
+    // Intentar cargar el logo
+    try {
+      const logoImg = new Image();
+      logoImg.src = '/assets/Logo.png';
+      // Logo en la esquina superior izquierda
+      doc.addImage(logoImg, 'PNG', margin, 20, 20, 20);
+    } catch (e) {
+      console.log('Logo no disponible, continuando sin él');
+    }
+
+    // Título "Ollama Web" al lado del logo con diseño limpio
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 255, 255);
-    const titleLines = doc.splitTextToSize('INFORME DE INVESTIGACIÓN', contentWidth);
-    doc.text(titleLines, pageWidth / 2, 35, { align: 'center' });
+    doc.setTextColor(30, 41, 59); // Gris oscuro
+    doc.text('Ollama Web', margin + 24, 28);
 
-    // Tema de investigación
-    doc.setFontSize(14);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(200, 200, 200);
-    const queryLines = doc.splitTextToSize(query, contentWidth - 20);
-    doc.text(queryLines, pageWidth / 2, 55, { align: 'center' });
+    doc.setTextColor(100, 116, 139); // Gris medio
+    doc.text('|', margin + 53, 28);
+
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Mi Investigación', margin + 57, 28);
+
+    // Título principal del informe con diseño limpio
+    yPos = 55;
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+
+    // Generar título inteligente basado en la query
+    let reportTitle = 'Informe de Investigación';
+    const queryLower = query.toLowerCase();
+    if (queryLower.includes('vuelo')) {
+      reportTitle = 'Análisis de Vuelos';
+    } else if (queryLower.includes('hotel')) {
+      reportTitle = 'Análisis de Alojamiento';
+    } else if (queryLower.includes('precio') || queryLower.includes('comprar')) {
+      reportTitle = 'Análisis Comparativo';
+    }
+
+    doc.text(reportTitle, pageWidth / 2, yPos, { align: 'center' });
+
+    // Subtítulo con la query
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    const queryShort = query.length > 80 ? query.substring(0, 77) + '...' : query;
+    doc.text(queryShort, pageWidth / 2, yPos + 10, { align: 'center' });
 
     // Fecha
-    doc.setFontSize(10);
-    doc.setTextColor(180, 180, 180);
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184);
     const dateStr = new Date().toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric'
     });
-    doc.text(`Generado: ${dateStr}`, pageWidth / 2, 70, { align: 'center' });
+    doc.text(dateStr, pageWidth / 2, yPos + 18, { align: 'center' });
 
-    // Estadísticas
-    yPos = 95;
+    // Caja de estadísticas elegante
+    yPos = 85;
     doc.setFillColor(248, 250, 252);
-    doc.roundedRect(margin, yPos - 5, contentWidth, 25, 3, 3, 'F');
+    doc.roundedRect(margin, yPos, contentWidth, 18, 3, 3, 'F');
 
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`${findings.length} temas investigados`, margin + 10, yPos + 5);
-    doc.text(`${allSources.length} fuentes web consultadas`, margin + 70, yPos + 5);
-    doc.text(`Informe completo`, margin + 145, yPos + 5);
+    const statsY = yPos + 12;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(75, 85, 99);
 
-    yPos = 130;
+    const colWidth = contentWidth / 3;
 
-    // ===== RESUMEN EJECUTIVO =====
-    doc.setFillColor(59, 130, 246);
-    doc.rect(margin, yPos, 4, 20, 'F');
+    // Dibujar pequeños puntos como indicadores
+    doc.setFillColor(100, 116, 139);
+    doc.circle(margin + colWidth * 0.5 - 15, statsY - 2, 1.2, 'F');
+    doc.circle(margin + colWidth * 1.5 - 15, statsY - 2, 1.2, 'F');
+    doc.circle(margin + colWidth * 2.5 - 18, statsY - 2, 1.2, 'F');
 
-    doc.setFontSize(16);
+    doc.text(findings.length + ' temas', margin + colWidth * 0.5 - 8, statsY);
+    doc.text(allSources.length + ' fuentes', margin + colWidth * 1.5 - 8, statsY);
+    doc.text('Informe completo', margin + colWidth * 2.5 - 10, statsY);
+
+    yPos = 120;
+
+    // Extraer secciones de la síntesis
+    const sections = extractSections(synthesis);
+
+    // ===== METODOLOGÍA DE BÚSQUEDA =====
+    checkNewPage(40);
+
+    // Cabecera de sección con diseño limpio
+    doc.setFillColor(100, 116, 139);
+    doc.roundedRect(margin, yPos, 3, 14, 1.5, 1.5, 'F');
+
+    doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 58, 138);
-    doc.text('Resumen Ejecutivo', margin + 10, yPos + 7);
-    yPos += 15;
+    doc.setTextColor(51, 65, 85);
+    doc.text('Metodología de Búsqueda', margin + 8, yPos + 10);
+    yPos += 25;
 
-    // Extraer primeras líneas de la síntesis como resumen
-    const summaryText = synthesis.split('\n').slice(0, 5).join(' ').substring(0, 500) + '...';
-    doc.setFontSize(11);
+    // Contenido de metodología
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(60, 60, 60);
-    const summaryLines = doc.splitTextToSize(summaryText, contentWidth - 10);
-    summaryLines.forEach(line => {
+
+    let methodologyText = sections.methodology ||
+      `Se realizó una investigación exhaustiva utilizando múltiples fuentes web. ` +
+      `Se analizaron ${findings.length} aspectos diferentes del tema, consultando ${allSources.length} fuentes ` +
+      `para obtener información actualizada y relevante.`;
+
+    // Limpiar markdown
+    methodologyText = methodologyText
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/`/g, '')
+      .substring(0, 400);
+
+    const methodLines = doc.splitTextToSize(methodologyText, contentWidth - 15);
+    methodLines.forEach(line => {
       checkNewPage();
       doc.text(line, margin + 10, yPos);
       yPos += 5;
@@ -10981,121 +11221,216 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
 
     yPos += 10;
 
-    // ===== HALLAZGOS DETALLADOS =====
+    // ===== TABLA COMPARATIVA (si existe) =====
+    if (sections.tables.length > 0) {
+      checkNewPage(50);
+
+      doc.setFillColor(100, 116, 139);
+      doc.roundedRect(margin, yPos, 3, 14, 1.5, 1.5, 'F');
+
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(51, 65, 85);
+      doc.text('Tabla Comparativa', margin + 8, yPos + 10);
+      yPos += 25;
+
+      // Usar jspdf-autotable para cada tabla
+      sections.tables.forEach((table, tableIndex) => {
+        if (table.headers.length > 0 && table.rows.length > 0) {
+          checkNewPage(40);
+
+          try {
+            doc.autoTable({
+              startY: yPos,
+              head: [table.headers],
+              body: table.rows,
+              margin: { left: margin, right: margin },
+              styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                overflow: 'linebreak',
+                halign: 'left'
+              },
+              headStyles: {
+                fillColor: [45, 55, 72],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                fontSize: 9
+              },
+              alternateRowStyles: {
+                fillColor: [248, 250, 252]
+              },
+              columnStyles: {
+                0: { cellWidth: 'auto' }
+              },
+              didDrawPage: function (data) {
+                yPos = data.cursor.y + 10;
+              }
+            });
+
+            yPos = doc.lastAutoTable.finalY + 15;
+          } catch (tableError) {
+            console.log('Error renderizando tabla:', tableError);
+            // Fallback: mostrar como texto
+            doc.setFontSize(9);
+            doc.text('Datos encontrados durante la investigación:', margin + 10, yPos);
+            yPos += 10;
+          }
+        }
+      });
+    }
+
+    // ===== ANÁLISIS DETALLADO =====
+    checkNewPage(40);
+
+    doc.setFillColor(100, 116, 139);
+    doc.roundedRect(margin, yPos, 3, 14, 1.5, 1.5, 'F');
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(51, 65, 85);
+    doc.text('Análisis Detallado', margin + 8, yPos + 10);
+    yPos += 25;
+
+    // Mostrar hallazgos clave
     findings.forEach((finding, index) => {
-      checkNewPage(40);
+      checkNewPage(35);
 
-      // Cabecera de sección
+      // Cabecera del hallazgo
       doc.setFillColor(249, 250, 251);
-      doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
+      doc.roundedRect(margin + 5, yPos, contentWidth - 10, 10, 2, 2, 'F');
 
-      doc.setFontSize(12);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(55, 65, 81);
-      doc.text(`${index + 1}. ${finding.question.substring(0, 80)}`, margin + 5, yPos + 8);
-      yPos += 18;
+      doc.text(`${index + 1}. ${finding.question.substring(0, 70)}`, margin + 10, yPos + 7);
+      yPos += 15;
 
-      // Contenido del hallazgo
-      doc.setFontSize(10);
+      // Contenido resumido
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(75, 85, 99);
 
-      // Limpiar markdown del answer
       let cleanAnswer = finding.answer
         .replace(/#{1,6}\s/g, '')
         .replace(/\*\*/g, '')
         .replace(/\*/g, '')
         .replace(/`/g, '')
-        .replace(/\n\n+/g, '\n');
+        .replace(/\n\n+/g, '\n')
+        .substring(0, 600);
 
-      // Limitar longitud
-      if (cleanAnswer.length > 1500) {
-        cleanAnswer = cleanAnswer.substring(0, 1500) + '...';
-      }
-
-      const answerLines = doc.splitTextToSize(cleanAnswer, contentWidth - 5);
-      answerLines.forEach(line => {
+      const answerLines = doc.splitTextToSize(cleanAnswer, contentWidth - 20);
+      answerLines.slice(0, 12).forEach(line => {
         if (checkNewPage()) {
-          // Añadir indicador de continuación
           doc.setFontSize(8);
           doc.setTextColor(150, 150, 150);
-          doc.text('(continuación)', margin, yPos - 5);
-          doc.setFontSize(10);
+          doc.text('(continuación del análisis)', margin, yPos - 5);
+          doc.setFontSize(9);
           doc.setTextColor(75, 85, 99);
         }
-        doc.text(line, margin + 5, yPos);
-        yPos += 4.5;
+        doc.text(line, margin + 10, yPos);
+        yPos += 4;
       });
 
-      // Fuentes de este hallazgo
+      // Fuentes del hallazgo
       if (finding.sources && finding.sources.length > 0) {
-        yPos += 3;
-        doc.setFontSize(8);
+        yPos += 2;
+        doc.setFontSize(7);
         doc.setTextColor(100, 116, 139);
-        doc.text('Fuentes:', margin + 5, yPos);
-        yPos += 4;
-
-        finding.sources.slice(0, 3).forEach(source => {
-          checkNewPage();
-          let domain = 'web';
-          try { domain = new URL(source.link).hostname; } catch (e) { }
-          doc.setTextColor(59, 130, 246);
-          doc.text(`• ${domain}`, margin + 8, yPos);
-          yPos += 3.5;
-        });
+        const sourceDomains = finding.sources.slice(0, 2).map(s => {
+          try { return new URL(s.link).hostname; } catch { return 'web'; }
+        }).join(', ');
+        doc.text(`Fuentes: ${sourceDomains}`, margin + 10, yPos);
       }
 
-      yPos += 8;
+      yPos += 10;
     });
 
-    // ===== SÍNTESIS COMPLETA =====
+    // ===== RECOMENDACIÓN FINAL =====
     doc.addPage();
     yPos = margin;
 
-    doc.setFillColor(16, 185, 129);
-    doc.rect(margin, yPos, 4, 15, 'F');
+    // Caja destacada para la recomendación
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, yPos, contentWidth, 16, 3, 3, 'F');
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, yPos, contentWidth, 16, 3, 3, 'S');
 
-    doc.setFontSize(18);
+    doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(6, 78, 59);
-    doc.text('Síntesis y Conclusiones', margin + 10, yPos + 10);
-    yPos += 25;
+    doc.setTextColor(51, 65, 85);
+    doc.text('Recomendación Final', margin + 8, yPos + 11);
+    yPos += 30;
 
-    // Limpiar y añadir síntesis
-    let cleanSynthesis = synthesis
+    // Contenido de la recomendación
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+
+    let recommendationText = sections.recommendation ||
+      synthesis.split('\n').slice(-10).join(' ').substring(0, 800);
+
+    recommendationText = recommendationText
       .replace(/#{1,6}\s/g, '')
       .replace(/\*\*/g, '')
       .replace(/\*/g, '')
       .replace(/`/g, '');
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(55, 65, 81);
-
-    const synthesisLines = doc.splitTextToSize(cleanSynthesis, contentWidth - 5);
-    synthesisLines.forEach(line => {
+    const recLines = doc.splitTextToSize(recommendationText, contentWidth - 15);
+    recLines.forEach(line => {
       checkNewPage();
-      doc.text(line, margin + 5, yPos);
-      yPos += 4.5;
+      doc.text(line, margin + 10, yPos);
+      yPos += 5;
     });
+
+    yPos += 15;
+
+    // ===== CONSEJOS ADICIONALES (si existen) =====
+    if (sections.tips) {
+      checkNewPage(30);
+
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin, yPos, contentWidth, 14, 3, 3, 'F');
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(51, 65, 85);
+      doc.text('Consejos Adicionales', margin + 8, yPos + 9.5);
+      yPos += 22;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+
+      const tipsText = sections.tips
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .substring(0, 500);
+
+      const tipsLines = doc.splitTextToSize(tipsText, contentWidth - 15);
+      tipsLines.forEach(line => {
+        checkNewPage();
+        doc.text(line, margin + 10, yPos);
+        yPos += 4.5;
+      });
+    }
 
     // ===== FUENTES BIBLIOGRÁFICAS =====
     doc.addPage();
     yPos = margin;
 
-    doc.setFillColor(139, 92, 246);
-    doc.rect(margin, yPos, 4, 15, 'F');
+    doc.setFillColor(100, 116, 139);
+    doc.roundedRect(margin, yPos, 3, 14, 1.5, 1.5, 'F');
 
-    doc.setFontSize(18);
+    doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(91, 33, 182);
-    doc.text('Fuentes Consultadas', margin + 10, yPos + 10);
+    doc.setTextColor(51, 65, 85);
+    doc.text('Fuentes Consultadas', margin + 8, yPos + 10);
     yPos += 25;
 
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-
-    // Eliminar duplicados de fuentes
+    // Eliminar duplicados
     const uniqueSources = [];
     const seenLinks = new Set();
     allSources.forEach(source => {
@@ -11105,46 +11440,85 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
       }
     });
 
-    uniqueSources.forEach((source, index) => {
-      checkNewPage(15);
+    // Crear tabla de fuentes
+    if (uniqueSources.length > 0) {
+      const sourcesTableData = uniqueSources.slice(0, 20).map((source, idx) => {
+        let domain = 'web';
+        try { domain = new URL(source.link).hostname; } catch { }
+        return [
+          (idx + 1).toString(),
+          (source.title || 'Sin título').substring(0, 50),
+          domain
+        ];
+      });
 
-      let domain = 'web';
-      try { domain = new URL(source.link).hostname; } catch (e) { }
+      try {
+        doc.autoTable({
+          startY: yPos,
+          head: [['#', 'Título', 'Dominio']],
+          body: sourcesTableData,
+          margin: { left: margin, right: margin },
+          styles: {
+            fontSize: 8,
+            cellPadding: 3
+          },
+          headStyles: {
+            fillColor: [139, 92, 246],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold'
+          },
+          columnStyles: {
+            0: { cellWidth: 10 },
+            1: { cellWidth: 100 },
+            2: { cellWidth: 50 }
+          }
+        });
 
-      // Número
-      doc.setTextColor(139, 92, 246);
-      doc.text(`[${index + 1}]`, margin, yPos);
+        yPos = doc.lastAutoTable.finalY + 10;
+      } catch (e) {
+        // Fallback
+        uniqueSources.slice(0, 15).forEach((source, index) => {
+          checkNewPage(12);
 
-      // Título
-      doc.setTextColor(30, 41, 59);
-      doc.setFont('helvetica', 'bold');
-      const titleText = (source.title || 'Sin título').substring(0, 70);
-      doc.text(titleText, margin + 10, yPos);
-      yPos += 4;
+          let domain = 'web';
+          try { domain = new URL(source.link).hostname; } catch { }
 
-      // Dominio
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 116, 139);
-      doc.text(domain, margin + 10, yPos);
-      yPos += 4;
+          doc.setFontSize(8);
+          doc.setTextColor(139, 92, 246);
+          doc.text(`[${index + 1}]`, margin, yPos);
 
-      // URL (truncada)
-      doc.setTextColor(59, 130, 246);
-      doc.setFontSize(8);
-      const urlText = source.link.length > 80 ? source.link.substring(0, 77) + '...' : source.link;
-      doc.text(urlText, margin + 10, yPos);
-      doc.setFontSize(9);
-      yPos += 7;
-    });
+          doc.setTextColor(30, 41, 59);
+          doc.setFont('helvetica', 'bold');
+          doc.text((source.title || 'Sin título').substring(0, 60), margin + 10, yPos);
 
-    // ===== PIE DE PÁGINA =====
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(100, 116, 139);
+          doc.text(domain, margin + 10, yPos + 4);
+
+          yPos += 10;
+        });
+      }
+    }
+
+    // ===== PIE DE PÁGINA EN TODAS LAS PÁGINAS =====
     const totalPages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
+
+      // Línea decorativa
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-      doc.text('Generado con Ollama Web - Investigación Profunda', margin, pageHeight - 10);
+      doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+
+      doc.setTextColor(255, 140, 66);
+      doc.text('Ollama Web', margin, pageHeight - 8);
+
+      doc.setTextColor(150, 150, 150);
+      doc.text('Investigación Profunda', pageWidth - margin, pageHeight - 8, { align: 'right' });
     }
 
     // Generar URL del PDF
@@ -11193,8 +11567,8 @@ function showResearchReportPanel(pdfUrl, query, sourcesCount) {
 
   // Actualizar título y metadata
   if (titleText) titleText.textContent = query.length > 40 ? query.substring(0, 40) + '...' : query;
-  if (dateSpan) dateSpan.textContent = `📅 ${new Date().toLocaleDateString('es-ES')}`;
-  if (sourcesSpan) sourcesSpan.textContent = `🌐 ${sourcesCount} fuentes`;
+  if (dateSpan) dateSpan.textContent = `${new Date().toLocaleDateString('es-ES')}`;
+  if (sourcesSpan) sourcesSpan.textContent = `${sourcesCount} fuentes`;
 
   // Guardar URL del PDF actual
   webResearchCurrentPdfUrl = pdfUrl;

@@ -25,6 +25,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.0/dist/abcjs-basic-min.js"></script>
   <script src="js/translation-manager.js"></script>
 </head>
@@ -1495,14 +1496,10 @@ C D E F | G A B c |"></textarea>
   <aside id="research-report-panel" class="research-report-panel" style="display: none;">
     <div class="research-report-header">
       <div class="research-report-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-          <polyline points="10 9 9 9 8 9" />
-        </svg>
-        <span id="research-report-title-text">Informe de Investigación</span>
+        <img src="/assets/Logo.png" alt="Ollama Web" class="research-logo" />
+        <span class="research-brand">Ollama Web</span>
+        <span class="research-separator">|</span>
+        <span id="research-report-title-text">Mi Investigación</span>
       </div>
       <div class="research-report-actions">
         <button id="download-research-pdf" class="research-action-btn" title="Descargar PDF">
