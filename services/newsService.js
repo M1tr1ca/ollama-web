@@ -3,7 +3,7 @@
 // Obtener y procesar noticias con Serper API
 // ===========================
 
-import { saveNewsCache, getNewsCache } from './cacheService.js';
+import { saveNewsCache, getNewsCache, clearNewsCache } from './cacheService.js';
 
 const SERPER_API_KEY = ''; // Se configura desde la UI o .env
 const SERPER_NEWS_URL = 'https://google.serper.dev/news';
@@ -196,14 +196,21 @@ const DEMO_NEWS = [
  * Obtener noticias (desde caché, Serper API, o demo)
  * @param {Object} location - {lat, lon, city, country}
  * @param {string} category - Categoría (general, technology, business)
+ * @param {boolean} forceRefresh - Si true, ignora el caché y obtiene noticias nuevas
  * @returns {Promise<Array>}
  */
-export async function fetchNews(location = null, category = 'general') {
-    // Primero verificar caché
-    const cached = getNewsCache();
-    if (cached && cached.length > 0) {
-        console.log('📰 Using cached news');
-        return cached;
+export async function fetchNews(location = null, category = 'general', forceRefresh = false) {
+    // Si se fuerza actualización, limpiar caché primero
+    if (forceRefresh) {
+        console.log('📰 Force refresh requested, clearing cache...');
+        clearNewsCache();
+    } else {
+        // Verificar caché solo si no se fuerza actualización
+        const cached = getNewsCache();
+        if (cached && cached.length > 0) {
+            console.log('📰 Using cached news');
+            return cached;
+        }
     }
 
     // Si no hay API key, usar noticias demo
@@ -214,11 +221,15 @@ export async function fetchNews(location = null, category = 'general') {
         return DEMO_NEWS;
     }
 
+    console.log('📰 API Key found:', apiKey.substring(0, 8) + '...');
+
     // Buscar con Serper
     try {
         const query = location?.city
             ? `noticias ${location.city} ${category}`
             : `noticias ${category} España`;
+
+        console.log('📰 Serper query:', query);
 
         const response = await fetch(SERPER_NEWS_URL, {
             method: 'POST',
@@ -230,16 +241,31 @@ export async function fetchNews(location = null, category = 'general') {
                 q: query,
                 gl: 'es',
                 hl: 'es',
-                num: 10
+                num: 15,
+                tbs: 'qdr:d' // Noticias del último día
             })
         });
 
+        console.log('📰 Serper response status:', response.status);
+
         if (!response.ok) {
-            throw new Error('Serper API request failed');
+            const errorText = await response.text();
+            console.error('📰 Serper API error:', errorText);
+            throw new Error('Serper API request failed: ' + response.status);
         }
 
         const data = await response.json();
-        const news = parseSerperNews(data.news || []);
+        console.log('📰 Serper raw response:', data);
+
+        const newsItems = data.news || [];
+        console.log('📰 News items received:', newsItems.length);
+
+        if (newsItems.length === 0) {
+            console.log('📰 No news from Serper, using demo news');
+            return DEMO_NEWS;
+        }
+
+        const news = parseSerperNews(newsItems);
 
         if (news.length > 0) {
             saveNewsCache(news);
@@ -247,7 +273,7 @@ export async function fetchNews(location = null, category = 'general') {
 
         return news;
     } catch (error) {
-        console.error('Error fetching news from Serper:', error);
+        console.error('📰 Error fetching news from Serper:', error);
         // Fallback a noticias demo
         return DEMO_NEWS;
     }

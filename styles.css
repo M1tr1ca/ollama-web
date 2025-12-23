@@ -185,11 +185,22 @@ body {
 }
 
 .sidebar-logo {
-  font-size: 18px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  letter-spacing: -0.02em;
+  height: 28px;
+  width: auto;
+  object-fit: contain;
   flex: 1;
+}
+
+.sidebar-logo-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: -0.3px;
+  flex: 1;
+}
+
+.sidebar.minimized .sidebar-logo-text {
+  display: none;
 }
 
 .toggle-sidebar-button {
@@ -1507,8 +1518,8 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
 }
 
 .greeting-logo {
-  width: 42px;
-  height: 42px;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
 }

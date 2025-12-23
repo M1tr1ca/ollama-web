@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat con Captura - Kaisio Chat</title>
+  <title>Kaisio Chat - Captura</title>
   <link rel="icon" type="image/png" href="/assets/Estrella.png" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
@@ -117,8 +118,15 @@
     }
 
     @keyframes pulse-capture {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4); }
-      50% { box-shadow: 0 0 0 8px rgba(96, 165, 250, 0); }
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4);
+      }
+
+      50% {
+        box-shadow: 0 0 0 8px rgba(96, 165, 250, 0);
+      }
     }
 
     /* Preview */
@@ -294,12 +302,27 @@
       animation: loading-pulse 1.4s infinite ease-in-out;
     }
 
-    .popup-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
-    .popup-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+    .popup-loading-dots span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .popup-loading-dots span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
 
     @keyframes loading-pulse {
-      0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
-      30% { opacity: 1; transform: scale(1.1); }
+
+      0%,
+      60%,
+      100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+      }
+
+      30% {
+        opacity: 1;
+        transform: scale(1.1);
+      }
     }
 
     /* Input */
@@ -408,8 +431,13 @@
     }
 
     @keyframes flash {
-      0% { opacity: 0.7; }
-      100% { opacity: 0; }
+      0% {
+        opacity: 0.7;
+      }
+
+      100% {
+        opacity: 0;
+      }
     }
 
     /* Markdown content */
@@ -437,7 +465,8 @@
       font-weight: 600;
     }
 
-    .popup-message-content ul, .popup-message-content ol {
+    .popup-message-content ul,
+    .popup-message-content ol {
       margin: 4px 0;
       padding-left: 16px;
     }
@@ -480,8 +509,13 @@
     }
 
     @keyframes fade-in {
-      from { opacity: 0; }
-      to { opacity: 1; }
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
     }
 
     .capture-mode-box {
@@ -502,8 +536,17 @@
     }
 
     @keyframes pulse-icon {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.1); opacity: 0.7; }
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.1);
+        opacity: 0.7;
+      }
     }
 
     .capture-mode-box span {
@@ -513,6 +556,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="popup-header">
     <div class="popup-title">
@@ -523,13 +567,13 @@
     <div class="popup-actions">
       <button class="popup-btn capture-btn" id="capture-btn" title="Capturar pantalla (Ctrl+Shift+S)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <circle cx="12" cy="12" r="3"/>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="12" cy="12" r="3" />
         </svg>
       </button>
       <button class="popup-btn" id="clear-chat-btn" title="Limpiar chat">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
         </svg>
       </button>
     </div>
@@ -537,16 +581,16 @@
 
   <div class="popup-preview" id="preview">
     <div class="preview-label">Captura actual:</div>
-    <img id="preview-img" src="" alt="Captura"/>
+    <img id="preview-img" src="" alt="Captura" />
     <button class="clear-btn" id="clear-preview-btn" title="Eliminar captura">×</button>
   </div>
 
   <div class="popup-messages" id="messages">
     <div class="popup-empty" id="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
-        <rect x="2" y="3" width="20" height="14" rx="2"/>
-        <circle cx="12" cy="10" r="3"/>
-        <path d="M8 21l4-4 4 4"/>
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <circle cx="12" cy="10" r="3" />
+        <path d="M8 21l4-4 4 4" />
       </svg>
       <p>Captura tu pantalla y pregunta sobre lo que ves</p>
       <span class="hint">Esta ventana se mantiene visible sobre otras apps</span>
@@ -558,8 +602,8 @@
       <textarea id="popup-input" placeholder="Pregunta sobre lo que ves..." rows="1"></textarea>
       <button class="popup-send-btn" id="send-btn" title="Enviar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="12" y1="19" x2="12" y2="5"/>
-          <polyline points="5 12 12 5 19 12"/>
+          <line x1="12" y1="19" x2="12" y2="5" />
+          <polyline points="5 12 12 5 19 12" />
         </svg>
       </button>
     </div>
@@ -570,7 +614,7 @@
 
   <script>
     const API_BASE = 'http://localhost:11434';
-    
+
     // Estado
     let currentCapture = null;
     let messages = [];
@@ -595,38 +639,38 @@
     async function init() {
       // Obtener referencia a la ventana padre
       parentWindow = window.opener;
-      
+
       // Cargar modelos
       await loadModels();
-      
+
       // Event listeners
       captureBtn.addEventListener('click', captureScreen);
       sendBtn.addEventListener('click', sendMessage);
       clearPreviewBtn.addEventListener('click', clearCapture);
       clearChatBtn.addEventListener('click', clearChat);
-      
+
       inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           sendMessage();
         }
       });
-      
+
       inputEl.addEventListener('input', autoResize);
-      
+
       modelSelect.addEventListener('change', (e) => {
         currentModel = e.target.value;
         // Sincronizar con la ventana padre si está disponible
         if (parentWindow && !parentWindow.closed) {
           try {
             parentWindow.postMessage({ type: 'modelChange', model: currentModel }, '*');
-          } catch (e) {}
+          } catch (e) { }
         }
       });
-      
+
       // Escuchar mensajes de la ventana padre
       window.addEventListener('message', handleParentMessage);
-      
+
       // Atajos de teclado
       document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.shiftKey && e.key === 'S') {
@@ -634,11 +678,11 @@
           captureScreen();
         }
       });
-      
+
       // Verificar conexión periódicamente
       setInterval(checkConnection, 5000);
       checkConnection();
-      
+
       // Enfocar input
       inputEl.focus();
     }
@@ -648,10 +692,10 @@
       try {
         const response = await fetch(`${API_BASE}/api/tags`);
         if (!response.ok) throw new Error('Error al cargar modelos');
-        
+
         const data = await response.json();
         const models = data?.models ?? [];
-        
+
         modelSelect.innerHTML = '';
         models.forEach(model => {
           const option = document.createElement('option');
@@ -659,20 +703,20 @@
           option.textContent = formatModelName(model.name);
           modelSelect.appendChild(option);
         });
-        
+
         // Intentar obtener el modelo actual de la ventana padre
         if (parentWindow && !parentWindow.closed) {
           try {
             parentWindow.postMessage({ type: 'getModel' }, '*');
-          } catch (e) {}
+          } catch (e) { }
         }
-        
+
         // Si no hay modelo seleccionado, usar el primero
         if (models.length > 0) {
           currentModel = models[0].name;
           modelSelect.value = currentModel;
         }
-        
+
         updateStatus(true);
       } catch (error) {
         console.error('Error loading models:', error);
@@ -694,7 +738,7 @@
     // Manejar mensajes de la ventana padre
     function handleParentMessage(event) {
       const data = event.data;
-      
+
       if (data.type === 'setModel' && data.model) {
         currentModel = data.model;
         if (modelSelect.querySelector(`option[value="${data.model}"]`)) {
@@ -707,13 +751,13 @@
     async function captureScreen() {
       try {
         captureBtn.classList.add('capturing');
-        
+
         // Ocultar completamente la ventana popup durante la captura
         document.body.style.opacity = '0';
-        
+
         // Pequeña espera para asegurar que esté oculta
         await new Promise(resolve => setTimeout(resolve, 50));
-        
+
         // Mostrar indicador de modo captura
         const indicator = document.createElement('div');
         indicator.className = 'capture-mode-overlay';
@@ -728,10 +772,10 @@
         `;
         document.body.appendChild(indicator);
         document.body.style.opacity = '1';
-        
+
         try {
           const stream = await navigator.mediaDevices.getDisplayMedia({
-            video: { 
+            video: {
               cursor: 'always',
               displaySurface: 'monitor'
             },
@@ -739,40 +783,40 @@
             preferCurrentTab: false,
             selfBrowserSurface: 'exclude'
           });
-          
+
           // Quitar indicador
           indicator.remove();
-          
+
           // Capturar frame INSTANTÁNEAMENTE
           const track = stream.getVideoTracks()[0];
           const imageCapture = new ImageCapture(track);
           const bitmap = await imageCapture.grabFrame();
-          
+
           // DETENER INMEDIATAMENTE
           stream.getTracks().forEach(track => track.stop());
-          
+
           const canvas = document.createElement('canvas');
           canvas.width = bitmap.width;
           canvas.height = bitmap.height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(bitmap, 0, 0);
-          
+
           currentCapture = canvas.toDataURL('image/png');
-          
+
           // Mostrar preview
           previewImg.src = currentCapture;
           previewEl.classList.add('visible');
-          
+
           // Flash
           showFlash();
-          
+
           inputEl.focus();
-          
+
         } catch (innerError) {
           indicator.remove();
           throw innerError;
         }
-        
+
       } catch (error) {
         console.error('Error capturando:', error);
         document.body.style.opacity = '1';
@@ -808,7 +852,7 @@
       const prompt = inputEl.value.trim();
       if (!prompt && !currentCapture) return;
       if (isLoading) return;
-      
+
       // Añadir mensaje del usuario
       const userMessage = {
         role: 'user',
@@ -817,21 +861,21 @@
         timestamp: Date.now()
       };
       messages.push(userMessage);
-      
+
       // Limpiar
       inputEl.value = '';
       autoResize();
       const capturedImage = currentCapture;
       clearCapture();
-      
+
       renderMessages();
       scrollToBottom();
-      
+
       // Mostrar loading
       showLoading();
       isLoading = true;
       sendBtn.disabled = true;
-      
+
       try {
         const apiMessages = [
           {
@@ -839,7 +883,7 @@
             content: 'Eres un asistente visual experto. El usuario te enviará capturas de pantalla y preguntas. Responde de manera concisa pero completa.'
           }
         ];
-        
+
         messages.forEach(msg => {
           const apiMsg = { role: msg.role, content: msg.content };
           if (msg.image && msg.role === 'user') {
@@ -848,7 +892,7 @@
           }
           apiMessages.push(apiMsg);
         });
-        
+
         const response = await fetch(`${API_BASE}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -859,31 +903,31 @@
             options: { num_ctx: 4096 }
           })
         });
-        
+
         if (!response.ok) throw new Error(response.statusText);
-        
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
         let assistantContent = '';
-        
+
         const assistantMessage = {
           role: 'assistant',
           content: '',
           timestamp: Date.now()
         };
         messages.push(assistantMessage);
-        
+
         hideLoading();
-        
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          
+
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() ?? '';
-          
+
           for (const line of lines) {
             if (!line.trim()) continue;
             try {
@@ -894,10 +938,10 @@
                 renderMessages();
                 scrollToBottom();
               }
-            } catch (e) {}
+            } catch (e) { }
           }
         }
-        
+
       } catch (error) {
         console.error('Error:', error);
         hideLoading();
@@ -920,35 +964,35 @@
         emptyState.style.display = 'flex';
         return;
       }
-      
+
       emptyState.style.display = 'none';
-      
+
       let html = '';
       messages.forEach(msg => {
         const time = formatTime(msg.timestamp);
         const isUser = msg.role === 'user';
-        
+
         html += `<div class="popup-message ${msg.role}">`;
-        
+
         if (isUser && msg.image) {
           html += `<img class="popup-message-image" src="${msg.image}" alt="Captura"/>`;
         }
-        
+
         const content = isUser ? escapeHtml(msg.content) : parseMarkdown(msg.content);
         html += `<div class="popup-message-content">${content}</div>`;
         html += `<span class="popup-message-time">${time}</span>`;
         html += '</div>';
       });
-      
+
       // Mantener el empty state oculto
       messagesContainer.innerHTML = html + '<div id="empty-state" class="popup-empty" style="display: none;"></div>';
-      
+
       // Renderizar matemáticas si está disponible
       if (typeof renderMathInElement !== 'undefined') {
         renderMathInElement(messagesContainer, {
           delimiters: [
-            {left: '$$', right: '$$', display: true},
-            {left: '$', right: '$', display: false}
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false }
           ],
           throwOnError: false
         });
@@ -1022,4 +1066,5 @@
     init();
   </script>
 </body>
+
 </html>

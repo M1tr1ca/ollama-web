@@ -5650,7 +5650,19 @@ const PHOTOS = [
   'photo/wallpaper2.jpg',
   'photo/Argenteuil. Yates-4kJbsbyBKFUobnFEKK3u-hd-png.png',
   'photo/Puente de Waterloo, Londres, al anochecer-2ZkCL0uZxiZy0h7jcnpQ-hd-png.png',
-  'photo/Canoe on the Epte-2HF5cCC7u0ju6eRcwdwr-hd-jpg.jpg'
+  'photo/Canoe on the Epte-2HF5cCC7u0ju6eRcwdwr-hd-jpg.jpg',
+  'photo/Las Islas de Port-Villez-1LNtwj4xtUd5RqE54JPX-hd-png (1).png',
+  'photo/the_seine_1971.57.1.jpg',
+  'photo/1968.88 - A City Park.jpg',
+  'photo/1985.1103 - Stacks of Wheat (End of Summer).jpg',
+  'photo/1926.224 - A Sunday on La Grande Jatte — 1884.jpg',
+  'photo/Las Islas de Port-Villez-1LNtwj4xtUd5RqE54JPX-hd-png.png',
+  'photo/El Sena en Port-Villez (Un Raffo de Viento)-0T6oJ5ptMReH7rOgm94n-hd-png.png',
+  'photo/El Sena cerca de Giverny-0HkCfvAxmenpol6H9BIu-hd-png.png',
+  'photo/El mar y los Alpes-07VL03N3u7FhWqbrjGZT-hd-png.png',
+  'photo/Zaan en Zaandam-7BpXtwQnAM6KtE5m5FZZ-hd-png.png',
+  'photo/A la orilla del fiordo de Christiania-69bKwEcyCS89HJYIHenO-hd-png.png',
+  'photo/Vista de Vetheuil sur Seine-1HAOmjsg9gjGzMgoXJTK-hd-png.png',
 ];
 
 function getTodayDateString() {
@@ -6322,11 +6334,11 @@ function updateGreeting() {
 
     const translated = window.translationManager.translate(greetingKey, { name: firstName });
     // Wrap with logo image and proper structure
-    greetingElement.innerHTML = `<img src="/assets/Logo.png" alt="" class="greeting-logo" /><span class="greeting-message">${translated}</span>`;
+    greetingElement.innerHTML = `<span class="greeting-message">${translated}</span>`;
   } else {
     // Fallback
     const { greeting } = getGreetingMessage();
-    greetingElement.innerHTML = `<img src="/assets/Logo.png" alt="" class="greeting-logo" /><span class="greeting-message">${greeting}, </span><span class="user-name">${firstName}</span>`;
+    greetingElement.innerHTML = `<span class="greeting-message">${greeting}, </span><span class="user-name">${firstName}</span>`;
   }
 }
 
@@ -10112,36 +10124,56 @@ function addFinding(container, finding) {
 async function generateResearchPlan(userQuery, signal = null) {
   console.log('🔬 Generando plan de investigación para:', userQuery);
 
-  const planPrompt = `Eres un asistente de investigación web experto. El usuario quiere investigar: "${userQuery}"
+  const planPrompt = `Eres un investigador científico experto. Debes crear un plan de investigación para: "${userQuery}"
 
-IMPORTANTE: Tu tarea es crear un plan de BÚSQUEDAS WEB específicas para encontrar la información que necesita el usuario.
+ESTRATEGIA:
+Genera EXACTAMENTE 4 búsquedas de Google que cubran diferentes aspectos del tema:
 
-Analiza la consulta del usuario y genera búsquedas de Google optimizadas. Por ejemplo:
-- Si busca vuelos: genera búsquedas como "vuelos Madrid Marsella enero 2025 precios", "ofertas vuelos baratos Madrid MRS", etc.
-- Si busca productos: genera búsquedas de comparativas, reviews, precios
-- Si busca información: genera búsquedas específicas del tema
+1. FUNDAMENTOS: Conceptos básicos, definiciones, qué es y cómo funciona
+2. APLICACIONES: Aplicaciones prácticas, ejemplos reales, casos de uso
+3. COMPARATIVA: Comparaciones, ventajas/desventajas, alternativas
+4. ACTUALIDAD: Novedades 2024-2025, mejores prácticas, tendencias
 
-Responde ÚNICAMENTE con un JSON válido (sin markdown, sin \`\`\`):
+IMPORTANTE: Cada búsqueda debe aportar información DIFERENTE y COMPLEMENTARIA.
+
+Responde SOLO con JSON válido (sin \`\`\` ni markdown):
 {
-  "mainQuestion": "Reformulación clara del objetivo del usuario",
+  "mainQuestion": "Reformulación clara de lo que el usuario quiere saber",
   "searchPlan": [
     {
       "id": "s1",
-      "searchQuery": "términos de búsqueda optimizados para Google",
-      "purpose": "Qué información se espera encontrar",
-      "category": "precios|comparativa|información|reviews|ofertas"
+      "searchQuery": "términos para buscar en Google sobre fundamentos",
+      "purpose": "Fundamentos y conceptos básicos",
+      "category": "fundamentos"
+    },
+    {
+      "id": "s2",
+      "searchQuery": "términos para buscar en Google sobre aplicaciones",
+      "purpose": "Aplicaciones prácticas y casos de uso",
+      "category": "aplicaciones"
+    },
+    {
+      "id": "s3",
+      "searchQuery": "términos para buscar en Google sobre comparación",
+      "purpose": "Análisis comparativo y crítico",
+      "category": "comparativa"
+    },
+    {
+      "id": "s4",
+      "searchQuery": "términos para buscar en Google sobre actualidad",
+      "purpose": "Actualidad y mejores prácticas",
+      "category": "actualidad"
     }
   ],
-  "approach": "Estrategia de la investigación"
+  "approach": "Investigación completa"
 }
 
 REGLAS:
-1. Genera entre 3-5 búsquedas específicas y distintas
-2. Las búsquedas deben ser términos que usarías en Google
-3. Cada búsqueda debe aportar información diferente
-4. Adapta las búsquedas al contexto (fechas, lugares, productos mencionados)
-5. Si hay fechas específicas, inclúyelas en las búsquedas
-6. Prioriza búsquedas que den resultados útiles y actuales`;
+- Las búsquedas deben usar SOLO términos relacionados con "${userQuery}"
+- NO incluyas información de otros temas
+- Si hay fechas/lugares específicos en la consulta, úsalos
+- Cada búsqueda debe cubrir un aspecto diferente
+- Usa términos naturales para Google (no preguntas completas)`;
 
   try {
     const response = await fetch(`${API_BASE}/api/chat`, {
@@ -10817,10 +10849,10 @@ async function investigateSubQuestionWithWeb(question, previousFindings = [], si
   let accumulatedContext = '';
   let currentAnswer = '';
 
-  // Construir contexto de hallazgos previos
+  // Construir contexto de hallazgos previos (solo los títulos, no el contenido completo)
   let contextFromFindings = '';
   if (previousFindings.length > 0) {
-    contextFromFindings = `\n\nContexto de hallazgos previos:\n${previousFindings.map((f, i) => `${i + 1}. ${f}`).join('\n')}`;
+    contextFromFindings = `\n\nTemas ya investigados (NO repitas esta información):\n${previousFindings.slice(0, 3).map((f, i) => `${i + 1}. ${f.substring(0, 80)}`).join('\n')}`;
   }
 
   // CICLO ITERATIVO: Buscar → Razonar → ¿Necesita más? → Buscar...
@@ -10895,23 +10927,81 @@ Responde SOLO con el término de búsqueda, sin explicaciones.`;
       progressCallback(`🧠 Analizando resultados (iteración ${iteration + 1}/${MAX_WEB_SEARCH_ITERATIONS})...`);
     }
 
-    const investigatePrompt = `Eres un investigador experto. Investiga la siguiente pregunta usando la información de búsqueda web proporcionada:
+    // Determinar el enfoque según la búsqueda
+    let focusInstruction = '';
+    const queryLower = question.toLowerCase();
+    
+    if (queryLower.includes('fundamentos') || queryLower.includes('explicación') || queryLower.includes('qué es') || queryLower.includes('cómo funciona')) {
+      focusInstruction = `
+ENFOQUE: FUNDAMENTOS Y CONCEPTOS
+- Define claramente el concepto principal
+- Explica cómo funciona de forma comprensible
+- Incluye principios básicos y teoría subyacente
+- Usa analogías si ayuda a la comprensión`;
+    } else if (queryLower.includes('aplicaciones') || queryLower.includes('casos') || queryLower.includes('ejemplos') || queryLower.includes('uso')) {
+      focusInstruction = `
+ENFOQUE: APLICACIONES PRÁCTICAS
+- Describe aplicaciones reales y casos de uso específicos
+- Incluye ejemplos concretos de implementación
+- Menciona industrias o contextos donde se usa
+- Destaca resultados o beneficios obtenidos`;
+    } else if (queryLower.includes('comparativa') || queryLower.includes('vs') || queryLower.includes('ventajas') || queryLower.includes('desventajas')) {
+      focusInstruction = `
+ENFOQUE: ANÁLISIS COMPARATIVO
+- Compara con alternativas o competidores
+- Lista ventajas y desventajas claramente
+- Analiza criterios de selección
+- Proporciona recomendaciones según escenarios`;
+    } else if (queryLower.includes('2024') || queryLower.includes('2025') || queryLower.includes('mejores') || queryLower.includes('actualidad') || queryLower.includes('tendencias')) {
+      focusInstruction = `
+ENFOQUE: ACTUALIDAD Y MEJORES PRÁCTICAS
+- Destaca información actualizada (2024-2025)
+- Menciona últimas tendencias y novedades
+- Incluye mejores prácticas recomendadas actualmente
+- Cita herramientas, versiones o métodos modernos`;
+    } else if (queryLower.includes('precio') || queryLower.includes('coste') || queryLower.includes('tarifa')) {
+      focusInstruction = `
+ENFOQUE: PRECIOS Y OPCIONES
+- Presenta rangos de precios específicos encontrados
+- Compara opciones disponibles con sus costes
+- Incluye factores que afectan al precio
+- Menciona ofertas o descuentos si se encuentran`;
+    }
 
-PREGUNTA: "${question}"
+    const investigatePrompt = `Eres un investigador científico experto. Tu tarea es analizar información web y responder de forma clara, estructurada y profesional.
+
+PREGUNTA DE INVESTIGACIÓN: "${question}"
 ${contextFromFindings}
+${focusInstruction}
 
 INFORMACIÓN DE BÚSQUEDA WEB:
 ${accumulatedContext}
 
-INSTRUCCIONES:
-1. Analiza cuidadosamente toda la información de las fuentes web
-2. Proporciona una respuesta COMPLETA y bien fundamentada
-3. Incluye datos específicos, estadísticas o ejemplos de las fuentes
-4. Si la información es sobre precios, incluye rangos de precios encontrados
-5. Cita las fuentes cuando sea relevante
-6. Estructura tu respuesta de forma clara
+INSTRUCCIONES CRÍTICAS:
+1. Analiza TODA la información de las fuentes web proporcionadas
+2. NO repitas información de temas ya investigados
+3. Enfócate SOLO en el aspecto específico de esta búsqueda
+4. Proporciona una respuesta COMPLETA, bien estructurada y profesional
+5. Incluye datos específicos, números, estadísticas o ejemplos concretos de las fuentes
+6. Usa subtítulos (##) para organizar secciones
+7. Usa listas con bullets (•) para enumerar puntos clave
+8. Usa **negritas** para destacar conceptos importantes
+9. Si hay tablas de datos, preséntelas en formato markdown
+10. Estructura tu respuesta para que sea útil en un informe profesional
 
-Proporciona tu análisis completo:`;
+FORMATO DE RESPUESTA:
+## [Título descriptivo]
+
+[Introducción breve]
+
+### [Subtítulo 1]
+• **Concepto clave**: Explicación
+• Punto relevante con datos específicos
+
+### [Subtítulo 2]
+[Contenido bien estructurado]
+
+Proporciona tu análisis completo y profesional:`;
 
     try {
       const response = await fetch(`${API_BASE}/api/chat`, {
@@ -10951,7 +11041,7 @@ Proporciona tu análisis completo:`;
   };
 }
 
-// Generar informe PDF profesional con diseño mejorado
+// Generar informe PDF profesional minimalista
 function generateResearchPDF(query, findings, synthesis, allSources) {
   console.log('📄 Generando informe PDF profesional...');
 
@@ -10971,21 +11061,176 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
+    const margin = 25;
     const contentWidth = pageWidth - (margin * 2);
     let yPos = margin;
 
-    // Función auxiliar para añadir nueva página si es necesario
+    // ========== COLORES MINIMALISTAS (solo blanco/negro/gris) ==========
+    const colors = {
+      black: [0, 0, 0],
+      darkGray: [60, 60, 60],
+      mediumGray: [120, 120, 120],
+      lightGray: [180, 180, 180],
+      veryLightGray: [240, 240, 240],
+      white: [255, 255, 255]
+    };
+
+    // ========== FUNCIONES AUXILIARES ==========
     const checkNewPage = (requiredSpace = 20) => {
       if (yPos + requiredSpace > pageHeight - margin) {
         doc.addPage();
-        yPos = margin;
+        addPageHeader();
+        yPos = margin + 15;
         return true;
       }
       return false;
     };
 
-    // Función para parsear tablas markdown de la síntesis
+    const addPageHeader = () => {
+      // Logo en la esquina superior izquierda
+      try {
+        const logoImg = new Image();
+        logoImg.src = '/assets/Logo.png';
+        doc.addImage(logoImg, 'PNG', margin, 10, 15, 15);
+      } catch (e) {
+        // Si no hay logo, mostrar texto simple
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...colors.darkGray);
+        doc.text('OLLAMA WEB', margin, 15);
+      }
+      
+      // Línea separadora delgada
+      doc.setDrawColor(...colors.lightGray);
+      doc.setLineWidth(0.3);
+      doc.line(margin, margin - 2, pageWidth - margin, margin - 2);
+    };
+
+    const cleanMarkdown = (text, preserveBold = false) => {
+      if (!text) return '';
+      let cleaned = text
+        .replace(/#{1,6}\s+/g, '')
+        .replace(/`(.+?)`/g, '$1')
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      
+      if (!preserveBold) {
+        cleaned = cleaned
+          .replace(/\*\*(.+?)\*\*/g, '$1')
+          .replace(/\*(.+?)\*/g, '$1');
+      }
+      
+      return cleaned;
+    };
+
+    const renderTextWithBold = (text, x, y, maxWidth) => {
+      // Renderizar texto con soporte para **negritas**
+      const parts = [];
+      let remaining = text;
+      let currentX = x;
+      let currentY = y;
+      
+      // Dividir por **texto** para detectar negritas
+      const boldRegex = /\*\*(.+?)\*\*/g;
+      let lastIndex = 0;
+      let match;
+      
+      while ((match = boldRegex.exec(text)) !== null) {
+        // Texto antes de la negrita
+        if (match.index > lastIndex) {
+          parts.push({ text: text.substring(lastIndex, match.index), bold: false });
+        }
+        // Texto en negrita
+        parts.push({ text: match[1], bold: true });
+        lastIndex = match.index + match[0].length;
+      }
+      
+      // Texto restante
+      if (lastIndex < text.length) {
+        parts.push({ text: text.substring(lastIndex), bold: false });
+      }
+      
+      // Si no hay negritas, renderizar normal
+      if (parts.length === 0) {
+        parts.push({ text: text, bold: false });
+      }
+      
+      // Renderizar cada parte
+      parts.forEach(part => {
+        doc.setFont('helvetica', part.bold ? 'bold' : 'normal');
+        const lines = doc.splitTextToSize(part.text, maxWidth - (currentX - x));
+        
+        lines.forEach((line, idx) => {
+          if (idx > 0) {
+            currentY += 5;
+            currentX = x;
+            checkNewPage(6);
+          }
+          doc.text(line, currentX, currentY);
+          currentX += doc.getTextWidth(line);
+          
+          // Si llegamos al final de la línea, nueva línea
+          if (currentX > x + maxWidth - 10) {
+            currentY += 5;
+            currentX = x;
+            checkNewPage(6);
+          }
+        });
+      });
+      
+      return currentY;
+    };
+
+    const parseContent = (text) => {
+      // Parsear el texto en secciones estructuradas
+      const sections = [];
+      const lines = text.split('\n');
+      let currentSection = null;
+      let currentContent = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        
+        // Detectar títulos (líneas que empiezan con #)
+        if (trimmed.match(/^#{1,3}\s+(.+)$/)) {
+          // Guardar sección anterior
+          if (currentSection || currentContent.length > 0) {
+            sections.push({
+              title: currentSection,
+              content: currentContent.join('\n').trim(),
+              type: 'section'
+            });
+          }
+          
+          const titleMatch = trimmed.match(/^#{1,3}\s+(.+)$/);
+          currentSection = cleanMarkdown(titleMatch[1]);
+          currentContent = [];
+        }
+        // Contenido normal
+        else if (trimmed.length > 0) {
+          currentContent.push(line);
+        }
+        // Línea vacía - separador de párrafos
+        else if (currentContent.length > 0) {
+          currentContent.push('');
+        }
+      }
+
+      // Guardar última sección
+      if (currentSection || currentContent.length > 0) {
+        sections.push({
+          title: currentSection,
+          content: currentContent.join('\n').trim(),
+          type: 'section'
+        });
+        currentSection = null;
+      }
+
+      return sections;
+    };
+
     const parseMarkdownTables = (text) => {
       const tables = [];
       const lines = text.split('\n');
@@ -10995,249 +11240,302 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
 
-        // Detectar línea de tabla (empieza y termina con |)
+        // Detectar línea de tabla
         if (line.startsWith('|') && line.endsWith('|')) {
           // Detectar separador de cabecera (|---|---|)
           if (line.match(/^\|[\s\-:|]+\|$/)) {
+            if (currentTable) {
             headerFound = true;
+            }
             continue;
           }
 
           // Parsear celdas
-          const cells = line.split('|').slice(1, -1).map(c => c.trim());
+          const cells = line.split('|')
+            .slice(1, -1)
+            .map(c => c.trim())
+            .filter(c => c.length > 0);
+          
+          if (cells.length === 0) continue;
 
           if (!currentTable) {
+            // Primera línea - asumimos que es header
             currentTable = { headers: cells, rows: [] };
           } else if (!headerFound) {
-            // Si aún no tenemos separador, esto podría ser la cabecera
+            // Si no hemos visto separador, esta línea es header
             currentTable.headers = cells;
           } else {
+            // Es una fila de datos
             currentTable.rows.push(cells);
           }
-        } else if (currentTable && currentTable.rows.length > 0) {
-          // Fin de tabla
+        } else {
+          // Línea no es tabla
+          if (currentTable && headerFound && currentTable.rows.length > 0) {
+            // Guardar tabla completa
           tables.push(currentTable);
-          currentTable = null;
-          headerFound = false;
-        } else if (currentTable && line === '') {
-          // Reset si hay línea vacía sin rows
+          }
           currentTable = null;
           headerFound = false;
         }
       }
 
-      // Añadir última tabla si existe
-      if (currentTable && currentTable.rows.length > 0) {
+      // Guardar última tabla si existe
+      if (currentTable && headerFound && currentTable.rows.length > 0) {
         tables.push(currentTable);
       }
 
       return tables;
     };
 
-    // Función para extraer secciones del contenido
-    const extractSections = (text) => {
-      const sections = {
-        methodology: '',
-        comparison: '',
-        analysis: '',
-        recommendation: '',
-        tips: '',
-        tables: []
-      };
-
-      // Extraer tablas
-      sections.tables = parseMarkdownTables(text);
-
-      // Buscar secciones por títulos
-      const lines = text.split('\n');
-      let currentSection = '';
-      let sectionContent = [];
-
-      const sectionKeywords = {
-        methodology: ['metodología', 'metodologia', 'búsqueda', 'busqueda', 'cómo se realizó'],
-        comparison: ['tabla comparativa', 'comparativa', 'comparación', 'opciones encontradas'],
-        analysis: ['análisis', 'analisis', 'detallado', 'pros y contras', 'ventajas'],
-        recommendation: ['recomendación', 'recomendacion', 'mejor opción', 'conclusión', 'conclusion'],
-        tips: ['consejos', 'tips', 'adicional', 'alternativas']
-      };
-
-      for (const line of lines) {
-        const lineLower = line.toLowerCase();
-        let foundSection = '';
-
-        for (const [section, keywords] of Object.entries(sectionKeywords)) {
-          if (keywords.some(kw => lineLower.includes(kw))) {
-            foundSection = section;
-            break;
-          }
-        }
-
-        if (foundSection && foundSection !== currentSection) {
-          if (currentSection && sectionContent.length > 0) {
-            sections[currentSection] = sectionContent.join('\n');
-          }
-          currentSection = foundSection;
-          sectionContent = [];
-        } else if (currentSection) {
-          sectionContent.push(line);
-        }
-      }
-
-      if (currentSection && sectionContent.length > 0) {
-        sections[currentSection] = sectionContent.join('\n');
-      }
-
-      return sections;
-    };
-
-    // ===== PORTADA CON LOGO =====
-    // Diseño limpio sin barra de color
-
-    // Intentar cargar el logo
+    // ========== PORTADA MINIMALISTA ==========
+    
+    // Logo
     try {
       const logoImg = new Image();
       logoImg.src = '/assets/Logo.png';
-      // Logo en la esquina superior izquierda
-      doc.addImage(logoImg, 'PNG', margin, 20, 20, 20);
+      doc.addImage(logoImg, 'PNG', margin, yPos, 25, 25);
+      yPos += 35;
     } catch (e) {
-      console.log('Logo no disponible, continuando sin él');
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...colors.black);
+      doc.text('OLLAMA WEB', margin, yPos);
+      yPos += 15;
     }
 
-    // Título "Ollama Web" al lado del logo con diseño limpio
-    doc.setFontSize(11);
+    // Título del informe
+    doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 41, 59); // Gris oscuro
-    doc.text('Ollama Web', margin + 24, 28);
+    doc.setTextColor(...colors.black);
+    doc.text('Informe de Investigación', margin, yPos);
+    yPos += 15;
 
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 116, 139); // Gris medio
-    doc.text('|', margin + 53, 28);
-
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    doc.text('Mi Investigación', margin + 57, 28);
-
-    // Título principal del informe con diseño limpio
-    yPos = 55;
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(15, 23, 42);
-
-    // Generar título inteligente basado en la query
-    let reportTitle = 'Informe de Investigación';
-    const queryLower = query.toLowerCase();
-    if (queryLower.includes('vuelo')) {
-      reportTitle = 'Análisis de Vuelos';
-    } else if (queryLower.includes('hotel')) {
-      reportTitle = 'Análisis de Alojamiento';
-    } else if (queryLower.includes('precio') || queryLower.includes('comprar')) {
-      reportTitle = 'Análisis Comparativo';
-    }
-
-    doc.text(reportTitle, pageWidth / 2, yPos, { align: 'center' });
-
-    // Subtítulo con la query
+    // Query del usuario
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(71, 85, 105);
-    const queryShort = query.length > 80 ? query.substring(0, 77) + '...' : query;
-    doc.text(queryShort, pageWidth / 2, yPos + 10, { align: 'center' });
+    doc.setTextColor(...colors.darkGray);
+    const queryLines = doc.splitTextToSize(query, contentWidth);
+    queryLines.forEach((line) => {
+      doc.text(line, margin, yPos);
+      yPos += 6;
+    });
+    yPos += 5;
 
-    // Fecha
+    // Fecha y metadatos
     doc.setFontSize(9);
-    doc.setTextColor(148, 163, 184);
+    doc.setTextColor(...colors.mediumGray);
     const dateStr = new Date().toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
-    doc.text(dateStr, pageWidth / 2, yPos + 18, { align: 'center' });
+    doc.text(dateStr, margin, yPos);
+    yPos += 5;
+    doc.text(`${findings.length} temas analizados | ${allSources.length} fuentes consultadas`, margin, yPos);
+    yPos += 15;
 
-    // Caja de estadísticas elegante
-    yPos = 85;
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(margin, yPos, contentWidth, 18, 3, 3, 'F');
+    // Línea separadora
+    doc.setDrawColor(...colors.lightGray);
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 12;
 
-    const statsY = yPos + 12;
-    doc.setFontSize(9);
+    // ========== CONTENIDO PRINCIPAL ==========
+    // Parsear el contenido de synthesis
+    const contentSections = parseContent(synthesis);
+    const tables = parseMarkdownTables(synthesis);
+
+    // Renderizar cada sección
+    contentSections.forEach((section, sectionIndex) => {
+      checkNewPage(30);
+
+      // Si hay título de sección
+      if (section.title) {
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...colors.black);
+        doc.text(section.title, margin, yPos);
+        yPos += 8;
+      }
+
+      // Contenido de la sección
+      if (section.content) {
+        const contentLines = section.content.split('\n');
+        let i = 0;
+        
+        while (i < contentLines.length) {
+          const line = contentLines[i];
+          const trimmed = line.trim();
+          
+          // Línea vacía - separador
+          if (trimmed.length === 0) {
+            yPos += 4;
+            i++;
+            continue;
+          }
+          
+          // Detectar lista (línea empieza con • o - o *)
+          if (trimmed.match(/^[•\-*]\s+/)) {
+            // Extraer el contenido sin el bullet
+            const itemText = trimmed.replace(/^[•\-*]\s+/, '');
+            
+            doc.setFontSize(10);
+            doc.setTextColor(...colors.darkGray);
+            
+            checkNewPage(8);
+            
+            // Dibujar bullet
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(75, 85, 99);
-
-    const colWidth = contentWidth / 3;
-
-    // Dibujar pequeños puntos como indicadores
-    doc.setFillColor(100, 116, 139);
-    doc.circle(margin + colWidth * 0.5 - 15, statsY - 2, 1.2, 'F');
-    doc.circle(margin + colWidth * 1.5 - 15, statsY - 2, 1.2, 'F');
-    doc.circle(margin + colWidth * 2.5 - 18, statsY - 2, 1.2, 'F');
-
-    doc.text(findings.length + ' temas', margin + colWidth * 0.5 - 8, statsY);
-    doc.text(allSources.length + ' fuentes', margin + colWidth * 1.5 - 8, statsY);
-    doc.text('Informe completo', margin + colWidth * 2.5 - 10, statsY);
-
-    yPos = 120;
-
-    // Extraer secciones de la síntesis
-    const sections = extractSections(synthesis);
-
-    // ===== METODOLOGÍA DE BÚSQUEDA =====
-    checkNewPage(40);
-
-    // Cabecera de sección con diseño limpio
-    doc.setFillColor(100, 116, 139);
-    doc.roundedRect(margin, yPos, 3, 14, 1.5, 1.5, 'F');
-
-    doc.setFontSize(13);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(51, 65, 85);
-    doc.text('Metodología de Búsqueda', margin + 8, yPos + 10);
-    yPos += 25;
-
-    // Contenido de metodología
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60, 60, 60);
-
-    let methodologyText = sections.methodology ||
-      `Se realizó una investigación exhaustiva utilizando múltiples fuentes web. ` +
-      `Se analizaron ${findings.length} aspectos diferentes del tema, consultando ${allSources.length} fuentes ` +
-      `para obtener información actualizada y relevante.`;
-
-    // Limpiar markdown
-    methodologyText = methodologyText
-      .replace(/#{1,6}\s/g, '')
-      .replace(/\*\*/g, '')
-      .replace(/\*/g, '')
-      .replace(/`/g, '')
-      .substring(0, 400);
-
-    const methodLines = doc.splitTextToSize(methodologyText, contentWidth - 15);
-    methodLines.forEach(line => {
-      checkNewPage();
-      doc.text(line, margin + 10, yPos);
+            doc.text('•', margin + 2, yPos);
+            
+            // Verificar si tiene **negrita**
+            if (itemText.includes('**')) {
+              // Dividir en partes: normal y negrita
+              const parts = [];
+              let remaining = itemText;
+              let match;
+              const boldRegex = /\*\*(.+?)\*\*/g;
+              let lastIndex = 0;
+              
+              while ((match = boldRegex.exec(itemText)) !== null) {
+                if (match.index > lastIndex) {
+                  parts.push({ text: itemText.substring(lastIndex, match.index), bold: false });
+                }
+                parts.push({ text: match[1], bold: true });
+                lastIndex = match.index + match[0].length;
+              }
+              
+              if (lastIndex < itemText.length) {
+                parts.push({ text: itemText.substring(lastIndex), bold: false });
+              }
+              
+              // Renderizar cada parte
+              let currentX = margin + 7;
+              let currentY = yPos;
+              
+              parts.forEach(part => {
+                doc.setFont('helvetica', part.bold ? 'bold' : 'normal');
+                
+                // Dividir texto en palabras para manejar saltos de línea
+                const words = part.text.split(' ');
+                words.forEach((word, wordIdx) => {
+                  const testText = word + (wordIdx < words.length - 1 ? ' ' : '');
+                  const wordWidth = doc.getTextWidth(testText);
+                  
+                  // Si la palabra no cabe, nueva línea
+                  if (currentX + wordWidth > margin + contentWidth) {
+                    currentY += 5;
+                    currentX = margin + 7;
+                    checkNewPage(6);
+                  }
+                  
+                  doc.text(testText, currentX, currentY);
+                  currentX += wordWidth;
+                });
+              });
+              
+              yPos = currentY + 5;
+              
+            } else {
+              // Sin negrita, renderizar normal
+              const itemLines = doc.splitTextToSize(itemText, contentWidth - 8);
+              itemLines.forEach((itemLine, idx) => {
+                if (idx > 0) checkNewPage(6);
+                doc.text(itemLine, margin + 7, yPos);
+                yPos += 5;
+              });
+            }
+            
+            yPos += 1;
+            i++;
+            continue;
+          }
+          
+          // Texto normal (párrafo)
+          doc.setFontSize(10);
+          doc.setTextColor(...colors.darkGray);
+          
+          checkNewPage(8);
+          
+          // Verificar si tiene **negrita**
+          if (trimmed.includes('**')) {
+            // Dividir en partes: normal y negrita
+            const parts = [];
+            let match;
+            const boldRegex = /\*\*(.+?)\*\*/g;
+            let lastIndex = 0;
+            
+            while ((match = boldRegex.exec(trimmed)) !== null) {
+              if (match.index > lastIndex) {
+                parts.push({ text: trimmed.substring(lastIndex, match.index), bold: false });
+              }
+              parts.push({ text: match[1], bold: true });
+              lastIndex = match.index + match[0].length;
+            }
+            
+            if (lastIndex < trimmed.length) {
+              parts.push({ text: trimmed.substring(lastIndex), bold: false });
+            }
+            
+            // Renderizar cada parte
+            let currentX = margin;
+            let currentY = yPos;
+            
+            parts.forEach(part => {
+              doc.setFont('helvetica', part.bold ? 'bold' : 'normal');
+              
+              // Dividir texto en palabras
+              const words = part.text.split(' ');
+              words.forEach((word, wordIdx) => {
+                const testText = word + (wordIdx < words.length - 1 ? ' ' : '');
+                const wordWidth = doc.getTextWidth(testText);
+                
+                // Si la palabra no cabe, nueva línea
+                if (currentX + wordWidth > margin + contentWidth) {
+                  currentY += 5;
+                  currentX = margin;
+                  checkNewPage(6);
+                }
+                
+                doc.text(testText, currentX, currentY);
+                currentX += wordWidth;
+              });
+            });
+            
+            yPos = currentY + 6;
+            
+          } else {
+            // Sin negrita, renderizar normal
+            doc.setFont('helvetica', 'normal');
+            const paraLines = doc.splitTextToSize(trimmed, contentWidth);
+            paraLines.forEach(paraLine => {
+              checkNewPage(6);
+              doc.text(paraLine, margin, yPos);
       yPos += 5;
     });
+            yPos += 2;
+          }
 
-    yPos += 10;
+          i++;
+        }
+      }
 
-    // ===== TABLA COMPARATIVA (si existe) =====
-    if (sections.tables.length > 0) {
-      checkNewPage(50);
+      yPos += 8;
+    });
 
-      doc.setFillColor(100, 116, 139);
-      doc.roundedRect(margin, yPos, 3, 14, 1.5, 1.5, 'F');
+    // ========== TABLAS (si existen) ==========
+    if (tables.length > 0) {
+      checkNewPage(40);
 
-      doc.setFontSize(13);
+      doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(51, 65, 85);
-      doc.text('Tabla Comparativa', margin + 8, yPos + 10);
-      yPos += 25;
+      doc.setTextColor(...colors.black);
+      doc.text('Datos Comparativos', margin, yPos);
+      yPos += 10;
 
-      // Usar jspdf-autotable para cada tabla
-      sections.tables.forEach((table, tableIndex) => {
+      tables.forEach((table) => {
         if (table.headers.length > 0 && table.rows.length > 0) {
-          checkNewPage(40);
+          checkNewPage(50);
 
           try {
             doc.autoTable({
@@ -11246,189 +11544,212 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
               body: table.rows,
               margin: { left: margin, right: margin },
               styles: {
-                fontSize: 8,
-                cellPadding: 3,
+                fontSize: 9,
+                cellPadding: 4,
                 overflow: 'linebreak',
-                halign: 'left'
+                halign: 'left',
+                textColor: colors.darkGray,
+                lineColor: colors.lightGray,
+                lineWidth: 0.1
               },
               headStyles: {
-                fillColor: [45, 55, 72],
-                textColor: [255, 255, 255],
+                fillColor: colors.darkGray,
+                textColor: colors.white,
                 fontStyle: 'bold',
-                fontSize: 9
+                fontSize: 9,
+                halign: 'center'
               },
               alternateRowStyles: {
-                fillColor: [248, 250, 252]
-              },
-              columnStyles: {
-                0: { cellWidth: 'auto' }
-              },
-              didDrawPage: function (data) {
-                yPos = data.cursor.y + 10;
+                fillColor: colors.veryLightGray
               }
             });
-
             yPos = doc.lastAutoTable.finalY + 15;
           } catch (tableError) {
             console.log('Error renderizando tabla:', tableError);
-            // Fallback: mostrar como texto
-            doc.setFontSize(9);
-            doc.text('Datos encontrados durante la investigación:', margin + 10, yPos);
-            yPos += 10;
           }
         }
       });
     }
 
-    // ===== ANÁLISIS DETALLADO =====
-    checkNewPage(40);
+    // ========== DETALLES DE HALLAZGOS ==========
+    if (findings.length > 0) {
+      checkNewPage(30);
 
-    doc.setFillColor(100, 116, 139);
-    doc.roundedRect(margin, yPos, 3, 14, 1.5, 1.5, 'F');
-
-    doc.setFontSize(13);
+      doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(51, 65, 85);
-    doc.text('Análisis Detallado', margin + 8, yPos + 10);
-    yPos += 25;
+      doc.setTextColor(...colors.black);
+      doc.text('Hallazgos Detallados', margin, yPos);
+      yPos += 10;
 
-    // Mostrar hallazgos clave
     findings.forEach((finding, index) => {
       checkNewPage(35);
 
-      // Cabecera del hallazgo
-      doc.setFillColor(249, 250, 251);
-      doc.roundedRect(margin + 5, yPos, contentWidth - 10, 10, 2, 2, 'F');
+        // Número del hallazgo
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...colors.mediumGray);
+        doc.text(`${index + 1}.`, margin, yPos);
 
+        // Pregunta/tema del hallazgo
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(55, 65, 81);
-      doc.text(`${index + 1}. ${finding.question.substring(0, 70)}`, margin + 10, yPos + 7);
-      yPos += 15;
+        doc.setTextColor(...colors.black);
+        const questionLines = doc.splitTextToSize(finding.question, contentWidth - 8);
+        questionLines.forEach(line => {
+          doc.text(line, margin + 6, yPos);
+          yPos += 6;
+        });
+        yPos += 2;
 
-      // Contenido resumido
+        // Respuesta del hallazgo
       doc.setFontSize(9);
+        doc.setTextColor(...colors.darkGray);
+        
+        const answerText = finding.answer || '';
+        const answerLines = answerText.split('\n');
+        
+        answerLines.forEach(answerLine => {
+          const trimmed = answerLine.trim();
+          if (trimmed.length === 0) {
+            yPos += 3;
+            return;
+          }
+          
+          checkNewPage(8);
+          
+          // Detectar lista
+          if (trimmed.match(/^[•\-*]\s+/)) {
+            const itemText = trimmed.replace(/^[•\-*]\s+/, '');
+            doc.setFont('helvetica', 'normal');
+            doc.text('•', margin + 8, yPos);
+            
+            if (itemText.includes('**')) {
+              // Con negritas
+              const parts = [];
+              let match;
+              const boldRegex = /\*\*(.+?)\*\*/g;
+              let lastIndex = 0;
+              
+              while ((match = boldRegex.exec(itemText)) !== null) {
+                if (match.index > lastIndex) {
+                  parts.push({ text: itemText.substring(lastIndex, match.index), bold: false });
+                }
+                parts.push({ text: match[1], bold: true });
+                lastIndex = match.index + match[0].length;
+              }
+              if (lastIndex < itemText.length) {
+                parts.push({ text: itemText.substring(lastIndex), bold: false });
+              }
+              
+              let currentX = margin + 13;
+              let currentY = yPos;
+              
+              parts.forEach(part => {
+                doc.setFont('helvetica', part.bold ? 'bold' : 'normal');
+                const words = part.text.split(' ');
+                words.forEach((word, wordIdx) => {
+                  const testText = word + (wordIdx < words.length - 1 ? ' ' : '');
+                  const wordWidth = doc.getTextWidth(testText);
+                  if (currentX + wordWidth > margin + contentWidth - 6) {
+                    currentY += 4.5;
+                    currentX = margin + 13;
+                    checkNewPage(6);
+                  }
+                  doc.text(testText, currentX, currentY);
+                  currentX += wordWidth;
+                });
+              });
+              yPos = currentY + 4.5;
+            } else {
+              // Sin negritas
+    doc.setFont('helvetica', 'normal');
+              const itemLines = doc.splitTextToSize(itemText, contentWidth - 15);
+              itemLines.forEach(itemLine => {
+                doc.text(itemLine, margin + 13, yPos);
+                yPos += 4.5;
+              });
+            }
+          } else {
+            // Párrafo normal
+            if (trimmed.includes('**')) {
+              // Con negritas
+              const parts = [];
+              let match;
+              const boldRegex = /\*\*(.+?)\*\*/g;
+              let lastIndex = 0;
+              
+              while ((match = boldRegex.exec(trimmed)) !== null) {
+                if (match.index > lastIndex) {
+                  parts.push({ text: trimmed.substring(lastIndex, match.index), bold: false });
+                }
+                parts.push({ text: match[1], bold: true });
+                lastIndex = match.index + match[0].length;
+              }
+              if (lastIndex < trimmed.length) {
+                parts.push({ text: trimmed.substring(lastIndex), bold: false });
+              }
+              
+              let currentX = margin + 6;
+              let currentY = yPos;
+              
+              parts.forEach(part => {
+                doc.setFont('helvetica', part.bold ? 'bold' : 'normal');
+                const words = part.text.split(' ');
+                words.forEach((word, wordIdx) => {
+                  const testText = word + (wordIdx < words.length - 1 ? ' ' : '');
+                  const wordWidth = doc.getTextWidth(testText);
+                  if (currentX + wordWidth > margin + contentWidth - 6) {
+                    currentY += 4.5;
+                    currentX = margin + 6;
+                    checkNewPage(6);
+                  }
+                  doc.text(testText, currentX, currentY);
+                  currentX += wordWidth;
+                });
+              });
+              yPos = currentY + 5;
+            } else {
+              // Sin negritas
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(75, 85, 99);
-
-      let cleanAnswer = finding.answer
-        .replace(/#{1,6}\s/g, '')
-        .replace(/\*\*/g, '')
-        .replace(/\*/g, '')
-        .replace(/`/g, '')
-        .replace(/\n\n+/g, '\n')
-        .substring(0, 600);
-
-      const answerLines = doc.splitTextToSize(cleanAnswer, contentWidth - 20);
-      answerLines.slice(0, 12).forEach(line => {
-        if (checkNewPage()) {
-          doc.setFontSize(8);
-          doc.setTextColor(150, 150, 150);
-          doc.text('(continuación del análisis)', margin, yPos - 5);
-          doc.setFontSize(9);
-          doc.setTextColor(75, 85, 99);
-        }
-        doc.text(line, margin + 10, yPos);
-        yPos += 4;
+              const paraLines = doc.splitTextToSize(trimmed, contentWidth - 6);
+              paraLines.forEach(paraLine => {
+                doc.text(paraLine, margin + 6, yPos);
+        yPos += 4.5;
       });
+              yPos += 1;
+            }
+          }
+        });
 
       // Fuentes del hallazgo
       if (finding.sources && finding.sources.length > 0) {
         yPos += 2;
-        doc.setFontSize(7);
-        doc.setTextColor(100, 116, 139);
-        const sourceDomains = finding.sources.slice(0, 2).map(s => {
-          try { return new URL(s.link).hostname; } catch { return 'web'; }
-        }).join(', ');
-        doc.text(`Fuentes: ${sourceDomains}`, margin + 10, yPos);
-      }
+          doc.setFontSize(8);
+          doc.setTextColor(...colors.mediumGray);
+          doc.setFont('helvetica', 'italic');
+          const sourceDomains = finding.sources.slice(0, 3).map(s => {
+            try { return new URL(s.link).hostname.replace('www.', ''); } catch { return ''; }
+          }).filter(d => d).join(', ');
+          if (sourceDomains) {
+            const sourceText = `Fuentes: ${sourceDomains}`;
+            doc.text(sourceText, margin + 6, yPos);
+            yPos += 5;
+          }
+        }
 
-      yPos += 10;
-    });
-
-    // ===== RECOMENDACIÓN FINAL =====
-    doc.addPage();
-    yPos = margin;
-
-    // Caja destacada para la recomendación
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(margin, yPos, contentWidth, 16, 3, 3, 'F');
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(margin, yPos, contentWidth, 16, 3, 3, 'S');
-
-    doc.setFontSize(13);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(51, 65, 85);
-    doc.text('Recomendación Final', margin + 8, yPos + 11);
-    yPos += 30;
-
-    // Contenido de la recomendación
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60, 60, 60);
-
-    let recommendationText = sections.recommendation ||
-      synthesis.split('\n').slice(-10).join(' ').substring(0, 800);
-
-    recommendationText = recommendationText
-      .replace(/#{1,6}\s/g, '')
-      .replace(/\*\*/g, '')
-      .replace(/\*/g, '')
-      .replace(/`/g, '');
-
-    const recLines = doc.splitTextToSize(recommendationText, contentWidth - 15);
-    recLines.forEach(line => {
-      checkNewPage();
-      doc.text(line, margin + 10, yPos);
-      yPos += 5;
-    });
-
-    yPos += 15;
-
-    // ===== CONSEJOS ADICIONALES (si existen) =====
-    if (sections.tips) {
-      checkNewPage(30);
-
-      doc.setFillColor(248, 250, 252);
-      doc.roundedRect(margin, yPos, contentWidth, 14, 3, 3, 'F');
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(51, 65, 85);
-      doc.text('Consejos Adicionales', margin + 8, yPos + 9.5);
-      yPos += 22;
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(60, 60, 60);
-
-      const tipsText = sections.tips
-        .replace(/#{1,6}\s/g, '')
-        .replace(/\*\*/g, '')
-        .replace(/\*/g, '')
-        .substring(0, 500);
-
-      const tipsLines = doc.splitTextToSize(tipsText, contentWidth - 15);
-      tipsLines.forEach(line => {
-        checkNewPage();
-        doc.text(line, margin + 10, yPos);
-        yPos += 4.5;
+        yPos += 8;
       });
     }
 
-    // ===== FUENTES BIBLIOGRÁFICAS =====
-    doc.addPage();
-    yPos = margin;
-
-    doc.setFillColor(100, 116, 139);
-    doc.roundedRect(margin, yPos, 3, 14, 1.5, 1.5, 'F');
-
-    doc.setFontSize(13);
+    // ========== FUENTES CONSULTADAS ==========
+    if (allSources.length > 0) {
+      checkNewPage(30);
+      
+      doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(51, 65, 85);
-    doc.text('Fuentes Consultadas', margin + 8, yPos + 10);
-    yPos += 25;
+      doc.setTextColor(...colors.black);
+      doc.text('Fuentes Consultadas', margin, yPos);
+      yPos += 10;
 
     // Eliminar duplicados
     const uniqueSources = [];
@@ -11440,88 +11761,63 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
       }
     });
 
-    // Crear tabla de fuentes
-    if (uniqueSources.length > 0) {
-      const sourcesTableData = uniqueSources.slice(0, 20).map((source, idx) => {
-        let domain = 'web';
-        try { domain = new URL(source.link).hostname; } catch { }
-        return [
-          (idx + 1).toString(),
-          (source.title || 'Sin título').substring(0, 50),
-          domain
-        ];
-      });
-
-      try {
-        doc.autoTable({
-          startY: yPos,
-          head: [['#', 'Título', 'Dominio']],
-          body: sourcesTableData,
-          margin: { left: margin, right: margin },
-          styles: {
-            fontSize: 8,
-            cellPadding: 3
-          },
-          headStyles: {
-            fillColor: [139, 92, 246],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold'
-          },
-          columnStyles: {
-            0: { cellWidth: 10 },
-            1: { cellWidth: 100 },
-            2: { cellWidth: 50 }
-          }
-        });
-
-        yPos = doc.lastAutoTable.finalY + 10;
-      } catch (e) {
-        // Fallback
-        uniqueSources.slice(0, 15).forEach((source, index) => {
-          checkNewPage(12);
-
-          let domain = 'web';
-          try { domain = new URL(source.link).hostname; } catch { }
+      // Listar fuentes de forma limpia
+      uniqueSources.slice(0, 30).forEach((source, index) => {
+        checkNewPage(10);
+        
+        let domain = '';
+        try { 
+          domain = new URL(source.link).hostname.replace('www.', ''); 
+        } catch { 
+          domain = 'web'; 
+        }
 
           doc.setFontSize(8);
-          doc.setTextColor(139, 92, 246);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...colors.mediumGray);
           doc.text(`[${index + 1}]`, margin, yPos);
 
-          doc.setTextColor(30, 41, 59);
-          doc.setFont('helvetica', 'bold');
-          doc.text((source.title || 'Sin título').substring(0, 60), margin + 10, yPos);
-
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(100, 116, 139);
-          doc.text(domain, margin + 10, yPos + 4);
-
-          yPos += 10;
+        doc.setTextColor(...colors.darkGray);
+        const title = (source.title || 'Sin título').substring(0, 70);
+        const titleLines = doc.splitTextToSize(title, contentWidth - 10);
+        titleLines.forEach((line, idx) => {
+          doc.text(line, margin + 8, yPos + (idx * 4));
         });
-      }
+        
+        const lastLineY = yPos + ((titleLines.length - 1) * 4) + 4;
+        doc.setFontSize(7);
+        doc.setTextColor(...colors.lightGray);
+        doc.text(domain, margin + 8, lastLineY);
+        
+        yPos = lastLineY + 5;
+      });
     }
 
-    // ===== PIE DE PÁGINA EN TODAS LAS PÁGINAS =====
+    // ========== PIE DE PÁGINA MINIMALISTA EN TODAS LAS PÁGINAS ==========
     const totalPages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
 
-      // Línea decorativa
-      doc.setDrawColor(200, 200, 200);
+      const footerY = pageHeight - 15;
+      
+      // Línea superior delgada
+      doc.setDrawColor(...colors.lightGray);
       doc.setLineWidth(0.3);
-      doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+      doc.line(margin, footerY, pageWidth - margin, footerY);
 
+      // Texto del footer
       doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...colors.mediumGray);
 
-      doc.setTextColor(255, 140, 66);
-      doc.text('Ollama Web', margin, pageHeight - 8);
+      // Ollama Web a la izquierda
+      doc.text('Ollama Web', margin, footerY + 6);
 
-      doc.setTextColor(150, 150, 150);
-      doc.text('Investigación Profunda', pageWidth - margin, pageHeight - 8, { align: 'right' });
+      // Número de página a la derecha
+      doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, footerY + 6, { align: 'right' });
     }
 
-    // Generar URL del PDF
+    // ========== GENERAR Y DEVOLVER PDF ==========
     console.log('📦 Generando blob del PDF...');
     const pdfBlob = doc.output('blob');
     console.log('✅ Blob generado:', pdfBlob.size, 'bytes');
@@ -11529,10 +11825,9 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
     const pdfUrl = URL.createObjectURL(pdfBlob);
     console.log('✅ URL del PDF creada:', pdfUrl);
 
-    // Guardar referencia para descarga
     webResearchCurrentPdfUrl = pdfUrl;
-
     return pdfUrl;
+
   } catch (error) {
     console.error('❌ Error al generar PDF:', error);
     throw error;
@@ -14814,10 +15109,8 @@ function toggleNewsView(view) {
     // Mark discover button as active
     if (discoverButton) discoverButton.classList.add('active');
 
-    // Initialize news if not done yet
-    if (!newsState.initialized) {
-      initializeNewsPanel();
-    }
+    // Siempre recargar noticias al abrir el panel (para obtener contenido actualizado)
+    initializeNewsPanel();
 
     console.log('📰 Switched to News view');
   } else {
@@ -14890,9 +15183,9 @@ async function initializeNewsPanel() {
     );
     updateWeatherUI(newsState.weather);
 
-    // 3. Fetch news
+    // 3. Fetch news (siempre forzar actualización para obtener noticias nuevas)
     console.log('📰 Fetching news...');
-    newsState.news = await newsServiceModule.fetchNews(newsState.location);
+    newsState.news = await newsServiceModule.fetchNews(newsState.location, 'general', true);
     newsState.allNews = [...newsState.news]; // Store all news for filtering
     renderNewsGrid(newsState.news);
 
