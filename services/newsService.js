@@ -1,12 +1,11 @@
 // ===========================
 // News Service
-// Obtener y procesar noticias con Serper API
+// Obtener y procesar noticias con GNews.io API
 // ===========================
 
 import { saveNewsCache, getNewsCache, clearNewsCache } from './cacheService.js';
 
-const SERPER_API_KEY = ''; // Se configura desde la UI o .env
-const SERPER_NEWS_URL = 'https://google.serper.dev/news';
+const GNEWS_BASE_URL = 'https://gnews.io/api/v4';
 
 // Noticias de demostración para cuando no hay API key
 const DEMO_NEWS = [
@@ -193,7 +192,7 @@ const DEMO_NEWS = [
 ];
 
 /**
- * Obtener noticias (desde caché, Serper API, o demo)
+ * Obtener noticias (desde caché, GNews.io API, o demo)
  * @param {Object} location - {lat, lon, city, country}
  * @param {string} category - Categoría (general, technology, business)
  * @param {boolean} forceRefresh - Si true, ignora el caché y obtiene noticias nuevas
@@ -214,58 +213,61 @@ export async function fetchNews(location = null, category = 'general', forceRefr
     }
 
     // Si no hay API key, usar noticias demo
-    const apiKey = getSerperApiKey();
+    const apiKey = getGNewsApiKey();
     if (!apiKey) {
-        console.log('📰 No Serper API key, using demo news');
+        console.log('📰 No GNews API key, using demo news');
         saveNewsCache(DEMO_NEWS);
         return DEMO_NEWS;
     }
 
     console.log('📰 API Key found:', apiKey.substring(0, 8) + '...');
 
-    // Buscar con Serper
+    // Buscar con GNews.io
     try {
-        const query = location?.city
-            ? `noticias ${location.city} ${category}`
-            : `noticias ${category} España`;
+        // Mapear categorías al formato de GNews
+        const gnewsCategory = mapCategoryToGNews(category);
 
-        console.log('📰 Serper query:', query);
-
-        const response = await fetch(SERPER_NEWS_URL, {
-            method: 'POST',
-            headers: {
-                'X-API-KEY': apiKey,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                q: query,
-                gl: 'es',
-                hl: 'es',
-                num: 15,
-                tbs: 'qdr:d' // Noticias del último día
-            })
+        // Construir URL con parámetros - Noticias globales en inglés (medios americanos)
+        const params = new URLSearchParams({
+            apikey: apiKey,
+            lang: 'en',
+            max: '20'
         });
 
-        console.log('📰 Serper response status:', response.status);
+        // Usar endpoint de top-headlines o search según la categoría
+        let url;
+        if (gnewsCategory && gnewsCategory !== 'general') {
+            params.append('category', gnewsCategory);
+            url = `${GNEWS_BASE_URL}/top-headlines?${params.toString()}`;
+        } else {
+            // Sin restricción de ubicación - noticias globales
+            url = `${GNEWS_BASE_URL}/top-headlines?${params.toString()}`;
+        }
+
+        console.log('📰 GNews URL:', url.replace(apiKey, '***'));
+
+        const response = await fetch(url);
+
+        console.log('📰 GNews response status:', response.status);
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('📰 Serper API error:', errorText);
-            throw new Error('Serper API request failed: ' + response.status);
+            console.error('📰 GNews API error:', errorText);
+            throw new Error('GNews API request failed: ' + response.status);
         }
 
         const data = await response.json();
-        console.log('📰 Serper raw response:', data);
+        console.log('📰 GNews raw response:', data);
 
-        const newsItems = data.news || [];
+        const newsItems = data.articles || [];
         console.log('📰 News items received:', newsItems.length);
 
         if (newsItems.length === 0) {
-            console.log('📰 No news from Serper, using demo news');
+            console.log('📰 No news from GNews, using demo news');
             return DEMO_NEWS;
         }
 
-        const news = parseSerperNews(newsItems);
+        const news = parseGNewsArticles(newsItems);
 
         if (news.length > 0) {
             saveNewsCache(news);
@@ -273,28 +275,60 @@ export async function fetchNews(location = null, category = 'general', forceRefr
 
         return news;
     } catch (error) {
-        console.error('📰 Error fetching news from Serper:', error);
+        console.error('📰 Error fetching news from GNews:', error);
         // Fallback a noticias demo
         return DEMO_NEWS;
     }
 }
 
 /**
- * Parsear respuesta de Serper a formato interno
- * @param {Array} serperNews 
+ * Mapear categorías internas al formato de GNews.io
+ * Categorías válidas de GNews: general, world, nation, business, technology, entertainment, sports, science, health
+ * @param {string} category 
+ * @returns {string}
+ */
+function mapCategoryToGNews(category) {
+    const categoryMap = {
+        'general': 'general',
+        'technology': 'technology',
+        'tecnología': 'technology',
+        'business': 'business',
+        'economía': 'business',
+        'economia': 'business',
+        'sports': 'sports',
+        'deportes': 'sports',
+        'science': 'science',
+        'ciencia': 'science',
+        'health': 'health',
+        'salud': 'health',
+        'entertainment': 'entertainment',
+        'entretenimiento': 'entertainment',
+        'world': 'world',
+        'internacional': 'world',
+        'nation': 'nation',
+        'política': 'nation',
+        'politica': 'nation'
+    };
+    return categoryMap[category?.toLowerCase()] || 'general';
+}
+
+/**
+ * Parsear respuesta de GNews.io a formato interno
+ * @param {Array} articles 
  * @returns {Array}
  */
-function parseSerperNews(serperNews) {
-    return serperNews.map((item, index) => ({
+function parseGNewsArticles(articles) {
+    return articles.map((item, index) => ({
         id: `news-${Date.now()}-${index}`,
         title: item.title || 'Sin título',
-        description: item.snippet || '',
-        url: item.link || '#',
-        imageUrl: item.imageUrl || getPlaceholderImage(index),
-        source: item.source || 'Fuente desconocida',
-        publishedAt: item.date || new Date().toISOString(),
-        category: detectCategory(item.title + ' ' + (item.snippet || '')),
-        timeAgo: formatTimeAgo(item.date)
+        description: item.description || '',
+        url: item.url || '#',
+        imageUrl: item.image || getPlaceholderImage(index),
+        source: item.source?.name || 'Fuente desconocida',
+        publishedAt: item.publishedAt || new Date().toISOString(),
+        category: detectCategory(item.title + ' ' + (item.description || '')),
+        timeAgo: formatTimeAgo(item.publishedAt),
+        content: item.content || '' // GNews incluye contenido parcial
     }));
 }
 
@@ -375,33 +409,33 @@ function getPlaceholderImage(index) {
 }
 
 /**
- * Obtener API key de Serper
+ * Obtener API key de GNews.io
  * @returns {string|null}
  */
-function getSerperApiKey() {
-    // Intentar desde localStorage primero
-    const stored = localStorage.getItem('serper-api-key');
+function getGNewsApiKey() {
+    // Leer desde localStorage
+    const stored = localStorage.getItem('gnews-api-key');
     if (stored) return stored;
 
     // Intentar desde variable de entorno (si usa Vite)
-    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SERPER_API_KEY) {
-        return import.meta.env.VITE_SERPER_API_KEY;
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GNEWS_API_KEY) {
+        return import.meta.env.VITE_GNEWS_API_KEY;
     }
 
     return null;
 }
 
 /**
- * Configurar API key de Serper
+ * Configurar API key de GNews.io
  * @param {string} apiKey 
  */
-export function setSerperApiKey(apiKey) {
-    localStorage.setItem('serper-api-key', apiKey);
+export function setGNewsApiKey(apiKey) {
+    localStorage.setItem('gnews-api-key', apiKey);
 }
 
 /**
- * Limpiar API key de Serper
+ * Limpiar API key de GNews.io
  */
-export function clearSerperApiKey() {
-    localStorage.removeItem('serper-api-key');
+export function clearGNewsApiKey() {
+    localStorage.removeItem('gnews-api-key');
 }

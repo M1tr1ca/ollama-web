@@ -962,6 +962,69 @@ body {
   color: rgba(255, 255, 255, 0.5);
 }
 
+.section-hint a {
+  color: var(--theme-primary);
+  text-decoration: none;
+}
+
+.section-hint a:hover {
+  text-decoration: underline;
+}
+
+/* API Keys Modal */
+.api-key-input-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.api-key-input-container .api-key-input {
+  flex: 1;
+  font-family: monospace;
+}
+
+.api-key-toggle-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.api-key-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.api-key-toggle-btn.active {
+  background: var(--theme-primary-alpha-15);
+  color: var(--theme-primary);
+  border-color: var(--theme-primary-alpha-30);
+}
+
+.api-keys-info {
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.api-keys-info p {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+}
+
 /* Selector de modos de chat visibles - Estilo Chip */
 .chat-modes-chips {
   display: flex;

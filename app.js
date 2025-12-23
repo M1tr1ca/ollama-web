@@ -7025,6 +7025,110 @@ function initUserMenu() {
       closeBackgroundPersonalizationModalFunc();
     });
   }
+
+  // ========================================
+  // Modal de API Keys
+  // ========================================
+  const apiKeysBtn = document.getElementById('api-keys-btn');
+  const apiKeysModal = document.getElementById('api-keys-modal');
+  const closeApiKeysModal = document.getElementById('close-api-keys-modal');
+  const cancelApiKeys = document.getElementById('cancel-api-keys');
+  const saveApiKeysBtn = document.getElementById('save-api-keys');
+  const serperApiKeyInput = document.getElementById('serper-api-key-input');
+  const gnewsApiKeyInput = document.getElementById('gnews-api-key-input');
+  const toggleSerperKey = document.getElementById('toggle-serper-key');
+  const toggleGnewsKey = document.getElementById('toggle-gnews-key');
+
+  // Función para cargar API keys guardadas
+  const loadApiKeys = () => {
+    if (serperApiKeyInput) {
+      serperApiKeyInput.value = localStorage.getItem('serper-api-key') || '';
+    }
+    if (gnewsApiKeyInput) {
+      gnewsApiKeyInput.value = localStorage.getItem('gnews-api-key') || '';
+    }
+  };
+
+  // Abrir modal de API Keys
+  if (apiKeysBtn) {
+    apiKeysBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (apiKeysModal) {
+        loadApiKeys();
+        apiKeysModal.style.display = 'flex';
+        if (settingsMenu) {
+          settingsMenu.style.display = 'none';
+        }
+        userMenu.style.display = 'none';
+        userCard.classList.remove('active');
+      }
+    });
+  }
+
+  // Cerrar modal de API Keys
+  const closeApiKeysModalFunc = () => {
+    if (apiKeysModal) {
+      apiKeysModal.style.display = 'none';
+    }
+  };
+
+  if (closeApiKeysModal) {
+    closeApiKeysModal.addEventListener('click', closeApiKeysModalFunc);
+  }
+
+  if (cancelApiKeys) {
+    cancelApiKeys.addEventListener('click', closeApiKeysModalFunc);
+  }
+
+  // Cerrar modal al hacer clic fuera
+  if (apiKeysModal) {
+    apiKeysModal.addEventListener('click', (e) => {
+      if (e.target === apiKeysModal) {
+        closeApiKeysModalFunc();
+      }
+    });
+  }
+
+  // Toggle para mostrar/ocultar API keys
+  if (toggleSerperKey && serperApiKeyInput) {
+    toggleSerperKey.addEventListener('click', () => {
+      const type = serperApiKeyInput.type === 'password' ? 'text' : 'password';
+      serperApiKeyInput.type = type;
+      toggleSerperKey.classList.toggle('active', type === 'text');
+    });
+  }
+
+  if (toggleGnewsKey && gnewsApiKeyInput) {
+    toggleGnewsKey.addEventListener('click', () => {
+      const type = gnewsApiKeyInput.type === 'password' ? 'text' : 'password';
+      gnewsApiKeyInput.type = type;
+      toggleGnewsKey.classList.toggle('active', type === 'text');
+    });
+  }
+
+  // Guardar API Keys
+  if (saveApiKeysBtn) {
+    saveApiKeysBtn.addEventListener('click', () => {
+      const serperKey = serperApiKeyInput?.value.trim() || '';
+      const gnewsKey = gnewsApiKeyInput?.value.trim() || '';
+
+      // Guardar o eliminar las keys según si están vacías
+      if (serperKey) {
+        localStorage.setItem('serper-api-key', serperKey);
+      } else {
+        localStorage.removeItem('serper-api-key');
+      }
+
+      if (gnewsKey) {
+        localStorage.setItem('gnews-api-key', gnewsKey);
+      } else {
+        localStorage.removeItem('gnews-api-key');
+      }
+
+      closeApiKeysModalFunc();
+      console.log('🔑 API Keys guardadas correctamente');
+    });
+  }
 }
 
 // Sistema de temas
@@ -9182,7 +9286,11 @@ let studyMode = false;
 
 // Variable para modo web (búsqueda en internet)
 let webSearchMode = false;
-const SERPER_API_KEY = '7ea5d17c7248272c4a1d3d0790ae7388e72f295c';
+
+// Función para obtener la API key de Serper desde localStorage
+function getSerperApiKey() {
+  return localStorage.getItem('serper-api-key') || null;
+}
 
 // Crear HTML estático de búsqueda web para restaurar desde el estado guardado
 function createWebSearchUIForRestore(webData) {
@@ -9493,10 +9601,16 @@ function addFinalSources(container, searchData) {
 // Función para buscar en la web con Serper API
 async function searchWeb(query) {
   try {
+    const apiKey = getSerperApiKey();
+    if (!apiKey) {
+      console.warn('⚠️ No hay API key de Serper configurada. Ve a Configuración > API Keys para añadirla.');
+      return null;
+    }
+
     const response = await fetch("https://google.serper.dev/search", {
       method: "POST",
       headers: {
-        "X-API-KEY": SERPER_API_KEY,
+        "X-API-KEY": apiKey,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -10930,7 +11044,7 @@ Responde SOLO con el término de búsqueda, sin explicaciones.`;
     // Determinar el enfoque según la búsqueda
     let focusInstruction = '';
     const queryLower = question.toLowerCase();
-    
+
     if (queryLower.includes('fundamentos') || queryLower.includes('explicación') || queryLower.includes('qué es') || queryLower.includes('cómo funciona')) {
       focusInstruction = `
 ENFOQUE: FUNDAMENTOS Y CONCEPTOS
@@ -11099,7 +11213,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
         doc.setTextColor(...colors.darkGray);
         doc.text('OLLAMA WEB', margin, 15);
       }
-      
+
       // Línea separadora delgada
       doc.setDrawColor(...colors.lightGray);
       doc.setLineWidth(0.3);
@@ -11114,13 +11228,13 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
         .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
-      
+
       if (!preserveBold) {
         cleaned = cleaned
           .replace(/\*\*(.+?)\*\*/g, '$1')
           .replace(/\*(.+?)\*/g, '$1');
       }
-      
+
       return cleaned;
     };
 
@@ -11130,12 +11244,12 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
       let remaining = text;
       let currentX = x;
       let currentY = y;
-      
+
       // Dividir por **texto** para detectar negritas
       const boldRegex = /\*\*(.+?)\*\*/g;
       let lastIndex = 0;
       let match;
-      
+
       while ((match = boldRegex.exec(text)) !== null) {
         // Texto antes de la negrita
         if (match.index > lastIndex) {
@@ -11145,22 +11259,22 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
         parts.push({ text: match[1], bold: true });
         lastIndex = match.index + match[0].length;
       }
-      
+
       // Texto restante
       if (lastIndex < text.length) {
         parts.push({ text: text.substring(lastIndex), bold: false });
       }
-      
+
       // Si no hay negritas, renderizar normal
       if (parts.length === 0) {
         parts.push({ text: text, bold: false });
       }
-      
+
       // Renderizar cada parte
       parts.forEach(part => {
         doc.setFont('helvetica', part.bold ? 'bold' : 'normal');
         const lines = doc.splitTextToSize(part.text, maxWidth - (currentX - x));
-        
+
         lines.forEach((line, idx) => {
           if (idx > 0) {
             currentY += 5;
@@ -11169,7 +11283,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
           }
           doc.text(line, currentX, currentY);
           currentX += doc.getTextWidth(line);
-          
+
           // Si llegamos al final de la línea, nueva línea
           if (currentX > x + maxWidth - 10) {
             currentY += 5;
@@ -11178,7 +11292,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
           }
         });
       });
-      
+
       return currentY;
     };
 
@@ -11192,7 +11306,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const trimmed = line.trim();
-        
+
         // Detectar títulos (líneas que empiezan con #)
         if (trimmed.match(/^#{1,3}\s+(.+)$/)) {
           // Guardar sección anterior
@@ -11203,7 +11317,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
               type: 'section'
             });
           }
-          
+
           const titleMatch = trimmed.match(/^#{1,3}\s+(.+)$/);
           currentSection = cleanMarkdown(titleMatch[1]);
           currentContent = [];
@@ -11245,7 +11359,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
           // Detectar separador de cabecera (|---|---|)
           if (line.match(/^\|[\s\-:|]+\|$/)) {
             if (currentTable) {
-            headerFound = true;
+              headerFound = true;
             }
             continue;
           }
@@ -11255,7 +11369,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
             .slice(1, -1)
             .map(c => c.trim())
             .filter(c => c.length > 0);
-          
+
           if (cells.length === 0) continue;
 
           if (!currentTable) {
@@ -11272,7 +11386,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
           // Línea no es tabla
           if (currentTable && headerFound && currentTable.rows.length > 0) {
             // Guardar tabla completa
-          tables.push(currentTable);
+            tables.push(currentTable);
           }
           currentTable = null;
           headerFound = false;
@@ -11288,7 +11402,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
     };
 
     // ========== PORTADA MINIMALISTA ==========
-    
+
     // Logo
     try {
       const logoImg = new Image();
@@ -11362,32 +11476,32 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
       if (section.content) {
         const contentLines = section.content.split('\n');
         let i = 0;
-        
+
         while (i < contentLines.length) {
           const line = contentLines[i];
           const trimmed = line.trim();
-          
+
           // Línea vacía - separador
           if (trimmed.length === 0) {
             yPos += 4;
             i++;
             continue;
           }
-          
+
           // Detectar lista (línea empieza con • o - o *)
           if (trimmed.match(/^[•\-*]\s+/)) {
             // Extraer el contenido sin el bullet
             const itemText = trimmed.replace(/^[•\-*]\s+/, '');
-            
+
             doc.setFontSize(10);
             doc.setTextColor(...colors.darkGray);
-            
+
             checkNewPage(8);
-            
+
             // Dibujar bullet
-    doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', 'normal');
             doc.text('•', margin + 2, yPos);
-            
+
             // Verificar si tiene **negrita**
             if (itemText.includes('**')) {
               // Dividir en partes: normal y negrita
@@ -11396,7 +11510,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
               let match;
               const boldRegex = /\*\*(.+?)\*\*/g;
               let lastIndex = 0;
-              
+
               while ((match = boldRegex.exec(itemText)) !== null) {
                 if (match.index > lastIndex) {
                   parts.push({ text: itemText.substring(lastIndex, match.index), bold: false });
@@ -11404,38 +11518,38 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
                 parts.push({ text: match[1], bold: true });
                 lastIndex = match.index + match[0].length;
               }
-              
+
               if (lastIndex < itemText.length) {
                 parts.push({ text: itemText.substring(lastIndex), bold: false });
               }
-              
+
               // Renderizar cada parte
               let currentX = margin + 7;
               let currentY = yPos;
-              
+
               parts.forEach(part => {
                 doc.setFont('helvetica', part.bold ? 'bold' : 'normal');
-                
+
                 // Dividir texto en palabras para manejar saltos de línea
                 const words = part.text.split(' ');
                 words.forEach((word, wordIdx) => {
                   const testText = word + (wordIdx < words.length - 1 ? ' ' : '');
                   const wordWidth = doc.getTextWidth(testText);
-                  
+
                   // Si la palabra no cabe, nueva línea
                   if (currentX + wordWidth > margin + contentWidth) {
                     currentY += 5;
                     currentX = margin + 7;
                     checkNewPage(6);
                   }
-                  
+
                   doc.text(testText, currentX, currentY);
                   currentX += wordWidth;
                 });
               });
-              
+
               yPos = currentY + 5;
-              
+
             } else {
               // Sin negrita, renderizar normal
               const itemLines = doc.splitTextToSize(itemText, contentWidth - 8);
@@ -11445,18 +11559,18 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
                 yPos += 5;
               });
             }
-            
+
             yPos += 1;
             i++;
             continue;
           }
-          
+
           // Texto normal (párrafo)
           doc.setFontSize(10);
           doc.setTextColor(...colors.darkGray);
-          
+
           checkNewPage(8);
-          
+
           // Verificar si tiene **negrita**
           if (trimmed.includes('**')) {
             // Dividir en partes: normal y negrita
@@ -11464,7 +11578,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
             let match;
             const boldRegex = /\*\*(.+?)\*\*/g;
             let lastIndex = 0;
-            
+
             while ((match = boldRegex.exec(trimmed)) !== null) {
               if (match.index > lastIndex) {
                 parts.push({ text: trimmed.substring(lastIndex, match.index), bold: false });
@@ -11472,38 +11586,38 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
               parts.push({ text: match[1], bold: true });
               lastIndex = match.index + match[0].length;
             }
-            
+
             if (lastIndex < trimmed.length) {
               parts.push({ text: trimmed.substring(lastIndex), bold: false });
             }
-            
+
             // Renderizar cada parte
             let currentX = margin;
             let currentY = yPos;
-            
+
             parts.forEach(part => {
               doc.setFont('helvetica', part.bold ? 'bold' : 'normal');
-              
+
               // Dividir texto en palabras
               const words = part.text.split(' ');
               words.forEach((word, wordIdx) => {
                 const testText = word + (wordIdx < words.length - 1 ? ' ' : '');
                 const wordWidth = doc.getTextWidth(testText);
-                
+
                 // Si la palabra no cabe, nueva línea
                 if (currentX + wordWidth > margin + contentWidth) {
                   currentY += 5;
                   currentX = margin;
                   checkNewPage(6);
                 }
-                
+
                 doc.text(testText, currentX, currentY);
                 currentX += wordWidth;
               });
             });
-            
+
             yPos = currentY + 6;
-            
+
           } else {
             // Sin negrita, renderizar normal
             doc.setFont('helvetica', 'normal');
@@ -11511,8 +11625,8 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
             paraLines.forEach(paraLine => {
               checkNewPage(6);
               doc.text(paraLine, margin, yPos);
-      yPos += 5;
-    });
+              yPos += 5;
+            });
             yPos += 2;
           }
 
@@ -11576,13 +11690,13 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
       checkNewPage(30);
 
       doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.setTextColor(...colors.black);
       doc.text('Hallazgos Detallados', margin, yPos);
       yPos += 10;
 
-    findings.forEach((finding, index) => {
-      checkNewPage(35);
+      findings.forEach((finding, index) => {
+        checkNewPage(35);
 
         // Número del hallazgo
         doc.setFontSize(10);
@@ -11591,8 +11705,8 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
         doc.text(`${index + 1}.`, margin, yPos);
 
         // Pregunta/tema del hallazgo
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(...colors.black);
         const questionLines = doc.splitTextToSize(finding.question, contentWidth - 8);
         questionLines.forEach(line => {
@@ -11602,34 +11716,34 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
         yPos += 2;
 
         // Respuesta del hallazgo
-      doc.setFontSize(9);
+        doc.setFontSize(9);
         doc.setTextColor(...colors.darkGray);
-        
+
         const answerText = finding.answer || '';
         const answerLines = answerText.split('\n');
-        
+
         answerLines.forEach(answerLine => {
           const trimmed = answerLine.trim();
           if (trimmed.length === 0) {
             yPos += 3;
             return;
           }
-          
+
           checkNewPage(8);
-          
+
           // Detectar lista
           if (trimmed.match(/^[•\-*]\s+/)) {
             const itemText = trimmed.replace(/^[•\-*]\s+/, '');
             doc.setFont('helvetica', 'normal');
             doc.text('•', margin + 8, yPos);
-            
+
             if (itemText.includes('**')) {
               // Con negritas
               const parts = [];
               let match;
               const boldRegex = /\*\*(.+?)\*\*/g;
               let lastIndex = 0;
-              
+
               while ((match = boldRegex.exec(itemText)) !== null) {
                 if (match.index > lastIndex) {
                   parts.push({ text: itemText.substring(lastIndex, match.index), bold: false });
@@ -11640,10 +11754,10 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
               if (lastIndex < itemText.length) {
                 parts.push({ text: itemText.substring(lastIndex), bold: false });
               }
-              
+
               let currentX = margin + 13;
               let currentY = yPos;
-              
+
               parts.forEach(part => {
                 doc.setFont('helvetica', part.bold ? 'bold' : 'normal');
                 const words = part.text.split(' ');
@@ -11662,7 +11776,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
               yPos = currentY + 4.5;
             } else {
               // Sin negritas
-    doc.setFont('helvetica', 'normal');
+              doc.setFont('helvetica', 'normal');
               const itemLines = doc.splitTextToSize(itemText, contentWidth - 15);
               itemLines.forEach(itemLine => {
                 doc.text(itemLine, margin + 13, yPos);
@@ -11677,7 +11791,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
               let match;
               const boldRegex = /\*\*(.+?)\*\*/g;
               let lastIndex = 0;
-              
+
               while ((match = boldRegex.exec(trimmed)) !== null) {
                 if (match.index > lastIndex) {
                   parts.push({ text: trimmed.substring(lastIndex, match.index), bold: false });
@@ -11688,10 +11802,10 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
               if (lastIndex < trimmed.length) {
                 parts.push({ text: trimmed.substring(lastIndex), bold: false });
               }
-              
+
               let currentX = margin + 6;
               let currentY = yPos;
-              
+
               parts.forEach(part => {
                 doc.setFont('helvetica', part.bold ? 'bold' : 'normal');
                 const words = part.text.split(' ');
@@ -11710,20 +11824,20 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
               yPos = currentY + 5;
             } else {
               // Sin negritas
-      doc.setFont('helvetica', 'normal');
+              doc.setFont('helvetica', 'normal');
               const paraLines = doc.splitTextToSize(trimmed, contentWidth - 6);
               paraLines.forEach(paraLine => {
                 doc.text(paraLine, margin + 6, yPos);
-        yPos += 4.5;
-      });
+                yPos += 4.5;
+              });
               yPos += 1;
             }
           }
         });
 
-      // Fuentes del hallazgo
-      if (finding.sources && finding.sources.length > 0) {
-        yPos += 2;
+        // Fuentes del hallazgo
+        if (finding.sources && finding.sources.length > 0) {
+          yPos += 2;
           doc.setFontSize(8);
           doc.setTextColor(...colors.mediumGray);
           doc.setFont('helvetica', 'italic');
@@ -11744,38 +11858,38 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
     // ========== FUENTES CONSULTADAS ==========
     if (allSources.length > 0) {
       checkNewPage(30);
-      
+
       doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.setTextColor(...colors.black);
       doc.text('Fuentes Consultadas', margin, yPos);
       yPos += 10;
 
-    // Eliminar duplicados
-    const uniqueSources = [];
-    const seenLinks = new Set();
-    allSources.forEach(source => {
-      if (!seenLinks.has(source.link)) {
-        seenLinks.add(source.link);
-        uniqueSources.push(source);
-      }
-    });
+      // Eliminar duplicados
+      const uniqueSources = [];
+      const seenLinks = new Set();
+      allSources.forEach(source => {
+        if (!seenLinks.has(source.link)) {
+          seenLinks.add(source.link);
+          uniqueSources.push(source);
+        }
+      });
 
       // Listar fuentes de forma limpia
       uniqueSources.slice(0, 30).forEach((source, index) => {
         checkNewPage(10);
-        
+
         let domain = '';
-        try { 
-          domain = new URL(source.link).hostname.replace('www.', ''); 
-        } catch { 
-          domain = 'web'; 
+        try {
+          domain = new URL(source.link).hostname.replace('www.', '');
+        } catch {
+          domain = 'web';
         }
 
-          doc.setFontSize(8);
+        doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...colors.mediumGray);
-          doc.text(`[${index + 1}]`, margin, yPos);
+        doc.text(`[${index + 1}]`, margin, yPos);
 
         doc.setTextColor(...colors.darkGray);
         const title = (source.title || 'Sin título').substring(0, 70);
@@ -11783,12 +11897,12 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
         titleLines.forEach((line, idx) => {
           doc.text(line, margin + 8, yPos + (idx * 4));
         });
-        
+
         const lastLineY = yPos + ((titleLines.length - 1) * 4) + 4;
         doc.setFontSize(7);
         doc.setTextColor(...colors.lightGray);
         doc.text(domain, margin + 8, lastLineY);
-        
+
         yPos = lastLineY + 5;
       });
     }
@@ -11799,7 +11913,7 @@ function generateResearchPDF(query, findings, synthesis, allSources) {
       doc.setPage(i);
 
       const footerY = pageHeight - 15;
-      
+
       // Línea superior delgada
       doc.setDrawColor(...colors.lightGray);
       doc.setLineWidth(0.3);
