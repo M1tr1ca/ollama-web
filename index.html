@@ -34,32 +34,53 @@
   <div id="app" class="layout">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
+        <span class="sidebar-logo-text">Kaisio Chat</span>
         <button id="toggle-sidebar" class="toggle-sidebar-button" title="Minimizar barra lateral">
           <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5" />
             <line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" stroke-width="1.5" />
           </svg>
         </button>
-        <span class="sidebar-logo-text">ollama-web</span>
       </div>
 
-      <button id="new-conversation" class="new-conversation-button" data-i18n="sidebar.newConversation">
-        <span class="icon">＋</span>
-        Nueva conversación
-      </button>
-
-      <button id="discover-news-btn" class="new-conversation-button discover-button">
-        <svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path
-            d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2">
-          </path>
-          <path d="M18 14h-8"></path>
-          <path d="M15 18h-5"></path>
-          <path d="M10 6h8v4h-8V6Z"></path>
-        </svg>
-        <span data-i18n="sidebar.discover">Descubrir</span>
-      </button>
+      <!-- Barra de acciones rápidas -->
+      <div class="sidebar-quick-actions">
+        <button id="new-conversation" class="quick-action-btn primary" title="Nueva conversación">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+        <button id="discover-news-btn" class="quick-action-btn" title="Descubrir">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path
+              d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2">
+            </path>
+            <path d="M18 14h-8"></path>
+            <path d="M15 18h-5"></path>
+            <path d="M10 6h8v4h-8V6Z"></path>
+          </svg>
+        </button>
+        <button id="todo-panel-btn" class="quick-action-btn" title="Lista de tareas">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+        </button>
+        <button id="calendar-panel-btn" class="quick-action-btn" title="Calendario">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+            <circle cx="12" cy="16" r="2"></circle>
+          </svg>
+        </button>
+      </div>
 
       <!-- Sección de Proyectos -->
 
@@ -1737,7 +1758,215 @@ C D E F | G A B c |"></textarea>
     <button class="tooltip-action" data-action="check-sources">Comprobar fuentes</button>
   </div>
 
-  <script type="module" src="/app.js"></script>
+  <!-- Panel de TODO -->
+  <div id="todo-panel" class="floating-panel todo-panel" style="display: none;">
+    <div class="floating-panel-header">
+      <div class="floating-panel-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 11l3 3L22 4"></path>
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+        </svg>
+        <span>Lista de Tareas</span>
+      </div>
+      <button class="floating-panel-close" id="todo-panel-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="todo-panel-content">
+      <div class="todo-input-container">
+        <input type="text" id="todo-input" class="todo-input" placeholder="Añadir nueva tarea...">
+        <button id="todo-add-btn" class="todo-add-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="todo-list" id="todo-list">
+        <div class="todo-empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          <p>No hay tareas pendientes</p>
+          <span>Añade una tarea para empezar</span>
+        </div>
+      </div>
+    </div>
+    <div class="todo-panel-footer">
+      <span id="todo-count">0 tareas pendientes</span>
+      <button id="todo-clear-completed" class="todo-clear-btn">Limpiar completadas</button>
+    </div>
+  </div>
+
+  <!-- Panel de Calendario -->
+  <div id="calendar-panel" class="floating-panel calendar-panel" style="display: none;">
+    <div class="floating-panel-header">
+      <div class="floating-panel-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span>Calendario</span>
+      </div>
+      <button class="floating-panel-close" id="calendar-panel-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="calendar-panel-content">
+      <!-- Selected day view with timeline -->
+      <div class="calendar-day-view" id="calendar-day-view" style="display: none;">
+        <div class="day-view-header">
+          <button id="day-view-back" class="day-view-back-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <span class="day-view-title" id="day-view-title">Martes – 2 dic 2025</span>
+        </div>
+        <!-- All-day events -->
+        <div class="day-view-allday" id="day-view-allday">
+          <span class="allday-label">todo<br>el día</span>
+          <div class="allday-events" id="allday-events"></div>
+        </div>
+        <!-- Timeline with hours -->
+        <div class="day-view-timeline" id="day-view-timeline">
+          <!-- Hours and events generated dynamically -->
+        </div>
+      </div>
+
+      <!-- Month view (default) -->
+      <div class="calendar-month-view" id="calendar-month-view">
+
+        <div class="calendar-nav">
+          <button id="calendar-prev" class="calendar-nav-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <span id="calendar-month-year" class="calendar-month-year">Diciembre 2025</span>
+          <button id="calendar-next" class="calendar-nav-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
+        <div class="calendar-grid">
+          <div class="calendar-weekdays">
+            <span>L</span>
+            <span>M</span>
+            <span>X</span>
+            <span>J</span>
+            <span>V</span>
+            <span>S</span>
+            <span>D</span>
+          </div>
+          <div class="calendar-days" id="calendar-days">
+            <!-- Los días se generan dinámicamente -->
+          </div>
+        </div>
+        <div class="calendar-events-section">
+          <div class="calendar-events-header">
+            <h4>Próximos</h4>
+            <button id="add-event-btn" class="add-event-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Añadir
+            </button>
+          </div>
+          <div class="calendar-events-list" id="calendar-events-list">
+            <div class="calendar-empty-state">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <p>No hay eventos próximos</p>
+            </div>
+          </div>
+        </div>
+      </div> <!-- End calendar-month-view -->
+    </div>
+
+    <!-- Modal para añadir evento al calendario -->
+    <div id="add-event-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content modal-content-small">
+        <div class="modal-header">
+          <h3>Nuevo evento</h3>
+          <button class="modal-close" id="close-add-event-modal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="event-form">
+            <div class="form-group">
+              <label for="event-title-input">Título</label>
+              <input type="text" id="event-title-input" class="modal-input" placeholder="Nombre del evento">
+            </div>
+
+            <div class="form-toggle">
+              <label>Todo el día</label>
+              <label class="allday-switch">
+                <input type="checkbox" id="event-allday-toggle">
+                <span class="allday-slider"></span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label for="event-date-input">Fecha</label>
+              <input type="date" id="event-date-input" class="modal-input">
+            </div>
+
+            <div class="form-row time-fields" id="event-time-fields">
+              <div class="form-group">
+                <label for="event-start-time">Empieza</label>
+                <input type="time" id="event-start-time" class="modal-input" value="09:00">
+              </div>
+              <div class="form-group">
+                <label for="event-end-time">Termina</label>
+                <input type="time" id="event-end-time" class="modal-input" value="10:00">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="event-description-input">Notas (opcional)</label>
+              <textarea id="event-description-input" class="modal-textarea-compact" rows="2"
+                placeholder="Detalles del evento..."></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Color</label>
+              <div class="event-color-picker" id="event-color-picker">
+                <button class="color-option" data-color="#d97757" style="background: #d97757;" title="Naranja"></button>
+                <button class="color-option" data-color="#10b981" style="background: #10b981;" title="Verde"></button>
+                <button class="color-option" data-color="#3b82f6" style="background: #3b82f6;" title="Azul"></button>
+                <button class="color-option" data-color="#8b5cf6" style="background: #8b5cf6;" title="Morado"></button>
+                <button class="color-option" data-color="#ec4899" style="background: #ec4899;" title="Rosa"></button>
+                <button class="color-option" data-color="#f59e0b" style="background: #f59e0b;"
+                  title="Amarillo"></button>
+                <button class="color-option" data-color="#ef4444" style="background: #ef4444;" title="Rojo"></button>
+                <button class="color-option" data-color="#6b7280" style="background: #6b7280;" title="Gris"></button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-button secondary" id="cancel-add-event">Cancelar</button>
+          <button class="modal-button primary" id="save-event">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/app.js"></script>
 </body>
 
 </html>

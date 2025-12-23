@@ -8334,7 +8334,7 @@ function renderProjectsList() {
 
 
     return `
-      <li class="project-item ${isActive ? 'active' : ''}" data-project-id="${project.id}">
+      <li class="project-item ${isActive ? 'active' : ''}" data-project-id="${project.id}" data-project-name="${escapeHtml(project.name || 'Sin nombre')}">
         <div class="project-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></div>
         <div class="project-item-info">
           <p class="project-item-name">${escapeHtml(project.name || 'Sin nombre')}</p>
@@ -15988,3 +15988,925 @@ window.newsPanelUtils = {
 window.closeNewsDetail = closeNewsDetail;
 
 console.log('📰 News Panel module loaded');
+
+// =====================================================
+// TODO PANEL FUNCTIONALITY
+// =====================================================
+
+const TODO_STORAGE_KEY = 'ollama-web-todos-v1';
+
+// State for TODO
+const todoState = {
+  todos: [],
+  initialized: false
+};
+
+// Load todos from localStorage
+function loadTodos() {
+  try {
+    const saved = localStorage.getItem(TODO_STORAGE_KEY);
+    if (saved) {
+      todoState.todos = JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Error loading todos:', e);
+    todoState.todos = [];
+  }
+}
+
+// Save todos to localStorage
+function saveTodos() {
+  try {
+    localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(todoState.todos));
+  } catch (e) {
+    console.error('Error saving todos:', e);
+  }
+}
+
+// Render TODO list
+function renderTodoList() {
+  const todoList = document.getElementById('todo-list');
+  const todoCount = document.getElementById('todo-count');
+  if (!todoList) return;
+
+  const pendingTodos = todoState.todos.filter(t => !t.completed);
+
+  if (todoState.todos.length === 0) {
+    todoList.innerHTML = `
+      <div class="todo-empty-state">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 11l3 3L22 4"></path>
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+        </svg>
+        <p>No hay tareas</p>
+        <span>Añade una tarea para empezar</span>
+      </div>
+    `;
+  } else {
+    // Group todos by date
+    const grouped = {};
+    todoState.todos.forEach(todo => {
+      const date = new Date(todo.createdAt).toISOString().split('T')[0];
+      if (!grouped[date]) grouped[date] = [];
+      grouped[date].push(todo);
+    });
+
+    // Sort dates descending (newest first)
+    const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+    let html = '';
+    sortedDates.forEach(date => {
+      html += `<div class="todo-date-group">
+        <div class="todo-date-header">${formatDateForTodo(date)}</div>`;
+
+      grouped[date].forEach(todo => {
+        html += `
+          <div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}">
+            <button class="todo-checkbox ${todo.completed ? 'checked' : ''}"></button>
+            <span class="todo-text">${escapeHtml(todo.text)}</span>
+            <button class="todo-delete">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        `;
+      });
+
+      html += '</div>';
+    });
+
+    todoList.innerHTML = html;
+  }
+
+  if (todoCount) {
+    const count = pendingTodos.length;
+    todoCount.textContent = `${count} ${count === 1 ? 'tarea' : 'tareas'}`;
+  }
+}
+
+// Format date for todo display
+function formatDateForTodo(dateStr) {
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const todayStr = today.toISOString().split('T')[0];
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  if (dateStr === todayStr) {
+    return 'Hoy';
+  } else if (dateStr === yesterdayStr) {
+    return 'Ayer';
+  } else {
+    return dateStr; // YYYY-MM-DD format like in the image
+  }
+}
+
+// Add a new todo
+function addTodo(text) {
+  if (!text.trim()) return;
+
+  const todo = {
+    id: Date.now().toString(),
+    text: text.trim(),
+    completed: false,
+    createdAt: new Date().toISOString()
+  };
+
+  todoState.todos.unshift(todo);
+  saveTodos();
+  renderTodoList();
+}
+
+// Toggle todo completion
+function toggleTodo(id) {
+  const todo = todoState.todos.find(t => t.id === id);
+  if (todo) {
+    todo.completed = !todo.completed;
+    saveTodos();
+    renderTodoList();
+  }
+}
+
+// Delete a todo
+function deleteTodo(id) {
+  todoState.todos = todoState.todos.filter(t => t.id !== id);
+  saveTodos();
+  renderTodoList();
+}
+
+// Clear completed todos
+function clearCompletedTodos() {
+  todoState.todos = todoState.todos.filter(t => !t.completed);
+  saveTodos();
+  renderTodoList();
+}
+
+// Initialize TODO panel
+function initTodoPanel() {
+  if (todoState.initialized) return;
+
+  loadTodos();
+  renderTodoList();
+
+  // Event listeners
+  const todoPanel = document.getElementById('todo-panel');
+  const todoPanelBtn = document.getElementById('todo-panel-btn');
+  const todoPanelClose = document.getElementById('todo-panel-close');
+  const todoInput = document.getElementById('todo-input');
+  const todoAddBtn = document.getElementById('todo-add-btn');
+  const todoClearCompleted = document.getElementById('todo-clear-completed');
+  const todoList = document.getElementById('todo-list');
+
+  if (todoPanelBtn) {
+    todoPanelBtn.addEventListener('click', () => {
+      if (todoPanel) {
+        todoPanel.style.display = todoPanel.style.display === 'none' ? 'flex' : 'none';
+        // Close calendar if open
+        const calendarPanel = document.getElementById('calendar-panel');
+        if (calendarPanel) calendarPanel.style.display = 'none';
+      }
+    });
+  }
+
+  if (todoPanelClose) {
+    todoPanelClose.addEventListener('click', () => {
+      if (todoPanel) todoPanel.style.display = 'none';
+    });
+  }
+
+  if (todoInput && todoAddBtn) {
+    todoAddBtn.addEventListener('click', () => {
+      addTodo(todoInput.value);
+      todoInput.value = '';
+    });
+
+    todoInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        addTodo(todoInput.value);
+        todoInput.value = '';
+      }
+    });
+  }
+
+  if (todoClearCompleted) {
+    todoClearCompleted.addEventListener('click', clearCompletedTodos);
+  }
+
+  if (todoList) {
+    todoList.addEventListener('click', (e) => {
+      const todoItem = e.target.closest('.todo-item');
+      if (!todoItem) return;
+
+      const id = todoItem.dataset.id;
+
+      // Si hace clic en eliminar, eliminar
+      if (e.target.closest('.todo-delete')) {
+        deleteTodo(id);
+      } else {
+        // Cualquier otro clic en el item lo marca/desmarca
+        toggleTodo(id);
+      }
+    });
+  }
+
+  todoState.initialized = true;
+  console.log('✅ TODO Panel initialized');
+}
+
+// =====================================================
+// CALENDAR PANEL FUNCTIONALITY
+// =====================================================
+
+const CALENDAR_STORAGE_KEY = 'ollama-web-calendar-events-v1';
+
+// State for Calendar
+const calendarState = {
+  events: [],
+  currentDate: new Date(),
+  selectedDate: null,
+  selectedColor: '#d97757',
+  initialized: false
+};
+
+// Month names in Spanish
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+// Load events from localStorage
+function loadCalendarEvents() {
+  try {
+    const saved = localStorage.getItem(CALENDAR_STORAGE_KEY);
+    if (saved) {
+      calendarState.events = JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Error loading calendar events:', e);
+    calendarState.events = [];
+  }
+}
+
+// Save events to localStorage
+function saveCalendarEvents() {
+  try {
+    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(calendarState.events));
+  } catch (e) {
+    console.error('Error saving calendar events:', e);
+  }
+}
+
+// Render calendar grid
+function renderCalendar() {
+  const monthYearEl = document.getElementById('calendar-month-year');
+  const daysEl = document.getElementById('calendar-days');
+
+  if (!monthYearEl || !daysEl) return;
+
+  const year = calendarState.currentDate.getFullYear();
+  const month = calendarState.currentDate.getMonth();
+
+  monthYearEl.textContent = `${MONTH_NAMES[month]} ${year}`;
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDay = (firstDay.getDay() + 6) % 7; // Adjust for Monday start
+  const daysInMonth = lastDay.getDate();
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  let daysHTML = '';
+
+  // Previous month days
+  const prevMonthDays = new Date(year, month, 0).getDate();
+  for (let i = startDay - 1; i >= 0; i--) {
+    daysHTML += `<div class="calendar-day other-month"><span class="day-number">${prevMonthDays - i}</span></div>`;
+  }
+
+  // Current month days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === calendarState.selectedDate;
+    const dayEvents = calendarState.events.filter(e => e.date === dateStr);
+    const hasEvent = dayEvents.length > 0;
+
+    let classes = 'calendar-day';
+    if (isToday) classes += ' today';
+    if (isSelected) classes += ' selected';
+    if (hasEvent) classes += ' has-event';
+
+    // Generate event titles (show all)
+    let eventsHTML = '';
+    if (hasEvent) {
+      eventsHTML = dayEvents.map(event =>
+        `<span class="day-event-title" style="--event-color: ${event.color}">${escapeHtml(event.title)}</span>`
+      ).join('');
+    }
+
+    daysHTML += `
+      <div class="${classes}" data-date="${dateStr}">
+        <span class="day-number">${day}</span>
+        <div class="day-events">${eventsHTML}</div>
+      </div>`;
+  }
+
+  // Next month days
+  const remainingDays = 42 - (startDay + daysInMonth);
+  for (let day = 1; day <= remainingDays; day++) {
+    daysHTML += `<div class="calendar-day other-month"><span class="day-number">${day}</span></div>`;
+  }
+
+  daysEl.innerHTML = daysHTML;
+}
+
+// Format time for display
+function formatTimeDisplay(time) {
+  if (!time) return '';
+  const [hours, minutes] = time.split(':');
+  const h = parseInt(hours);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+}
+
+// Select a calendar day and show day view
+function selectCalendarDay(dateStr) {
+  calendarState.selectedDate = dateStr;
+
+  const monthView = document.getElementById('calendar-month-view');
+  const dayView = document.getElementById('calendar-day-view');
+
+  if (monthView && dayView) {
+    monthView.style.display = 'none';
+    dayView.style.display = 'flex';
+    renderDayTimeline(dateStr);
+  }
+
+  renderCalendar(); // Update selection highlight
+}
+
+// Close day view and return to month view
+function closeDayView() {
+  calendarState.selectedDate = null;
+
+  const monthView = document.getElementById('calendar-month-view');
+  const dayView = document.getElementById('calendar-day-view');
+
+  if (monthView && dayView) {
+    dayView.style.display = 'none';
+    monthView.style.display = 'block';
+  }
+
+  renderCalendar();
+}
+
+// Render day timeline view
+function renderDayTimeline(dateStr) {
+  const titleEl = document.getElementById('day-view-title');
+  const allDayEl = document.getElementById('allday-events');
+  const timelineEl = document.getElementById('day-view-timeline');
+  const allDaySection = document.getElementById('day-view-allday');
+
+  if (!titleEl || !allDayEl || !timelineEl) return;
+
+  // Format date title
+  const date = new Date(dateStr);
+  const weekday = date.toLocaleDateString('es-ES', { weekday: 'long' });
+  const day = date.getDate();
+  const month = date.toLocaleDateString('es-ES', { month: 'short' });
+  const year = date.getFullYear();
+  titleEl.textContent = `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} – ${day} ${month} ${year}`;
+
+  // Get events for this day
+  const dayEvents = calendarState.events.filter(e => e.date === dateStr);
+  const allDayEvents = dayEvents.filter(e => e.allDay);
+  const timedEvents = dayEvents.filter(e => !e.allDay && e.startTime);
+
+  // Render all-day events
+  if (allDayEvents.length > 0) {
+    allDaySection.style.display = 'flex';
+    allDayEl.innerHTML = allDayEvents.map(event => `
+      <div class="allday-event" style="--event-color: ${event.color}" data-id="${event.id}">
+        <span class="allday-event-title">${escapeHtml(event.title)}</span>
+      </div>
+    `).join('');
+  } else {
+    allDaySection.style.display = 'none';
+  }
+
+  // Constants for timeline
+  const HOUR_HEIGHT = 50; // pixels per hour
+  const START_HOUR = 8;
+  const END_HOUR = 23;
+
+  // Generate hour lines
+  let hoursHTML = '';
+  for (let hour = START_HOUR; hour <= END_HOUR; hour++) {
+    const hourStr = String(hour).padStart(2, '0') + ':00';
+    hoursHTML += `
+      <div class="timeline-hour" style="height: ${HOUR_HEIGHT}px;">
+        <span class="hour-label">${hourStr}</span>
+        <div class="hour-line"></div>
+      </div>
+    `;
+  }
+
+  // Generate events with calculated positions and heights
+  // First, process events to detect overlaps
+  const processedEvents = timedEvents.map(event => {
+    const [startH, startM] = event.startTime.split(':').map(Number);
+    let endH = startH + 1; // Default 1 hour duration
+    let endM = startM;
+
+    if (event.endTime) {
+      [endH, endM] = event.endTime.split(':').map(Number);
+    }
+
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    const startOffset = (startH - START_HOUR) + (startM / 60);
+    const topPosition = startOffset * HOUR_HEIGHT;
+    const durationHours = (endH - startH) + ((endM - startM) / 60);
+    const height = Math.max(durationHours * HOUR_HEIGHT, 30);
+
+    return {
+      ...event,
+      startMinutes,
+      endMinutes,
+      topPosition,
+      height,
+      column: 0,
+      totalColumns: 1
+    };
+  });
+
+  // Sort by start time
+  processedEvents.sort((a, b) => a.startMinutes - b.startMinutes);
+
+  // Detect overlaps and assign columns
+  for (let i = 0; i < processedEvents.length; i++) {
+    const current = processedEvents[i];
+    const overlapping = [current];
+
+    // Find all events that overlap with current
+    for (let j = 0; j < processedEvents.length; j++) {
+      if (i === j) continue;
+      const other = processedEvents[j];
+      
+      // Check if events overlap
+      if (current.startMinutes < other.endMinutes && current.endMinutes > other.startMinutes) {
+        overlapping.push(other);
+      }
+    }
+
+    // Assign columns to overlapping events
+    const totalColumns = overlapping.length;
+    overlapping.forEach((evt, index) => {
+      if (evt.totalColumns < totalColumns) {
+        evt.totalColumns = totalColumns;
+        evt.column = index;
+      }
+    });
+  }
+
+  // Generate HTML with column positioning
+  let eventsHTML = '';
+  processedEvents.forEach(event => {
+    const timeRange = event.endTime
+      ? `${event.startTime} - ${event.endTime}`
+      : event.startTime;
+
+    // Add small gap between simultaneous events
+    const gap = 4; // pixels
+    const totalGaps = event.totalColumns > 1 ? (event.totalColumns - 1) * gap : 0;
+    const availableWidth = `calc(100% - 70px - ${totalGaps}px)`;
+    const width = event.totalColumns > 1 
+      ? `calc(${availableWidth} / ${event.totalColumns})` 
+      : 'calc(100% - 70px)';
+    
+    const gapOffset = event.column * gap;
+    const left = event.totalColumns > 1 
+      ? `calc(70px + (${availableWidth} / ${event.totalColumns}) * ${event.column} + ${gapOffset}px)` 
+      : '70px';
+
+    eventsHTML += `
+      <div class="timeline-event" 
+           style="--event-color: ${event.color}; top: ${event.topPosition}px; height: ${event.height}px; width: ${width}; left: ${left};" 
+           data-id="${event.id}">
+        <span class="timeline-event-title">${escapeHtml(event.title)}</span>
+        <span class="timeline-event-time">${timeRange}</span>
+      </div>
+    `;
+  });
+
+  timelineEl.innerHTML = `
+    <div class="timeline-hours">${hoursHTML}</div>
+    <div class="timeline-events">${eventsHTML}</div>
+  `;
+}
+
+// Render events list (only future events)
+function renderEventsList() {
+  const listEl = document.getElementById('calendar-events-list');
+  if (!listEl) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Filter and sort future events
+  const futureEvents = calendarState.events.filter(event => {
+    const eventDate = new Date(event.date);
+    eventDate.setHours(0, 0, 0, 0);
+    return eventDate >= today;
+  }).sort((a, b) => {
+    const dateCompare = new Date(a.date) - new Date(b.date);
+    if (dateCompare !== 0) return dateCompare;
+    if (a.allDay && !b.allDay) return -1;
+    if (!a.allDay && b.allDay) return 1;
+    if (a.startTime && b.startTime) return a.startTime.localeCompare(b.startTime);
+    return 0;
+  });
+
+  if (futureEvents.length === 0) {
+    listEl.innerHTML = `
+      <div class="calendar-empty-state">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <p>No hay eventos próximos</p>
+      </div>
+    `;
+  } else {
+    listEl.innerHTML = futureEvents.map(event => {
+      const eventDate = new Date(event.date);
+      const todayDate = new Date();
+      todayDate.setHours(0, 0, 0, 0);
+      eventDate.setHours(0, 0, 0, 0);
+
+      const diffDays = Math.floor((eventDate - todayDate) / (1000 * 60 * 60 * 24));
+      let dateLabel = '';
+      if (diffDays === 0) dateLabel = 'Hoy';
+      else if (diffDays === 1) dateLabel = 'Mañana';
+      else dateLabel = eventDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+
+      let timeStr = '';
+      if (event.allDay) {
+        timeStr = 'Todo el día';
+      } else if (event.startTime) {
+        timeStr = formatTimeDisplay(event.startTime);
+        if (event.endTime) {
+          timeStr += ' - ' + formatTimeDisplay(event.endTime);
+        }
+      }
+
+      return `
+        <div class="calendar-event-item" style="--event-color: ${event.color}" data-id="${event.id}">
+          <div class="event-color-dot"></div>
+          <div class="event-info">
+            <p class="event-title">${escapeHtml(event.title)}</p>
+            <p class="event-date">${dateLabel}${timeStr ? ' • ' + timeStr : ''}</p>
+          </div>
+          <div class="event-actions">
+            <button class="event-edit-btn" title="Editar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button class="event-delete-btn" title="Eliminar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+// Add event
+function addCalendarEvent(title, date, description, color, startTime, endTime, allDay) {
+  if (!title.trim() || !date) return;
+
+  const event = {
+    id: Date.now().toString(),
+    title: title.trim(),
+    date: date,
+    description: description?.trim() || '',
+    color: color || '#d97757',
+    startTime: allDay ? null : (startTime || null),
+    endTime: allDay ? null : (endTime || null),
+    allDay: allDay || false,
+    createdAt: new Date().toISOString()
+  };
+
+  calendarState.events.push(event);
+  saveCalendarEvents();
+  renderCalendar();
+  renderEventsList();
+}
+
+// Delete event
+function deleteCalendarEvent(id) {
+  calendarState.events = calendarState.events.filter(e => e.id !== id);
+  saveCalendarEvents();
+  renderCalendar();
+  renderEventsList();
+  // Refresh day view if open
+  if (calendarState.selectedDate) {
+    renderDayTimeline(calendarState.selectedDate);
+  }
+}
+
+// Open modal to edit event
+function openEditEventModal(eventId) {
+  const event = calendarState.events.find(e => e.id === eventId);
+  if (!event) return;
+
+  const addEventModal = document.getElementById('add-event-modal');
+  if (!addEventModal) return;
+
+  // Store editing state
+  calendarState.editingEventId = eventId;
+
+  // Update modal title
+  const modalTitle = addEventModal.querySelector('.modal-header h3');
+  if (modalTitle) modalTitle.textContent = 'Editar evento';
+
+  // Fill form with event data
+  const titleInput = document.getElementById('event-title-input');
+  const dateInput = document.getElementById('event-date-input');
+  const descInput = document.getElementById('event-description-input');
+  const startTimeInput = document.getElementById('event-start-time');
+  const endTimeInput = document.getElementById('event-end-time');
+  const allDayToggle = document.getElementById('event-allday-toggle');
+  const timeFields = document.getElementById('event-time-fields');
+
+  if (titleInput) titleInput.value = event.title;
+  if (dateInput) dateInput.value = event.date;
+  if (descInput) descInput.value = event.description || '';
+  if (startTimeInput) startTimeInput.value = event.startTime || '09:00';
+  if (endTimeInput) endTimeInput.value = event.endTime || '10:00';
+  if (allDayToggle) allDayToggle.checked = event.allDay || false;
+  if (timeFields) timeFields.style.display = event.allDay ? 'none' : 'flex';
+
+  // Set selected color
+  calendarState.selectedColor = event.color || '#d97757';
+  document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
+  document.querySelector(`.color-option[data-color="${event.color}"]`)?.classList.add('selected');
+
+  addEventModal.style.display = 'flex';
+}
+
+// Update existing event
+function updateCalendarEvent(id, title, date, description, color, startTime, endTime, allDay) {
+  const eventIndex = calendarState.events.findIndex(e => e.id === id);
+  if (eventIndex === -1) return;
+
+  calendarState.events[eventIndex] = {
+    ...calendarState.events[eventIndex],
+    title: title.trim(),
+    date: date,
+    description: description?.trim() || '',
+    color: color || '#d97757',
+    startTime: allDay ? null : (startTime || null),
+    endTime: allDay ? null : (endTime || null),
+    allDay: allDay || false
+  };
+
+  saveCalendarEvents();
+  renderCalendar();
+  renderEventsList();
+  // Refresh day view if open
+  if (calendarState.selectedDate) {
+    renderDayTimeline(calendarState.selectedDate);
+  }
+}
+
+// Navigate calendar
+function navigateCalendar(direction) {
+  const current = calendarState.currentDate;
+  calendarState.currentDate = new Date(current.getFullYear(), current.getMonth() + direction, 1);
+  renderCalendar();
+}
+
+// Initialize Calendar panel
+function initCalendarPanel() {
+  if (calendarState.initialized) return;
+
+  loadCalendarEvents();
+  renderCalendar();
+  renderEventsList();
+
+  // Event listeners
+  const calendarPanel = document.getElementById('calendar-panel');
+  const calendarPanelBtn = document.getElementById('calendar-panel-btn');
+  const calendarPanelClose = document.getElementById('calendar-panel-close');
+  const calendarPrev = document.getElementById('calendar-prev');
+  const calendarNext = document.getElementById('calendar-next');
+  const addEventBtn = document.getElementById('add-event-btn');
+  const addEventModal = document.getElementById('add-event-modal');
+  const closeAddEventModal = document.getElementById('close-add-event-modal');
+  const cancelAddEvent = document.getElementById('cancel-add-event');
+  const saveEventBtn = document.getElementById('save-event');
+  const eventColorPicker = document.getElementById('event-color-picker');
+  const eventsList = document.getElementById('calendar-events-list');
+
+  if (calendarPanelBtn) {
+    calendarPanelBtn.addEventListener('click', () => {
+      if (calendarPanel) {
+        calendarPanel.style.display = calendarPanel.style.display === 'none' ? 'flex' : 'none';
+        // Close todo if open
+        const todoPanel = document.getElementById('todo-panel');
+        if (todoPanel) todoPanel.style.display = 'none';
+      }
+    });
+  }
+
+  if (calendarPanelClose) {
+    calendarPanelClose.addEventListener('click', () => {
+      if (calendarPanel) calendarPanel.style.display = 'none';
+    });
+  }
+
+  if (calendarPrev) {
+    calendarPrev.addEventListener('click', () => navigateCalendar(-1));
+  }
+
+  if (calendarNext) {
+    calendarNext.addEventListener('click', () => navigateCalendar(1));
+  }
+
+  // Day click event listener (for selecting a day)
+  const calendarDays = document.getElementById('calendar-days');
+  if (calendarDays) {
+    calendarDays.addEventListener('click', (e) => {
+      const dayEl = e.target.closest('.calendar-day:not(.other-month)');
+      if (dayEl && dayEl.dataset.date) {
+        selectCalendarDay(dayEl.dataset.date);
+      }
+    });
+  }
+
+  // Back button from day view
+  const dayViewBack = document.getElementById('day-view-back');
+  if (dayViewBack) {
+    dayViewBack.addEventListener('click', closeDayView);
+  }
+
+  // Click on timeline event to edit
+  const dayViewTimeline = document.getElementById('day-view-timeline');
+  if (dayViewTimeline) {
+    dayViewTimeline.addEventListener('click', (e) => {
+      const eventEl = e.target.closest('.timeline-event');
+      if (eventEl && eventEl.dataset.id) {
+        openEditEventModal(eventEl.dataset.id);
+      }
+    });
+  }
+
+  // Click on all-day event to edit
+  const allDayEvents = document.getElementById('allday-events');
+  if (allDayEvents) {
+    allDayEvents.addEventListener('click', (e) => {
+      const eventEl = e.target.closest('.allday-event');
+      if (eventEl && eventEl.dataset.id) {
+        openEditEventModal(eventEl.dataset.id);
+      }
+    });
+  }
+
+  if (addEventBtn) {
+    addEventBtn.addEventListener('click', () => {
+      if (addEventModal) {
+        addEventModal.style.display = 'flex';
+        // Clear editing state (we're adding new, not editing)
+        calendarState.editingEventId = null;
+        // Reset modal title
+        const modalTitle = addEventModal.querySelector('.modal-header h3');
+        if (modalTitle) modalTitle.textContent = 'Nuevo evento';
+        // Reset form
+        document.getElementById('event-title-input').value = '';
+        document.getElementById('event-date-input').value = new Date().toISOString().split('T')[0];
+        document.getElementById('event-description-input').value = '';
+
+        // Reset time fields
+        const startTimeInput = document.getElementById('event-start-time');
+        const endTimeInput = document.getElementById('event-end-time');
+        const allDayToggle = document.getElementById('event-allday-toggle');
+        const timeFields = document.getElementById('event-time-fields');
+
+        if (startTimeInput) startTimeInput.value = '09:00';
+        if (endTimeInput) endTimeInput.value = '10:00';
+        if (allDayToggle) allDayToggle.checked = false;
+        if (timeFields) timeFields.style.display = 'flex';
+
+        calendarState.selectedColor = '#d97757';
+        // Reset color selection
+        document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
+        document.querySelector('.color-option[data-color="#d97757"]')?.classList.add('selected');
+      }
+    });
+  }
+
+  // All-day toggle handler
+  const allDayToggle = document.getElementById('event-allday-toggle');
+  const timeFields = document.getElementById('event-time-fields');
+
+  if (allDayToggle && timeFields) {
+    allDayToggle.addEventListener('change', () => {
+      timeFields.style.display = allDayToggle.checked ? 'none' : 'flex';
+    });
+  }
+
+  const closeModal = () => {
+    if (addEventModal) addEventModal.style.display = 'none';
+    // Reset editing state
+    calendarState.editingEventId = null;
+    // Reset modal title
+    const modalTitle = addEventModal?.querySelector('.modal-header h3');
+    if (modalTitle) modalTitle.textContent = 'Nuevo evento';
+  };
+
+  if (closeAddEventModal) closeAddEventModal.addEventListener('click', closeModal);
+  if (cancelAddEvent) cancelAddEvent.addEventListener('click', closeModal);
+
+  if (saveEventBtn) {
+    saveEventBtn.addEventListener('click', () => {
+      const title = document.getElementById('event-title-input')?.value;
+      const date = document.getElementById('event-date-input')?.value;
+      const description = document.getElementById('event-description-input')?.value;
+      const startTime = document.getElementById('event-start-time')?.value;
+      const endTime = document.getElementById('event-end-time')?.value;
+      const isAllDay = document.getElementById('event-allday-toggle')?.checked || false;
+
+      if (title && date) {
+        if (calendarState.editingEventId) {
+          // Update existing event
+          updateCalendarEvent(calendarState.editingEventId, title, date, description, calendarState.selectedColor, startTime, endTime, isAllDay);
+        } else {
+          // Add new event
+          addCalendarEvent(title, date, description, calendarState.selectedColor, startTime, endTime, isAllDay);
+        }
+        closeModal();
+      }
+    });
+  }
+
+  if (eventColorPicker) {
+    eventColorPicker.addEventListener('click', (e) => {
+      const colorOption = e.target.closest('.color-option');
+      if (colorOption) {
+        calendarState.selectedColor = colorOption.dataset.color;
+        document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
+        colorOption.classList.add('selected');
+      }
+    });
+  }
+
+  if (eventsList) {
+    eventsList.addEventListener('click', (e) => {
+      const eventItem = e.target.closest('.calendar-event-item');
+      if (!eventItem) return;
+
+      const editBtn = e.target.closest('.event-edit-btn');
+      const deleteBtn = e.target.closest('.event-delete-btn');
+
+      if (editBtn) {
+        openEditEventModal(eventItem.dataset.id);
+      } else if (deleteBtn) {
+        deleteCalendarEvent(eventItem.dataset.id);
+      }
+    });
+  }
+
+  calendarState.initialized = true;
+  console.log('📅 Calendar Panel initialized');
+}
+
+// Initialize panels on load
+document.addEventListener('DOMContentLoaded', () => {
+  initTodoPanel();
+  initCalendarPanel();
+});
+
+// Also initialize if DOM is already loaded
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(() => {
+    initTodoPanel();
+    initCalendarPanel();
+  }, 100);
+}
+
+console.log('✅ TODO and Calendar modules loaded');
