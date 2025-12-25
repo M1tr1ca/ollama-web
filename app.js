@@ -2270,7 +2270,14 @@ function renderConversationList() {
   if (!conversationList) return;
   conversationList.innerHTML = '';
 
-  if (state.order.length === 0) {
+  // Filtrar conversaciones que pertenecen a un proyecto (estas se mostrarán solo en la vista del proyecto)
+  const filteredOrder = state.order.filter(id => {
+    const conversation = state.conversations[id];
+    // Excluir conversaciones que pertenecen a un proyecto
+    return conversation && !conversation.projectId;
+  });
+
+  if (filteredOrder.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'conversation-item';
     empty.textContent = 'No hay conversaciones todavía';
@@ -2278,17 +2285,12 @@ function renderConversationList() {
     return;
   }
 
-  state.order.forEach((id) => {
+  filteredOrder.forEach((id) => {
     const conversation = state.conversations[id];
     if (!conversation) return;
 
     const item = document.createElement('li');
     item.className = `conversation-item${id === state.activeId ? ' active' : ''}`;
-
-    // Añadir clase si pertenece a un proyecto
-    if (conversation.projectId && projectsState?.projects[conversation.projectId]) {
-      item.classList.add('has-project');
-    }
 
     const textBlock = document.createElement('div');
     textBlock.className = 'conversation-text';
@@ -2309,14 +2311,6 @@ function renderConversationList() {
     const defaultTitle = window.translationManager ? window.translationManager.translate('chat.newConversation') : DEFAULT_TITLE;
     titleText.textContent = isDefault ? defaultTitle : currentTitle;
     name.appendChild(titleText);
-
-    // Show project tag if exists
-    if (conversation.projectId && projectsState?.projects[conversation.projectId]) {
-      const projectTag = document.createElement('span');
-      projectTag.className = 'conversation-project-tag';
-      projectTag.textContent = projectsState.projects[conversation.projectId].name;
-      name.appendChild(projectTag);
-    }
 
     const preview = document.createElement('p');
     preview.className = 'conversation-preview';
@@ -8715,6 +8709,750 @@ function initProjectSystem() {
 
   // Inicializar sistema de información de contexto
   initProjectContextInfo();
+
+  // Inicializar panel de proyectos (nuevo sistema)
+  initProjectsPanel();
+}
+
+// ========================================
+// Panel de Proyectos (estilo Claude)
+// ========================================
+
+let projectsPanelVisible = false;
+let projectDetailViewId = null;
+let projectsSearchTerm = '';
+let projectsSortBy = 'activity';
+
+function initProjectsPanel() {
+  // Botón de proyectos en el sidebar
+  const projectsPanelBtn = document.getElementById('projects-panel-btn');
+  if (projectsPanelBtn) {
+    projectsPanelBtn.addEventListener('click', () => {
+      toggleProjectsPanel();
+    });
+  }
+
+  // Botón nuevo proyecto desde el panel
+  const newProjectFromPanelBtn = document.getElementById('new-project-from-panel-btn');
+  if (newProjectFromPanelBtn) {
+    newProjectFromPanelBtn.addEventListener('click', () => {
+      openProjectModal();
+    });
+  }
+
+  // Búsqueda de proyectos
+  const searchInput = document.getElementById('projects-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      projectsSearchTerm = e.target.value.toLowerCase();
+      renderProjectsPanelGrid();
+    });
+  }
+
+  // Ordenación de proyectos
+  const sortSelect = document.getElementById('projects-sort-select');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', (e) => {
+      projectsSortBy = e.target.value;
+      renderProjectsPanelGrid();
+    });
+  }
+
+  // Botón volver a todos los proyectos
+  const backBtn = document.getElementById('back-to-projects-btn');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      closeProjectDetailView();
+    });
+  }
+
+  // Botón editar instrucciones del proyecto
+  const editInstructionsBtn = document.getElementById('project-edit-instructions-btn');
+  if (editInstructionsBtn) {
+    editInstructionsBtn.addEventListener('click', () => {
+      if (projectDetailViewId) {
+        openProjectModal(projectDetailViewId);
+      }
+    });
+  }
+
+  // Botón añadir archivos del proyecto
+  const addFilesBtn = document.getElementById('project-add-files-btn');
+  if (addFilesBtn) {
+    addFilesBtn.addEventListener('click', () => {
+      if (projectDetailViewId) {
+        openProjectModal(projectDetailViewId);
+      }
+    });
+  }
+
+  // Input del proyecto
+  const projectPromptInput = document.getElementById('project-prompt-input');
+  if (projectPromptInput) {
+    projectPromptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendProjectMessage();
+      }
+    });
+
+    // Auto-resize
+    projectPromptInput.addEventListener('input', () => {
+      projectPromptInput.style.height = 'auto';
+      projectPromptInput.style.height = Math.min(projectPromptInput.scrollHeight, 200) + 'px';
+    });
+  }
+
+  // Botón enviar del proyecto
+  const projectSendBtn = document.getElementById('project-send-btn');
+  if (projectSendBtn) {
+    projectSendBtn.addEventListener('click', () => {
+      sendProjectMessage();
+    });
+  }
+
+  // Llenar el selector de modelos del proyecto
+  populateProjectModelSelect();
+
+  // Inicializar toggle de modos del proyecto
+  initProjectChatModeToggle();
+}
+
+// Inicializar toggle de modos para el chat del proyecto
+function initProjectChatModeToggle() {
+  const toggle = document.getElementById('project-chat-mode-toggle');
+  if (!toggle) return;
+
+  const options = toggle.querySelectorAll('.chat-mode-option');
+  const slider = toggle.querySelector('.chat-mode-slider');
+
+  // Usar el mismo modo que el chat principal por defecto
+  let activeMode = state.chatMode || 'normal';
+
+  // Marcar el botón activo
+  options.forEach((option, index) => {
+    if (option.dataset.mode === activeMode) {
+      option.classList.add('active');
+      if (slider) {
+        slider.style.left = `${index * 32}px`;
+      }
+    } else {
+      option.classList.remove('active');
+    }
+
+    option.addEventListener('click', () => {
+      // Quitar active de todos
+      options.forEach(opt => opt.classList.remove('active'));
+      option.classList.add('active');
+
+      // Mover slider
+      const optionIndex = Array.from(options).indexOf(option);
+      if (slider) {
+        slider.style.left = `${optionIndex * 32}px`;
+      }
+
+      // Establecer modo
+      const mode = option.dataset.mode;
+      state.chatMode = mode;
+
+      // Sincronizar con los otros toggles
+      syncChatModeToggles(mode);
+    });
+  });
+}
+
+// Sincronizar todos los toggles de modo de chat
+function syncChatModeToggles(mode) {
+  const toggles = document.querySelectorAll('.chat-mode-toggle');
+  toggles.forEach(toggle => {
+    const options = toggle.querySelectorAll('.chat-mode-option');
+    const slider = toggle.querySelector('.chat-mode-slider');
+
+    options.forEach((option, index) => {
+      if (option.dataset.mode === mode) {
+        option.classList.add('active');
+        if (slider) {
+          slider.style.left = `${index * 32}px`;
+        }
+      } else {
+        option.classList.remove('active');
+      }
+    });
+  });
+}
+
+
+
+// Inicializar drag & drop para archivos del proyecto
+function initProjectFilesDragDrop() {
+  // Usamos event delegation en el project-sidebar
+  const sidebar = document.querySelector('.project-sidebar');
+  if (!sidebar) return;
+
+  // Prevenir comportamiento por defecto
+  sidebar.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const filesSection = sidebar.querySelector('.project-files-section');
+    if (filesSection) {
+      filesSection.classList.add('drag-over');
+    }
+  });
+
+  sidebar.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const filesSection = sidebar.querySelector('.project-files-section');
+    if (filesSection && !filesSection.contains(e.relatedTarget)) {
+      filesSection.classList.remove('drag-over');
+    }
+  });
+
+  sidebar.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const filesSection = sidebar.querySelector('.project-files-section');
+    if (filesSection) {
+      filesSection.classList.remove('drag-over');
+    }
+
+    if (!projectDetailViewId) return;
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleProjectFileDrop(files);
+    }
+  });
+}
+
+// Manejar archivos arrastrados al proyecto
+async function handleProjectFileDrop(files) {
+  if (!projectDetailViewId) return;
+
+  const project = projectsState.projects[projectDetailViewId];
+  if (!project) return;
+
+  if (!project.files) {
+    project.files = [];
+  }
+
+  for (const file of files) {
+    try {
+      const content = await readFileContent(file);
+
+      project.files.push({
+        id: generateId(),
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        content: content,
+        createdAt: Date.now()
+      });
+    } catch (error) {
+      console.error('Error al leer archivo:', error);
+    }
+  }
+
+  // Guardar y actualizar UI
+  saveProjects();
+  renderProjectDetailFiles(project);
+}
+
+
+function toggleProjectsPanel() {
+  const projectsPanel = document.getElementById('projects-panel');
+  const emptyState = document.getElementById('empty-state');
+  const chatState = document.getElementById('chat-state');
+  const newsPanel = document.getElementById('news-panel');
+
+  // Botones que deben ocultarse en el panel de proyectos
+  const incognitoButtonEmpty = document.getElementById('incognito-toggle-empty');
+  const screenOverlayToggleEmpty = document.getElementById('screen-overlay-toggle-empty');
+
+  if (!projectsPanel) return;
+
+  projectsPanelVisible = !projectsPanelVisible;
+
+  if (projectsPanelVisible) {
+    // Ocultar otros paneles
+    if (emptyState) emptyState.style.display = 'none';
+    if (chatState) chatState.style.display = 'none';
+    if (newsPanel) newsPanel.style.display = 'none';
+
+    // Ocultar botones del empty-state
+    if (incognitoButtonEmpty) incognitoButtonEmpty.style.display = 'none';
+    if (screenOverlayToggleEmpty) screenOverlayToggleEmpty.style.display = 'none';
+
+    // Mostrar panel de proyectos
+    projectsPanel.style.display = 'flex';
+
+    // Renderizar proyectos
+    renderProjectsPanelGrid();
+
+    // Actualizar botón activo
+    updateQuickActionButtons('projects-panel-btn');
+  } else {
+    // Ocultar panel de proyectos
+    projectsPanel.style.display = 'none';
+
+    // Mostrar el chat o empty state
+    if (state.activeId && state.conversations[state.activeId]) {
+      if (chatState) chatState.style.display = 'flex';
+      renderActiveConversation();
+    } else {
+      if (emptyState) emptyState.style.display = 'flex';
+      // Mostrar botones del empty-state
+      if (incognitoButtonEmpty) incognitoButtonEmpty.style.display = 'flex';
+      if (screenOverlayToggleEmpty) screenOverlayToggleEmpty.style.display = 'flex';
+    }
+
+    // Quitar estado activo del botón
+    const btn = document.getElementById('projects-panel-btn');
+    if (btn) btn.classList.remove('active');
+  }
+}
+
+function updateQuickActionButtons(activeId) {
+  // Quitar estado activo de todos los botones de acciones rápidas
+  const buttons = document.querySelectorAll('.quick-action-btn');
+  buttons.forEach(btn => btn.classList.remove('active'));
+
+  // Añadir estado activo al botón seleccionado
+  if (activeId) {
+    const activeBtn = document.getElementById(activeId);
+    if (activeBtn) activeBtn.classList.add('active');
+  }
+}
+
+function renderProjectsPanelGrid() {
+  const grid = document.getElementById('projects-grid');
+  if (!grid) return;
+
+  let projects = Object.values(projectsState.projects);
+
+  // Filtrar por búsqueda
+  if (projectsSearchTerm) {
+    projects = projects.filter(p =>
+      p.name.toLowerCase().includes(projectsSearchTerm) ||
+      (p.instructions && p.instructions.toLowerCase().includes(projectsSearchTerm))
+    );
+  }
+
+  // Ordenar
+  switch (projectsSortBy) {
+    case 'name':
+      projects.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    case 'created':
+      projects.sort((a, b) => b.createdAt - a.createdAt);
+      break;
+    case 'activity':
+    default:
+      projects.sort((a, b) => b.updatedAt - a.updatedAt);
+      break;
+  }
+
+  if (projects.length === 0) {
+    grid.innerHTML = `
+      <div class="projects-empty-state">
+        <div class="projects-empty-icon">📁</div>
+        <p class="projects-empty-title">No hay proyectos</p>
+        <p class="projects-empty-text">Crea un proyecto para organizar tus conversaciones y archivos</p>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = projects.map(project => {
+    const updatedAgo = getTimeAgo(project.updatedAt);
+    return `
+      <div class="project-card" data-project-id="${project.id}">
+        <h3 class="project-card-name">${escapeHtml(project.name)}</h3>
+        <p class="project-card-meta">Actualizado ${updatedAgo}</p>
+      </div>
+    `;
+  }).join('');
+
+  // Añadir event listeners
+  grid.querySelectorAll('.project-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const projectId = card.dataset.projectId;
+      openProjectDetailView(projectId);
+    });
+  });
+}
+
+function getTimeAgo(timestamp) {
+  const now = Date.now();
+  const diff = now - timestamp;
+
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (days > 0) {
+    return `hace ${days} día${days > 1 ? 's' : ''}`;
+  }
+  if (hours > 0) {
+    return `hace ${hours} hora${hours > 1 ? 's' : ''}`;
+  }
+  if (minutes > 0) {
+    return `hace ${minutes} minuto${minutes > 1 ? 's' : ''}`;
+  }
+  return 'ahora mismo';
+}
+
+function openProjectDetailView(projectId) {
+  const project = projectsState.projects[projectId];
+  if (!project) return;
+
+  projectDetailViewId = projectId;
+
+  // Asegurar que los otros paneles estén ocultos
+  const emptyState = document.getElementById('empty-state');
+  const chatState = document.getElementById('chat-state');
+  const newsPanel = document.getElementById('news-panel');
+  const incognitoButtonEmpty = document.getElementById('incognito-toggle-empty');
+  const screenOverlayToggleEmpty = document.getElementById('screen-overlay-toggle-empty');
+
+  if (emptyState) emptyState.style.display = 'none';
+  if (chatState) chatState.style.display = 'none';
+  if (newsPanel) newsPanel.style.display = 'none';
+  if (incognitoButtonEmpty) incognitoButtonEmpty.style.display = 'none';
+  if (screenOverlayToggleEmpty) screenOverlayToggleEmpty.style.display = 'none';
+
+  const listView = document.getElementById('projects-list-view');
+  const detailView = document.getElementById('project-detail-view');
+
+  if (listView) listView.style.display = 'none';
+  if (detailView) detailView.style.display = 'flex';
+
+  // Actualizar nombre
+  const nameEl = document.getElementById('project-detail-name');
+  if (nameEl) nameEl.textContent = project.name;
+
+  // Actualizar instrucciones
+  const instructionsHint = document.getElementById('project-instructions-hint');
+  const instructionsContent = document.getElementById('project-instructions-content');
+
+  if (project.instructions && project.instructions.trim()) {
+    if (instructionsHint) instructionsHint.style.display = 'none';
+    if (instructionsContent) {
+      instructionsContent.style.display = 'block';
+      instructionsContent.textContent = project.instructions;
+    }
+  } else {
+    if (instructionsHint) instructionsHint.style.display = 'block';
+    if (instructionsContent) instructionsContent.style.display = 'none';
+  }
+
+  // Renderizar archivos
+  renderProjectDetailFiles(project);
+
+  // Renderizar conversaciones
+  renderProjectDetailConversations(project);
+
+  // Establecer el proyecto activo SIN crear conversación ni mostrar otros paneles
+  projectsState.activeProjectId = projectId;
+  saveActiveProject(projectId);
+  updateProjectBadge();
+  renderProjectsList();
+
+  // Inicializar drag & drop para archivos (después de que el sidebar esté visible)
+  initProjectFilesDragDrop();
+
+  // Llenar el selector de modelos del proyecto
+  populateProjectModelSelect();
+
+  // Inicializar el toggle de modos
+  initProjectChatModeToggle();
+}
+
+
+
+function closeProjectDetailView() {
+  projectDetailViewId = null;
+
+  const listView = document.getElementById('projects-list-view');
+  const detailView = document.getElementById('project-detail-view');
+
+  if (listView) listView.style.display = 'flex';
+  if (detailView) detailView.style.display = 'none';
+
+  // Desactivar proyecto
+  setActiveProject(null);
+}
+
+function renderProjectDetailFiles(project) {
+  const container = document.getElementById('project-detail-files');
+  if (!container) return;
+
+  // Limpiar estado de selección
+  window.projectSelectedFiles = window.projectSelectedFiles || new Set();
+
+  if (!project.files || project.files.length === 0) {
+    container.innerHTML = '<div class="project-no-files">Arrastra archivos aquí o haz clic en + para añadir</div>';
+    updateProjectFilesActionBar(project);
+    return;
+  }
+
+  container.innerHTML = project.files.map(file => {
+    const ext = getFileExtension(file.name).toUpperCase();
+    const lines = file.content ? Math.ceil(file.content.length / 80) : 0;
+    const isSelected = window.projectSelectedFiles.has(file.id);
+
+    return `
+      <div class="project-file-card${isSelected ? ' selected' : ''}" data-file-id="${file.id}">
+        <div class="project-file-checkbox">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <div class="project-file-content">
+          <p class="project-file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</p>
+          <p class="project-file-meta">${lines} líneas</p>
+        </div>
+        <div class="project-file-footer">
+          <span class="project-file-type">${ext}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Añadir event listeners para selección de archivos (solo en el checkbox)
+  container.querySelectorAll('.project-file-card').forEach(card => {
+    const checkbox = card.querySelector('.project-file-checkbox');
+    const fileId = card.dataset.fileId;
+
+    checkbox.addEventListener('click', (e) => {
+      e.stopPropagation();
+      card.classList.toggle('selected');
+
+      if (card.classList.contains('selected')) {
+        window.projectSelectedFiles.add(fileId);
+      } else {
+        window.projectSelectedFiles.delete(fileId);
+      }
+
+      updateProjectFilesActionBar(project);
+    });
+  });
+
+  updateProjectFilesActionBar(project);
+}
+
+// Actualizar barra de acciones de archivos
+function updateProjectFilesActionBar(project) {
+  const filesSection = document.querySelector('.project-files-section');
+  if (!filesSection) return;
+
+  // Buscar o crear la barra de acciones
+  let actionBar = filesSection.querySelector('.project-files-action-bar');
+  const selectedCount = window.projectSelectedFiles?.size || 0;
+
+  if (selectedCount === 0) {
+    // Ocultar barra de acciones si existe
+    if (actionBar) {
+      actionBar.remove();
+    }
+    return;
+  }
+
+  // Crear barra de acciones si no existe
+  if (!actionBar) {
+    actionBar = document.createElement('div');
+    actionBar.className = 'project-files-action-bar';
+    const header = filesSection.querySelector('.project-section-header');
+    if (header) {
+      header.after(actionBar);
+    }
+  }
+
+  actionBar.innerHTML = `
+    <div class="project-files-selection-info">
+      <div class="project-files-selection-checkbox">
+        <div style="width: 10px; height: 3px; background: white; border-radius: 1px;"></div>
+      </div>
+      <span>${selectedCount} seleccionado${selectedCount !== 1 ? 's' : ''}</span>
+    </div>
+    <button class="project-files-delete-btn" title="Eliminar seleccionados">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+    </button>
+    <button class="project-files-close-btn" title="Cancelar selección">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  `;
+
+  // Event listener para eliminar
+  actionBar.querySelector('.project-files-delete-btn').addEventListener('click', () => {
+    deleteSelectedProjectFiles(project);
+  });
+
+  // Event listener para cancelar selección
+  actionBar.querySelector('.project-files-close-btn').addEventListener('click', () => {
+    window.projectSelectedFiles.clear();
+    renderProjectDetailFiles(project);
+  });
+}
+
+// Eliminar archivos seleccionados
+function deleteSelectedProjectFiles(project) {
+  if (!window.projectSelectedFiles || window.projectSelectedFiles.size === 0) return;
+
+  const count = window.projectSelectedFiles.size;
+  if (!confirm(`¿Eliminar ${count} archivo${count !== 1 ? 's' : ''} del proyecto?`)) return;
+
+  // Filtrar archivos que no están seleccionados
+  project.files = project.files.filter(file => !window.projectSelectedFiles.has(file.id));
+
+  // Limpiar selección
+  window.projectSelectedFiles.clear();
+
+  // Guardar y renderizar
+  saveProjects();
+  renderProjectDetailFiles(project);
+}
+
+
+function renderProjectDetailConversations(project) {
+  const container = document.getElementById('project-conversations-list');
+  if (!container) return;
+
+  const conversationIds = project.conversationIds || [];
+
+  if (conversationIds.length === 0) {
+    container.innerHTML = `
+      <div class="project-no-conversations" style="text-align: center; padding: 40px; color: rgba(255,255,255,0.4);">
+        <p>No hay conversaciones en este proyecto</p>
+        <p style="font-size: 13px; margin-top: 8px;">Escribe un mensaje para comenzar</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Obtener las conversaciones y ordenarlas por fecha
+  const conversations = conversationIds
+    .map(id => state.conversations[id])
+    .filter(conv => conv)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+
+  container.innerHTML = conversations.map(conv => {
+    const lastMessage = conv.messages[conv.messages.length - 1];
+    const preview = lastMessage
+      ? lastMessage.content.substring(0, 80) + (lastMessage.content.length > 80 ? '...' : '')
+      : 'Sin mensajes';
+    const timeAgo = getTimeAgo(conv.updatedAt);
+
+    return `
+      <div class="project-conversation-item" data-conv-id="${conv.id}">
+        <p class="project-conversation-title">${escapeHtml(conv.title || 'Nueva conversación')}</p>
+        <p class="project-conversation-meta">Último mensaje ${timeAgo}</p>
+      </div>
+    `;
+  }).join('');
+
+  // Añadir event listeners
+  container.querySelectorAll('.project-conversation-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const convId = item.dataset.convId;
+      // Cerrar el panel de proyectos y abrir la conversación
+      toggleProjectsPanel();
+      setActiveConversation(convId);
+    });
+  });
+}
+
+function populateProjectModelSelect() {
+  const select = document.getElementById('project-model-select');
+  if (!select) return;
+
+  // Copiar opciones del selector principal
+  const mainSelect = document.getElementById('model-select');
+  if (mainSelect && mainSelect.options.length > 0) {
+    select.innerHTML = mainSelect.innerHTML;
+    select.value = mainSelect.value || state.currentModel;
+  } else {
+    // Si el selector principal no tiene opciones, cargar directamente
+    if (state.models && state.models.length > 0) {
+      select.innerHTML = state.models.map(model =>
+        `<option value="${model.name}" ${model.name === state.currentModel ? 'selected' : ''}>${model.name}</option>`
+      ).join('');
+    } else {
+      select.innerHTML = '<option value="">Cargando modelos...</option>';
+    }
+  }
+
+  // Sincronizar cambios
+  select.addEventListener('change', () => {
+    const mainSelect = document.getElementById('model-select');
+    if (mainSelect) mainSelect.value = select.value;
+    state.currentModel = select.value;
+  });
+}
+
+async function sendProjectMessage() {
+  const input = document.getElementById('project-prompt-input');
+  if (!input || !input.value.trim()) return;
+
+  const message = input.value.trim();
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Asegurar que hay un proyecto activo
+  if (!projectDetailViewId) return;
+
+  const project = projectsState.projects[projectDetailViewId];
+  if (!project) return;
+
+  // SIEMPRE crear una nueva conversación para el proyecto
+  const newConv = createProjectConversation(projectDetailViewId);
+  if (!newConv) return;
+
+  // Cerrar el panel de proyectos inmediatamente
+  const projectsPanel = document.getElementById('projects-panel');
+  const chatState = document.getElementById('chat-state');
+
+  if (projectsPanel) {
+    projectsPanel.style.display = 'none';
+  }
+  projectsPanelVisible = false;
+
+  // Mostrar el chat
+  if (chatState) {
+    chatState.style.display = 'flex';
+  }
+
+  // Quitar estado activo del botón
+  const btn = document.getElementById('projects-panel-btn');
+  if (btn) btn.classList.remove('active');
+
+  // Poner el mensaje en el input principal y enviarlo
+  const promptInputInline = document.getElementById('prompt-input-inline');
+  if (promptInputInline) {
+    promptInputInline.value = message;
+    promptInputInline.focus();
+
+    // Enviar el mensaje
+    const form = document.getElementById('chat-form-inline');
+    if (form) {
+      form.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+  } else if (promptInput) {
+    promptInput.value = message;
+    promptInput.focus();
+
+    const form = document.getElementById('chat-form');
+    if (form) {
+      form.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+  }
 }
 
 // ========================================
@@ -16215,6 +16953,630 @@ function initTodoPanel() {
 
   todoState.initialized = true;
   console.log('✅ TODO Panel initialized');
+
+  // Initialize toggle buttons
+  initTodoViewToggle();
+}
+
+// =====================================================
+// TODO VIEW TOGGLE & PLANNED PROJECTS
+// =====================================================
+
+const PLANNED_STORAGE_KEY = 'ollama-web-planned-v1';
+
+// State for Planned Projects
+const plannedState = {
+  projects: [],
+  currentProjectId: null,
+  initialized: false
+};
+
+// Load planned projects from localStorage
+function loadPlannedProjects() {
+  try {
+    const saved = localStorage.getItem(PLANNED_STORAGE_KEY);
+    if (saved) {
+      plannedState.projects = JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Error loading planned projects:', e);
+    plannedState.projects = [];
+  }
+}
+
+// Save planned projects to localStorage
+function savePlannedProjects() {
+  try {
+    localStorage.setItem(PLANNED_STORAGE_KEY, JSON.stringify(plannedState.projects));
+  } catch (e) {
+    console.error('Error saving planned projects:', e);
+  }
+}
+
+// Initialize view toggle
+function initTodoViewToggle() {
+  const toggleBtns = document.querySelectorAll('.todo-toggle-btn');
+  const tasksView = document.getElementById('todo-tasks-view');
+  const plannedView = document.getElementById('todo-planned-view');
+
+  toggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+
+      // Update toggle buttons
+      toggleBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Switch views
+      if (view === 'tasks') {
+        if (tasksView) tasksView.style.display = 'flex';
+        if (plannedView) plannedView.style.display = 'none';
+      } else if (view === 'planned') {
+        if (tasksView) tasksView.style.display = 'none';
+        if (plannedView) plannedView.style.display = 'flex';
+        initPlannedView();
+      }
+    });
+  });
+}
+
+// Initialize planned view
+function initPlannedView() {
+  if (!plannedState.initialized) {
+    loadPlannedProjects();
+    initPlannedEventListeners();
+    plannedState.initialized = true;
+  }
+  renderPlannedProjects();
+}
+
+// Initialize planned view event listeners
+function initPlannedEventListeners() {
+  // Section collapse toggle
+  const sectionHeader = document.querySelector('.planned-section-header');
+  if (sectionHeader) {
+    sectionHeader.addEventListener('click', () => {
+      const section = document.getElementById('planned-section-later');
+      if (section) section.classList.toggle('collapsed');
+    });
+  }
+
+  // Add project button - enfoca el input inline
+  const addProjectBtn = document.getElementById('add-project-plan-btn');
+  const newProjectInput = document.getElementById('new-project-input');
+
+  if (addProjectBtn && newProjectInput) {
+    addProjectBtn.addEventListener('click', () => {
+      newProjectInput.focus();
+    });
+  }
+
+  // Input inline para añadir proyecto
+  if (newProjectInput) {
+    newProjectInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && newProjectInput.value.trim()) {
+        addPlannedProject(newProjectInput.value.trim());
+        newProjectInput.value = '';
+      }
+    });
+  }
+
+  // Project list click handler
+  const projectsList = document.getElementById('planned-projects-list');
+  if (projectsList) {
+    projectsList.addEventListener('click', (e) => {
+      const projectItem = e.target.closest('.planned-project-item');
+      if (!projectItem) return;
+
+      const id = projectItem.dataset.id;
+
+      if (e.target.closest('.planned-project-checkbox')) {
+        togglePlannedProjectComplete(id);
+        return;
+      }
+
+      if (e.target.closest('.planned-project-favorite')) {
+        togglePlannedProjectFavorite(id);
+        return;
+      }
+
+      openProjectDetail(id);
+    });
+  }
+
+  // Back button in detail view
+  const backBtn = document.getElementById('project-back-btn');
+  if (backBtn) {
+    backBtn.addEventListener('click', closeProjectDetail);
+  }
+
+  // Project main checkbox in detail
+  const projectMainCheckbox = document.getElementById('project-checkbox-main');
+  if (projectMainCheckbox) {
+    projectMainCheckbox.addEventListener('click', () => {
+      if (plannedState.currentProjectId) {
+        togglePlannedProjectComplete(plannedState.currentProjectId);
+        renderProjectDetail();
+      }
+    });
+  }
+
+  // Favorite button in detail
+  const favoriteBtn = document.getElementById('project-favorite-btn');
+  if (favoriteBtn) {
+    favoriteBtn.addEventListener('click', () => {
+      if (plannedState.currentProjectId) {
+        togglePlannedProjectFavorite(plannedState.currentProjectId);
+        renderProjectDetail();
+      }
+    });
+  }
+
+  // Add subtask input
+  const subtaskInput = document.getElementById('add-subtask-input');
+  if (subtaskInput) {
+    subtaskInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && subtaskInput.value.trim()) {
+        addSubtask(subtaskInput.value.trim());
+        subtaskInput.value = '';
+      }
+    });
+  }
+
+  // Subtasks list click handler
+  const subtasksList = document.getElementById('project-subtasks-list');
+  if (subtasksList) {
+    subtasksList.addEventListener('click', (e) => {
+      const subtaskItem = e.target.closest('.project-subtask-item');
+      if (!subtaskItem) return;
+
+      const subtaskId = subtaskItem.dataset.id;
+
+      // Si pulsa en el botón eliminar, eliminar
+      if (e.target.closest('.subtask-menu-btn')) {
+        deleteSubtask(subtaskId);
+        return;
+      }
+
+      // Cualquier otro clic en el item lo marca/desmarca
+      toggleSubtaskComplete(subtaskId);
+    });
+  }
+
+  // Delete project button - muestra modal personalizado
+  const deleteBtn = document.getElementById('project-delete-btn');
+  const deleteModal = document.getElementById('delete-confirm-modal');
+  const deleteYes = document.getElementById('delete-confirm-yes');
+  const deleteNo = document.getElementById('delete-confirm-no');
+
+  if (deleteBtn && deleteModal && deleteYes && deleteNo) {
+    deleteBtn.addEventListener('click', () => {
+      if (plannedState.currentProjectId) {
+        deleteModal.style.display = 'flex';
+      }
+    });
+
+    deleteYes.addEventListener('click', () => {
+      if (plannedState.currentProjectId) {
+        deletePlannedProject(plannedState.currentProjectId);
+        deleteModal.style.display = 'none';
+        closeProjectDetail();
+      }
+    });
+
+    deleteNo.addEventListener('click', () => {
+      deleteModal.style.display = 'none';
+    });
+
+    // Cerrar al hacer clic fuera
+    deleteModal.addEventListener('click', (e) => {
+      if (e.target === deleteModal) {
+        deleteModal.style.display = 'none';
+      }
+    });
+  }
+
+  // Due date button - muestra modal de fecha
+  const dueDateBtn = document.getElementById('project-due-date-btn');
+  const dateModal = document.getElementById('date-picker-modal');
+  const dateInput = document.getElementById('date-picker-input');
+  const dateSave = document.getElementById('date-picker-save');
+  const dateClear = document.getElementById('date-picker-clear');
+  const dateCancel = document.getElementById('date-picker-cancel');
+
+  if (dueDateBtn && dateModal && dateInput && dateSave && dateClear && dateCancel) {
+    dueDateBtn.addEventListener('click', () => {
+      if (plannedState.currentProjectId) {
+        const project = plannedState.projects.find(p => p.id === plannedState.currentProjectId);
+        dateInput.value = project?.dueDate || '';
+        dateModal.style.display = 'flex';
+      }
+    });
+
+    dateSave.addEventListener('click', () => {
+      if (plannedState.currentProjectId && dateInput.value) {
+        setProjectDueDate(plannedState.currentProjectId, dateInput.value);
+        dateModal.style.display = 'none';
+      }
+    });
+
+    dateClear.addEventListener('click', () => {
+      if (plannedState.currentProjectId) {
+        setProjectDueDate(plannedState.currentProjectId, null);
+        dateModal.style.display = 'none';
+      }
+    });
+
+    dateCancel.addEventListener('click', () => {
+      dateModal.style.display = 'none';
+    });
+
+    dateModal.addEventListener('click', (e) => {
+      if (e.target === dateModal) {
+        dateModal.style.display = 'none';
+      }
+    });
+  }
+
+  // Note button - muestra modal de nota
+  const noteBtn = document.getElementById('project-note-btn');
+  const noteModal = document.getElementById('note-modal');
+  const noteTextarea = document.getElementById('note-textarea');
+  const noteSave = document.getElementById('note-modal-save');
+  const noteClear = document.getElementById('note-modal-clear');
+  const noteCancel = document.getElementById('note-modal-cancel');
+
+  if (noteBtn && noteModal && noteTextarea && noteSave && noteClear && noteCancel) {
+    noteBtn.addEventListener('click', () => {
+      if (plannedState.currentProjectId) {
+        const project = plannedState.projects.find(p => p.id === plannedState.currentProjectId);
+        noteTextarea.value = project?.note || '';
+        noteModal.style.display = 'flex';
+      }
+    });
+
+    noteSave.addEventListener('click', () => {
+      if (plannedState.currentProjectId) {
+        setProjectNote(plannedState.currentProjectId, noteTextarea.value.trim());
+        noteModal.style.display = 'none';
+      }
+    });
+
+    noteClear.addEventListener('click', () => {
+      if (plannedState.currentProjectId) {
+        setProjectNote(plannedState.currentProjectId, null);
+        noteModal.style.display = 'none';
+      }
+    });
+
+    noteCancel.addEventListener('click', () => {
+      noteModal.style.display = 'none';
+    });
+
+    noteModal.addEventListener('click', (e) => {
+      if (e.target === noteModal) {
+        noteModal.style.display = 'none';
+      }
+    });
+  }
+}
+
+// Add a new planned project
+function addPlannedProject(name) {
+  const project = {
+    id: Date.now().toString(),
+    name: name,
+    completed: false,
+    favorite: false,
+    subtasks: [],
+    dueDate: null,
+    note: null,
+    createdAt: new Date().toISOString()
+  };
+
+  plannedState.projects.push(project);
+  savePlannedProjects();
+  renderPlannedProjects();
+}
+
+// Toggle project complete
+function togglePlannedProjectComplete(id) {
+  const project = plannedState.projects.find(p => p.id === id);
+  if (project) {
+    project.completed = !project.completed;
+    savePlannedProjects();
+    renderPlannedProjects();
+  }
+}
+
+// Toggle project favorite
+function togglePlannedProjectFavorite(id) {
+  const project = plannedState.projects.find(p => p.id === id);
+  if (project) {
+    project.favorite = !project.favorite;
+    savePlannedProjects();
+    renderPlannedProjects();
+  }
+}
+
+// Delete a project
+function deletePlannedProject(id) {
+  plannedState.projects = plannedState.projects.filter(p => p.id !== id);
+  savePlannedProjects();
+  renderPlannedProjects();
+}
+
+// Set project due date
+function setProjectDueDate(id, date) {
+  const project = plannedState.projects.find(p => p.id === id);
+  if (project) {
+    project.dueDate = date || null;
+    savePlannedProjects();
+    renderProjectDetail();
+  }
+}
+
+// Set project note
+function setProjectNote(id, note) {
+  const project = plannedState.projects.find(p => p.id === id);
+  if (project) {
+    project.note = note || null;
+    savePlannedProjects();
+    renderProjectDetail();
+  }
+}
+
+// Add subtask
+function addSubtask(text) {
+  const project = plannedState.projects.find(p => p.id === plannedState.currentProjectId);
+  if (project) {
+    project.subtasks.push({
+      id: Date.now().toString(),
+      text: text,
+      completed: false
+    });
+    savePlannedProjects();
+    renderProjectDetail();
+  }
+}
+
+// Toggle subtask complete
+function toggleSubtaskComplete(subtaskId) {
+  const project = plannedState.projects.find(p => p.id === plannedState.currentProjectId);
+  if (project) {
+    const subtask = project.subtasks.find(s => s.id === subtaskId);
+    if (subtask) {
+      subtask.completed = !subtask.completed;
+      savePlannedProjects();
+      renderProjectDetail();
+      renderPlannedProjects();
+    }
+  }
+}
+
+// Delete subtask
+function deleteSubtask(subtaskId) {
+  const project = plannedState.projects.find(p => p.id === plannedState.currentProjectId);
+  if (project) {
+    project.subtasks = project.subtasks.filter(s => s.id !== subtaskId);
+    savePlannedProjects();
+    renderProjectDetail();
+    renderPlannedProjects();
+  }
+}
+
+// Open project detail view
+function openProjectDetail(id) {
+  plannedState.currentProjectId = id;
+
+  const projectsList = document.querySelector('.planned-section');
+  const detailView = document.getElementById('project-detail-view');
+  const plannedHeader = document.querySelector('.planned-header');
+
+  if (projectsList && detailView && plannedHeader) {
+    projectsList.style.display = 'none';
+    plannedHeader.style.display = 'none';
+    detailView.style.display = 'flex';
+    renderProjectDetail();
+  }
+}
+
+// Close project detail view
+function closeProjectDetail() {
+  plannedState.currentProjectId = null;
+
+  const projectsList = document.querySelector('.planned-section');
+  const detailView = document.getElementById('project-detail-view');
+  const plannedHeader = document.querySelector('.planned-header');
+
+  if (projectsList && detailView && plannedHeader) {
+    detailView.style.display = 'none';
+    projectsList.style.display = 'flex';
+    plannedHeader.style.display = 'flex';
+  }
+}
+
+// Render planned projects list
+function renderPlannedProjects() {
+  const listEl = document.getElementById('planned-projects-list');
+  const countEl = document.getElementById('planned-count');
+
+  if (!listEl) return;
+
+  if (plannedState.projects.length === 0) {
+    listEl.innerHTML = `
+      <div class="planned-empty-state">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        <p>No hay proyectos planeados</p>
+        <span>Añade un proyecto para organizar tus tareas</span>
+      </div>
+    `;
+  } else {
+    const sorted = [...plannedState.projects].sort((a, b) => {
+      if (a.favorite && !b.favorite) return -1;
+      if (!a.favorite && b.favorite) return 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    listEl.innerHTML = sorted.map(project => {
+      const completedSubtasks = project.subtasks.filter(s => s.completed).length;
+      const totalSubtasks = project.subtasks.length;
+      const hasAllComplete = totalSubtasks > 0 && completedSubtasks === totalSubtasks;
+      const isOverdue = project.dueDate && isDateOverdue(project.dueDate);
+
+      return `
+        <div class="planned-project-item ${project.completed ? 'completed' : ''}" data-id="${project.id}">
+          <button class="planned-project-checkbox ${project.completed ? 'completed' : ''}"></button>
+          <div class="planned-project-info">
+            <p class="planned-project-name">${escapeHtml(project.name)}</p>
+            <div class="planned-project-meta">
+              <span class="planned-project-type">Tareas</span>
+              ${totalSubtasks > 0 ? `
+                <span class="planned-project-progress ${hasAllComplete ? 'all-complete' : ''}">
+                  ${hasAllComplete ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"></path></svg>' : ''}
+                  ${completedSubtasks} de ${totalSubtasks}
+                </span>
+              ` : ''}
+              ${project.dueDate ? `
+                <span class="planned-project-date ${isOverdue ? 'overdue' : ''}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                  ${formatPlannedDueDateShort(project.dueDate)}
+                </span>
+              ` : ''}
+            </div>
+          </div>
+          <button class="planned-project-favorite ${project.favorite ? 'active' : ''}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+          </button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (countEl) {
+    countEl.textContent = plannedState.projects.length;
+  }
+}
+
+// Render project detail
+function renderProjectDetail() {
+  const project = plannedState.projects.find(p => p.id === plannedState.currentProjectId);
+  if (!project) return;
+
+  const nameEl = document.getElementById('project-detail-name');
+  if (nameEl) {
+    nameEl.textContent = project.name;
+    nameEl.classList.toggle('completed', project.completed);
+  }
+
+  const mainCheckbox = document.getElementById('project-checkbox-main');
+  if (mainCheckbox) {
+    mainCheckbox.classList.toggle('completed', project.completed);
+  }
+
+  const favoriteBtn = document.getElementById('project-favorite-btn');
+  if (favoriteBtn) {
+    favoriteBtn.classList.toggle('active', project.favorite);
+  }
+
+  const subtasksList = document.getElementById('project-subtasks-list');
+  if (subtasksList) {
+    if (project.subtasks.length === 0) {
+      subtasksList.innerHTML = '';
+    } else {
+      subtasksList.innerHTML = project.subtasks.map(subtask => `
+        <div class="project-subtask-item ${subtask.completed ? 'completed' : ''}" data-id="${subtask.id}">
+          <button class="subtask-checkbox ${subtask.completed ? 'completed' : ''}"></button>
+          <span class="subtask-text">${escapeHtml(subtask.text)}</span>
+          <button class="subtask-menu-btn" title="Eliminar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      `).join('');
+    }
+  }
+
+  const dueDateBtn = document.getElementById('project-due-date-btn');
+  const dueDateText = document.getElementById('project-due-date-text');
+  if (dueDateBtn && dueDateText) {
+    if (project.dueDate) {
+      dueDateBtn.classList.add('has-date');
+      dueDateText.textContent = `Vence el ${formatPlannedDueDateLong(project.dueDate)}`;
+      // Añadir clase overdue si la fecha ha pasado
+      if (isDateOverdue(project.dueDate)) {
+        dueDateBtn.classList.add('overdue');
+      } else {
+        dueDateBtn.classList.remove('overdue');
+      }
+    } else {
+      dueDateBtn.classList.remove('has-date');
+      dueDateBtn.classList.remove('overdue');
+      dueDateText.textContent = 'Agregar fecha de vencimiento';
+    }
+  }
+
+  // Renderizar nota
+  const noteBtn = document.getElementById('project-note-btn');
+  const noteText = document.getElementById('project-note-text');
+  const noteContainer = document.getElementById('project-note-container');
+  const noteContent = document.getElementById('project-note-content');
+
+  if (noteBtn && noteText && noteContainer && noteContent) {
+    if (project.note) {
+      noteBtn.classList.add('has-note');
+      noteText.textContent = 'Editar nota';
+      noteContainer.style.display = 'block';
+      noteContent.textContent = project.note;
+    } else {
+      noteBtn.classList.remove('has-note');
+      noteText.textContent = 'Agregar nota';
+      noteContainer.style.display = 'none';
+      noteContent.textContent = '';
+    }
+  }
+
+  const createdEl = document.getElementById('project-created-date');
+  if (createdEl) {
+    const created = new Date(project.createdAt);
+    createdEl.textContent = `Creada el ${created.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}`;
+  }
+}
+
+// Format due date for list (short)
+function formatPlannedDueDateShort(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+// Format due date for detail (long)
+function formatPlannedDueDateLong(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// Check if date is overdue (past)
+function isDateOverdue(dateStr) {
+  if (!dateStr) return false;
+  const dueDate = new Date(dateStr + 'T23:59:59');
+  const now = new Date();
+  return dueDate < now;
 }
 
 // =====================================================
@@ -16458,7 +17820,7 @@ function renderDayTimeline(dateStr) {
     for (let j = 0; j < processedEvents.length; j++) {
       if (i === j) continue;
       const other = processedEvents[j];
-      
+
       // Check if events overlap
       if (current.startMinutes < other.endMinutes && current.endMinutes > other.startMinutes) {
         overlapping.push(other);
@@ -16486,13 +17848,13 @@ function renderDayTimeline(dateStr) {
     const gap = 4; // pixels
     const totalGaps = event.totalColumns > 1 ? (event.totalColumns - 1) * gap : 0;
     const availableWidth = `calc(100% - 70px - ${totalGaps}px)`;
-    const width = event.totalColumns > 1 
-      ? `calc(${availableWidth} / ${event.totalColumns})` 
+    const width = event.totalColumns > 1
+      ? `calc(${availableWidth} / ${event.totalColumns})`
       : 'calc(100% - 70px)';
-    
+
     const gapOffset = event.column * gap;
-    const left = event.totalColumns > 1 
-      ? `calc(70px + (${availableWidth} / ${event.totalColumns}) * ${event.column} + ${gapOffset}px)` 
+    const left = event.totalColumns > 1
+      ? `calc(70px + (${availableWidth} / ${event.totalColumns}) * ${event.column} + ${gapOffset}px)`
       : '70px';
 
     eventsHTML += `
