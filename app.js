@@ -2671,7 +2671,22 @@ function createThinkingBlock(thinking, duration = null, isLoading = false) {
       return `
         <div class="thinking-block expanded thinking-streaming">
           <div class="thinking-header">
-            <span class="thinking-icon">⚛</span>
+            <span class="thinking-icon">
+              <svg viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Cola izquierda superior -->
+                <rect class="fish-tail" x="0" y="4" width="8" height="6" fill="var(--theme-primary)" opacity="0.6"/>
+                <!-- Cola izquierda inferior -->
+                <rect class="fish-tail" x="0" y="18" width="8" height="6" fill="var(--theme-primary)" opacity="0.6"/>
+                <!-- Conexión cola-cuerpo -->
+                <rect class="fish-body" x="8" y="11" width="8" height="6" fill="var(--theme-primary)" opacity="0.5"/>
+                <!-- Cuerpo superior -->
+                <rect class="fish-body" x="16" y="4" width="16" height="6" fill="var(--theme-primary)" opacity="0.5"/>
+                <!-- Cuerpo inferior -->
+                <rect class="fish-body" x="16" y="18" width="16" height="6" fill="var(--theme-primary)" opacity="0.5"/>
+                <!-- Cabeza/final derecho -->
+                <rect class="fish-body" x="32" y="11" width="8" height="6" fill="var(--theme-primary)" opacity="0.5"/>
+              </svg>
+            </span>
             <span class="thinking-title thinking-active">Pensando<span class="thinking-dots-animated"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span></span>
           </div>
           <div class="thinking-content thinking-content-streaming" style="max-height: 120px; opacity: 1;">
@@ -2684,11 +2699,23 @@ function createThinkingBlock(thinking, duration = null, isLoading = false) {
     return `
       <div class="thinking-block">
         <div class="thinking-header">
-          <span class="thinking-icon">⚛</span>
+          <span class="thinking-icon">
+            <svg viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Cola izquierda superior -->
+              <rect class="fish-tail" x="0" y="4" width="8" height="6" fill="var(--theme-primary)" opacity="0.6"/>
+              <!-- Cola izquierda inferior -->
+              <rect class="fish-tail" x="0" y="18" width="8" height="6" fill="var(--theme-primary)" opacity="0.6"/>
+              <!-- Conexión cola-cuerpo -->
+              <rect class="fish-body" x="8" y="11" width="8" height="6" fill="var(--theme-primary)" opacity="0.5"/>
+              <!-- Cuerpo superior -->
+              <rect class="fish-body" x="16" y="4" width="16" height="6" fill="var(--theme-primary)" opacity="0.5"/>
+              <!-- Cuerpo inferior -->
+              <rect class="fish-body" x="16" y="18" width="16" height="6" fill="var(--theme-primary)" opacity="0.5"/>
+              <!-- Cabeza/final derecho -->
+              <rect class="fish-body" x="32" y="11" width="8" height="6" fill="var(--theme-primary)" opacity="0.5"/>
+            </svg>
+          </span>
           <span class="thinking-title thinking-active">Pensando</span>
-        </div>
-        <div class="thinking-loading">
-          Analizando la pregunta<div class="thinking-dots"><span></span><span></span><span></span></div>
         </div>
       </div>
     `;
@@ -3541,12 +3568,11 @@ async function streamAssistantResponse(conversation, payloadMessages) {
     currentStreamReader = null;
     updateStopButtonToSend();
 
-    // Solo actualizar si fue cancelado y aún no se ha actualizado el bubble
+    // No agregar mensaje aquí, ya se hace en stopStream()
+    // Solo actualizar el bubble si no fue cancelado
     if (wasCancelled) {
-      // Verificar si el bubble ya fue actualizado en stopStream
       const currentContent = bubble?.textContent || '';
       if (!currentContent.includes('cancelada')) {
-        assistantMessage.content += (assistantMessage.content ? '\n\n' : '') + '⚠️ Respuesta cancelada por el usuario.';
         updateAssistantBubble(bubble, assistantMessage.content, null);
         persistState();
       }
@@ -7221,6 +7247,9 @@ function setCustomTheme(color) {
         colorDisplay.textContent = '';
       }
     }
+    
+    // Actualizar favicon con el nuevo color
+    setTimeout(updateFavicon, 50);
   } catch (error) {
     console.warn('No se pudo aplicar el tema personalizado', error);
   }
@@ -7238,6 +7267,27 @@ function loadCustomTheme() {
     }
   } catch (error) {
     console.warn('No se pudo cargar el tema personalizado', error);
+  }
+}
+
+// Función para actualizar el favicon con el color del tema
+function updateFavicon() {
+  const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-primary').trim();
+  
+  const svg = `
+    <svg viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="4" width="8" height="6" fill="${themeColor}"/>
+      <rect x="0" y="18" width="8" height="6" fill="${themeColor}"/>
+      <rect x="8" y="11" width="8" height="6" fill="${themeColor}"/>
+      <rect x="16" y="4" width="16" height="6" fill="${themeColor}"/>
+      <rect x="16" y="18" width="16" height="6" fill="${themeColor}"/>
+      <rect x="32" y="11" width="8" height="6" fill="${themeColor}"/>
+    </svg>
+  `;
+  
+  const favicon = document.querySelector('link[rel="icon"]');
+  if (favicon) {
+    favicon.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
   }
 }
 
@@ -7264,6 +7314,9 @@ function setTheme(themeName) {
     if (themeName === 'custom') {
       loadCustomTheme();
     }
+    
+    // Actualizar favicon con el nuevo color
+    setTimeout(updateFavicon, 50);
   } catch (error) {
     console.warn('No se pudo guardar el tema', error);
   }
@@ -7278,6 +7331,9 @@ function initThemeSystem() {
   if (savedTheme === 'custom') {
     loadCustomTheme();
   }
+  
+  // Actualizar favicon inicial
+  setTimeout(updateFavicon, 100);
 
   // Configurar modal de temas (por si se usa en el futuro)
   const settingsModal = document.getElementById('settings-modal');
@@ -17085,13 +17141,13 @@ function initPlannedEventListeners() {
   }
 
   // Back button in detail view
-  const backBtn = document.getElementById('project-back-btn');
+  const backBtn = document.getElementById('planned-project-back-btn');
   if (backBtn) {
     backBtn.addEventListener('click', closeProjectDetail);
   }
 
   // Project main checkbox in detail
-  const projectMainCheckbox = document.getElementById('project-checkbox-main');
+  const projectMainCheckbox = document.getElementById('planned-project-checkbox-main');
   if (projectMainCheckbox) {
     projectMainCheckbox.addEventListener('click', () => {
       if (plannedState.currentProjectId) {
@@ -17102,7 +17158,7 @@ function initPlannedEventListeners() {
   }
 
   // Favorite button in detail
-  const favoriteBtn = document.getElementById('project-favorite-btn');
+  const favoriteBtn = document.getElementById('planned-project-favorite-btn');
   if (favoriteBtn) {
     favoriteBtn.addEventListener('click', () => {
       if (plannedState.currentProjectId) {
@@ -17113,7 +17169,7 @@ function initPlannedEventListeners() {
   }
 
   // Add subtask input
-  const subtaskInput = document.getElementById('add-subtask-input');
+  const subtaskInput = document.getElementById('planned-add-subtask-input');
   if (subtaskInput) {
     subtaskInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && subtaskInput.value.trim()) {
@@ -17124,7 +17180,7 @@ function initPlannedEventListeners() {
   }
 
   // Subtasks list click handler
-  const subtasksList = document.getElementById('project-subtasks-list');
+  const subtasksList = document.getElementById('planned-project-subtasks-list');
   if (subtasksList) {
     subtasksList.addEventListener('click', (e) => {
       const subtaskItem = e.target.closest('.project-subtask-item');
@@ -17144,7 +17200,7 @@ function initPlannedEventListeners() {
   }
 
   // Delete project button - muestra modal personalizado
-  const deleteBtn = document.getElementById('project-delete-btn');
+  const deleteBtn = document.getElementById('planned-project-delete-btn');
   const deleteModal = document.getElementById('delete-confirm-modal');
   const deleteYes = document.getElementById('delete-confirm-yes');
   const deleteNo = document.getElementById('delete-confirm-no');
@@ -17177,7 +17233,7 @@ function initPlannedEventListeners() {
   }
 
   // Due date button - muestra modal de fecha
-  const dueDateBtn = document.getElementById('project-due-date-btn');
+  const dueDateBtn = document.getElementById('planned-project-due-date-btn');
   const dateModal = document.getElementById('date-picker-modal');
   const dateInput = document.getElementById('date-picker-input');
   const dateSave = document.getElementById('date-picker-save');
@@ -17219,12 +17275,12 @@ function initPlannedEventListeners() {
   }
 
   // Note button - muestra modal de nota
-  const noteBtn = document.getElementById('project-note-btn');
-  const noteModal = document.getElementById('note-modal');
-  const noteTextarea = document.getElementById('note-textarea');
-  const noteSave = document.getElementById('note-modal-save');
-  const noteClear = document.getElementById('note-modal-clear');
-  const noteCancel = document.getElementById('note-modal-cancel');
+  const noteBtn = document.getElementById('planned-project-note-btn');
+  const noteModal = document.getElementById('planned-note-modal');
+  const noteTextarea = document.getElementById('planned-note-textarea');
+  const noteSave = document.getElementById('planned-note-modal-save');
+  const noteClear = document.getElementById('planned-note-modal-clear');
+  const noteCancel = document.getElementById('planned-note-modal-cancel');
 
   if (noteBtn && noteModal && noteTextarea && noteSave && noteClear && noteCancel) {
     noteBtn.addEventListener('click', () => {
@@ -17368,31 +17424,38 @@ function deleteSubtask(subtaskId) {
 // Open project detail view
 function openProjectDetail(id) {
   plannedState.currentProjectId = id;
-
-  const projectsList = document.querySelector('.planned-section');
-  const detailView = document.getElementById('project-detail-view');
+  
+  const detailView = document.getElementById('planned-project-detail-view');
   const plannedHeader = document.querySelector('.planned-header');
-
-  if (projectsList && detailView && plannedHeader) {
-    projectsList.style.display = 'none';
-    plannedHeader.style.display = 'none';
+  const plannedSection = document.querySelector('.planned-section');
+  
+  if (detailView) {
+    // Ocultar la lista y header
+    if (plannedHeader) plannedHeader.style.display = 'none';
+    if (plannedSection) plannedSection.style.display = 'none';
+    
+    // Mostrar el detalle
     detailView.style.display = 'flex';
-    renderProjectDetail();
   }
+  
+  renderProjectDetail();
 }
 
 // Close project detail view
 function closeProjectDetail() {
   plannedState.currentProjectId = null;
-
-  const projectsList = document.querySelector('.planned-section');
-  const detailView = document.getElementById('project-detail-view');
+  
+  const detailView = document.getElementById('planned-project-detail-view');
   const plannedHeader = document.querySelector('.planned-header');
-
-  if (projectsList && detailView && plannedHeader) {
+  const plannedSection = document.querySelector('.planned-section');
+  
+  if (detailView) {
+    // Ocultar el detalle
     detailView.style.display = 'none';
-    projectsList.style.display = 'flex';
-    plannedHeader.style.display = 'flex';
+    
+    // Mostrar la lista y header
+    if (plannedHeader) plannedHeader.style.display = 'flex';
+    if (plannedSection) plannedSection.style.display = 'flex';
   }
 }
 
@@ -17475,23 +17538,23 @@ function renderProjectDetail() {
   const project = plannedState.projects.find(p => p.id === plannedState.currentProjectId);
   if (!project) return;
 
-  const nameEl = document.getElementById('project-detail-name');
+  const nameEl = document.getElementById('planned-project-detail-name');
   if (nameEl) {
     nameEl.textContent = project.name;
     nameEl.classList.toggle('completed', project.completed);
   }
 
-  const mainCheckbox = document.getElementById('project-checkbox-main');
+  const mainCheckbox = document.getElementById('planned-project-checkbox-main');
   if (mainCheckbox) {
     mainCheckbox.classList.toggle('completed', project.completed);
   }
 
-  const favoriteBtn = document.getElementById('project-favorite-btn');
+  const favoriteBtn = document.getElementById('planned-project-favorite-btn');
   if (favoriteBtn) {
     favoriteBtn.classList.toggle('active', project.favorite);
   }
 
-  const subtasksList = document.getElementById('project-subtasks-list');
+  const subtasksList = document.getElementById('planned-project-subtasks-list');
   if (subtasksList) {
     if (project.subtasks.length === 0) {
       subtasksList.innerHTML = '';
@@ -17511,8 +17574,8 @@ function renderProjectDetail() {
     }
   }
 
-  const dueDateBtn = document.getElementById('project-due-date-btn');
-  const dueDateText = document.getElementById('project-due-date-text');
+  const dueDateBtn = document.getElementById('planned-project-due-date-btn');
+  const dueDateText = document.getElementById('planned-project-due-date-text');
   if (dueDateBtn && dueDateText) {
     if (project.dueDate) {
       dueDateBtn.classList.add('has-date');
@@ -17531,10 +17594,10 @@ function renderProjectDetail() {
   }
 
   // Renderizar nota
-  const noteBtn = document.getElementById('project-note-btn');
-  const noteText = document.getElementById('project-note-text');
-  const noteContainer = document.getElementById('project-note-container');
-  const noteContent = document.getElementById('project-note-content');
+  const noteBtn = document.getElementById('planned-project-note-btn');
+  const noteText = document.getElementById('planned-project-note-text');
+  const noteContainer = document.getElementById('planned-project-note-container');
+  const noteContent = document.getElementById('planned-project-note-content');
 
   if (noteBtn && noteText && noteContainer && noteContent) {
     if (project.note) {
@@ -17550,7 +17613,7 @@ function renderProjectDetail() {
     }
   }
 
-  const createdEl = document.getElementById('project-created-date');
+  const createdEl = document.getElementById('planned-project-created-date');
   if (createdEl) {
     const created = new Date(project.createdAt);
     createdEl.textContent = `Creada el ${created.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}`;

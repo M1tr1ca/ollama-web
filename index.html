@@ -34,7 +34,20 @@
   <div id="app" class="layout">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <img src="/assets/Logo2.png" alt="Kaisio Logo" class="sidebar-logo-img" />
+        <svg class="sidebar-logo-img" viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Cola izquierda superior -->
+          <rect x="0" y="4" width="8" height="6" fill="var(--theme-primary)"/>
+          <!-- Cola izquierda inferior -->
+          <rect x="0" y="18" width="8" height="6" fill="var(--theme-primary)"/>
+          <!-- Conexión cola-cuerpo -->
+          <rect x="8" y="11" width="8" height="6" fill="var(--theme-primary)"/>
+          <!-- Cuerpo superior -->
+          <rect x="16" y="4" width="16" height="6" fill="var(--theme-primary)"/>
+          <!-- Cuerpo inferior -->
+          <rect x="16" y="18" width="16" height="6" fill="var(--theme-primary)"/>
+          <!-- Cabeza/final derecho -->
+          <rect x="32" y="11" width="8" height="6" fill="var(--theme-primary)"/>
+        </svg>
         <span class="sidebar-logo-text">Kaisio</span>
         <button id="toggle-sidebar" class="toggle-sidebar-button" title="Minimizar barra lateral">
           <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -2078,18 +2091,18 @@ C D E F | G A B c |"></textarea>
       </div>
 
       <!-- Vista detalle de proyecto (subtareas) -->
-      <div class="project-detail-view" id="project-detail-view" style="display: none;">
+      <div class="project-detail-view" id="planned-project-detail-view" style="display: none;">
         <div class="project-detail-header">
-          <button class="project-back-btn" id="project-back-btn">
+          <button class="project-back-btn" id="planned-project-back-btn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="19" y1="12" x2="5" y2="12"></line>
               <polyline points="12 19 5 12 12 5"></polyline>
             </svg>
           </button>
           <div class="project-detail-title-row">
-            <button class="project-checkbox-large" id="project-checkbox-main"></button>
-            <h3 class="project-detail-name" id="project-detail-name">Nombre del Proyecto</h3>
-            <button class="project-favorite-btn" id="project-favorite-btn">
+            <button class="project-checkbox-large" id="planned-project-checkbox-main"></button>
+            <h3 class="project-detail-name" id="planned-project-detail-name">Nombre del Proyecto</h3>
+            <button class="project-favorite-btn" id="planned-project-favorite-btn">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon
                   points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
@@ -2100,41 +2113,41 @@ C D E F | G A B c |"></textarea>
         </div>
 
         <div class="project-subtasks-container">
-          <div class="project-subtasks-list" id="project-subtasks-list">
+          <div class="project-subtasks-list" id="planned-project-subtasks-list">
             <!-- Subtareas se renderizan aquí -->
           </div>
           <div class="project-add-subtask">
             <button class="subtask-checkbox-placeholder"></button>
-            <input type="text" id="add-subtask-input" class="add-subtask-input" placeholder="Añadir paso...">
+            <input type="text" id="planned-add-subtask-input" class="add-subtask-input" placeholder="Añadir paso...">
           </div>
         </div>
 
         <div class="project-detail-options">
-          <button class="project-option-btn project-due-date-btn" id="project-due-date-btn">
+          <button class="project-option-btn project-due-date-btn" id="planned-project-due-date-btn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
               <line x1="16" y1="2" x2="16" y2="6"></line>
               <line x1="8" y1="2" x2="8" y2="6"></line>
               <line x1="3" y1="10" x2="21" y2="10"></line>
             </svg>
-            <span id="project-due-date-text">Agregar fecha de vencimiento</span>
+            <span id="planned-project-due-date-text">Agregar fecha de vencimiento</span>
           </button>
-          <button class="project-option-btn project-note-btn" id="project-note-btn">
+          <button class="project-option-btn project-note-btn" id="planned-project-note-btn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
             </svg>
-            <span id="project-note-text">Agregar nota</span>
+            <span id="planned-project-note-text">Agregar nota</span>
           </button>
         </div>
 
         <!-- Contenedor para mostrar la nota -->
-        <div class="project-note-container" id="project-note-container" style="display: none;">
-          <p class="project-note-content" id="project-note-content"></p>
+        <div class="project-note-container" id="planned-project-note-container" style="display: none;">
+          <p class="project-note-content" id="planned-project-note-content"></p>
         </div>
 
         <div class="project-detail-footer">
-          <span class="project-created-date" id="project-created-date">Creada el ...</span>
-          <button class="project-delete-btn" id="project-delete-btn" title="Eliminar proyecto">
+          <span class="project-created-date" id="planned-project-created-date">Creada el ...</span>
+          <button class="project-delete-btn" id="planned-project-delete-btn" title="Eliminar proyecto">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -2144,14 +2157,14 @@ C D E F | G A B c |"></textarea>
       </div>
 
       <!-- Modal para nota -->
-      <div class="note-modal" id="note-modal" style="display: none;">
+      <div class="note-modal" id="planned-note-modal" style="display: none;">
         <div class="note-modal-content">
           <p>Nota del proyecto</p>
-          <textarea id="note-textarea" class="note-textarea" placeholder="Escribe una nota..." rows="4"></textarea>
+          <textarea id="planned-note-textarea" class="note-textarea" placeholder="Escribe una nota..." rows="4"></textarea>
           <div class="note-modal-buttons">
-            <button class="note-modal-save" id="note-modal-save">Guardar</button>
-            <button class="note-modal-clear" id="note-modal-clear">Quitar nota</button>
-            <button class="note-modal-cancel" id="note-modal-cancel">Cancelar</button>
+            <button class="note-modal-save" id="planned-note-modal-save">Guardar</button>
+            <button class="note-modal-clear" id="planned-note-modal-clear">Quitar nota</button>
+            <button class="note-modal-cancel" id="planned-note-modal-cancel">Cancelar</button>
           </div>
         </div>
       </div>

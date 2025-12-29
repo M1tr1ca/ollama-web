@@ -208,10 +208,11 @@ body {
 }
 
 .sidebar-logo-img {
-  height: 32px;
+  height: 24px;
   width: auto;
   object-fit: contain;
   flex-shrink: 0;
+  transition: opacity 0.3s ease;
 }
 
 .sidebar-logo-text {
@@ -3167,18 +3168,15 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
 }
 
 .thinking-block {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-  margin: 12px 0;
-  overflow: hidden;
+  background: transparent;
+  border: none;
+  margin: 8px 0;
+  overflow: visible;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .thinking-block:hover {
-  border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  /* Sin efectos hover para versión simple */
 }
 
 .thinking-streaming {
@@ -3189,61 +3187,131 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  cursor: default;
   user-select: none;
   position: relative;
 }
 
 .thinking-streaming .thinking-header {
-  padding: 6px 10px;
+  padding: 0;
 }
 
 .thinking-header:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
 }
 
 .thinking-header:active {
-  background: rgba(255, 255, 255, 0.06);
-  transform: scale(0.98);
+  background: transparent;
+  transform: none;
 }
 
 .thinking-icon {
-  font-size: 16px;
-  line-height: 1;
-  color: #6B9FED;
-  filter: brightness(1.1);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease;
-  display: inline-block;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.thinking-icon video {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.thinking-icon svg {
+  width: 28px;
+  height: 28px;
+  animation: fish-swim 3s ease-in-out infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.thinking-icon svg .fish-body {
+  animation: fish-body-pulse 3s ease-in-out infinite;
+  will-change: opacity;
+}
+
+.thinking-icon svg .fish-tail {
+  transform-origin: left center;
+  animation: fish-tail-wave 0.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.thinking-icon svg .fish-fin {
+  transform-origin: center;
+  animation: fish-fin-move 1.5s ease-in-out infinite;
+}
+
+@keyframes fish-swim {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(2px) translateY(-2px);
+  }
+  50% {
+    transform: translateX(0) translateY(0);
+  }
+  75% {
+    transform: translateX(-2px) translateY(2px);
+  }
+}
+
+@keyframes fish-tail-wave {
+  0%, 100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.8);
+  }
+}
+
+@keyframes fish-body-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes fish-fin-move {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
 }
 
 .thinking-header:hover .thinking-icon {
-  transform: scale(1.1);
-  filter: brightness(1.2);
+  /* Sin efectos hover */
 }
 
 .thinking-block.expanded .thinking-icon {
-  transform: rotate(15deg) scale(1.05);
+  /* Sin efectos de expandido */
 }
 
 .thinking-title {
   flex: 1;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
   font-weight: 400;
   letter-spacing: 0.01em;
   transition: color 0.2s ease;
 }
 
 .thinking-header:hover .thinking-title {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .thinking-title.thinking-active {
-  color: rgba(107, 159, 237, 0.95);
-  animation: thinking-pulse-text 2s ease-in-out infinite;
-  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  animation: none;
+  font-weight: 400;
 }
 
 .thinking-dots-animated {
@@ -12511,6 +12579,16 @@ body.research-report-visible .research-report-panel {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100%;
+}
+
+.todo-planned-view > * {
+  flex-shrink: 0;
+}
+
+.todo-planned-view > .project-detail-view {
+  flex: 1;
+  min-height: 0;
 }
 
 .planned-header {
@@ -13147,11 +13225,11 @@ body.research-report-visible .research-report-panel {
 
 /* Contenedor de nota mostrada */
 .project-note-container {
-  margin: 0 20px 16px;
-  padding: 12px 16px;
+  margin: 0 16px 12px;
+  padding: 14px 16px;
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
 }
 
 .project-note-content {
@@ -13176,34 +13254,43 @@ body.research-report-visible .research-report-panel {
    ===================================================== */
 
 .project-detail-view {
-  flex: 1;
-  display: flex;
+  display: none;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  background: transparent;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
 }
 
 .project-detail-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 14px 12px;
+  margin: 0 16px 12px 16px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .project-back-btn {
   width: 32px;
   height: 32px;
   border: none;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  margin-bottom: 12px;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .project-back-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.9);
 }
 
@@ -13211,26 +13298,40 @@ body.research-report-visible .research-report-panel {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
 }
 
 .project-checkbox-large {
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
-  border: 2px solid rgba(255, 255, 255, 0.25);
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border: 2.5px solid rgba(255, 255, 255, 0.25);
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .project-checkbox-large:hover {
   border-color: var(--theme-primary);
+  transform: scale(1.05);
 }
 
 .project-checkbox-large.completed {
   background: var(--theme-primary);
   border-color: var(--theme-primary);
+}
+
+.project-checkbox-large.completed::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 13px;
+  font-weight: bold;
 }
 
 .project-detail-name {
@@ -13239,10 +13340,16 @@ body.research-report-visible .research-report-panel {
   font-weight: 500;
   color: rgba(255, 255, 255, 0.95);
   margin: 0;
+  padding: 0;
+  letter-spacing: -0.01em;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .project-detail-name.completed {
   text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
   color: rgba(255, 255, 255, 0.4);
 }
 
@@ -13277,16 +13384,24 @@ body.research-report-visible .research-report-panel {
 .project-subtasks-container {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 8px 16px 16px 16px;
 }
 
 .project-subtasks-container::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+}
+
+.project-subtasks-container::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .project-subtasks-container::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
+  border-radius: 3px;
+}
+
+.project-subtasks-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .project-subtasks-list {
@@ -13300,57 +13415,72 @@ body.research-report-visible .research-report-panel {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 8px;
-  border-radius: 8px;
-  transition: background 0.15s ease;
+  padding: 14px 12px;
+  border-radius: 10px;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  background: transparent;
+  margin-bottom: 2px;
 }
 
 .project-subtask-item:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .subtask-checkbox {
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  max-width: 8px;
+  min-height: 8px;
+  max-height: 8px;
   border-radius: 50%;
-  background: var(--theme-primary);
   border: none;
+  background: var(--theme-primary);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
   transition: all 0.2s ease;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px var(--theme-primary-alpha-30);
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.subtask-checkbox:hover {
+  transform: scale(1.3);
+  box-shadow: 0 0 12px var(--theme-primary-alpha-30);
 }
 
 .subtask-checkbox.completed {
-  background: var(--theme-primary);
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: none;
 }
 
 .subtask-checkbox.completed::after {
-  content: '✓';
-  color: white;
-  font-size: 10px;
-  font-weight: bold;
+  display: none;
 }
 
 .subtask-checkbox:not(.completed) {
-  background: transparent;
-  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: var(--theme-primary);
+  border: none;
 }
 
 .subtask-checkbox:not(.completed):hover {
-  border-color: var(--theme-primary);
+  transform: scale(1.3);
 }
 
 .subtask-text {
   flex: 1;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
 }
 
 .project-subtask-item.completed .subtask-text {
   text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: rgba(255, 255, 255, 0.25);
   color: rgba(255, 255, 255, 0.35);
 }
 
@@ -13364,9 +13494,9 @@ body.research-report-visible .research-report-panel {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 6px;
   opacity: 0;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .project-subtask-item:hover .subtask-menu-btn {
@@ -13383,23 +13513,41 @@ body.research-report-visible .research-report-panel {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px;
-  margin-top: 8px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.project-add-subtask:focus-within {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .subtask-checkbox-placeholder {
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  max-width: 8px;
+  min-height: 8px;
+  max-height: 8px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  background: transparent;
+  border: none;
+  background: var(--theme-primary);
+  opacity: 0.4;
   cursor: default;
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
 }
 
 .add-subtask-input {
   flex: 1;
-  padding: 8px 0;
+  padding: 6px 0;
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.8);
@@ -13408,43 +13556,46 @@ body.research-report-visible .research-report-panel {
 }
 
 .add-subtask-input::placeholder {
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.3);
 }
 
 /* Opciones del proyecto */
 .project-detail-options {
   display: flex;
   flex-direction: column;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  background: rgba(255, 255, 255, 0.01);
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
 }
 
 .project-option-btn {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 20px;
+  padding: 14px 12px;
   border: none;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.02);
   color: rgba(255, 255, 255, 0.6);
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   text-align: left;
-  transition: all 0.15s ease;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: all 0.2s ease;
+  border-radius: 10px;
+  margin-bottom: 4px;
 }
 
 .project-option-btn:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .project-option-btn:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.9);
 }
 
 .project-option-btn svg {
   opacity: 0.6;
+  flex-shrink: 0;
 }
 
 .project-option-btn:hover svg {
@@ -13465,9 +13616,9 @@ body.research-report-visible .research-report-panel {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  background: rgba(255, 255, 255, 0.01);
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
 }
 
 .project-created-date {
@@ -14742,13 +14893,6 @@ body.research-report-visible .research-report-panel {
   height: 100%;
   position: relative;
   z-index: 1;
-}
-
-.project-detail-header {
-  padding: 24px 32px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(15, 15, 18, 0.6);
-  backdrop-filter: blur(20px);
 }
 
 .back-to-projects-btn {
