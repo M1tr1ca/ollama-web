@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description"
+        content="Cuida de tu mascota virtual interactiva. Alimenta, juega y observa a tu gato en esta experiencia inmersiva.">
+    <meta name="theme-color" content="#1a0a2e">
+    <title>Mi Mascota Virtual 🐱</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Background Room -->
+    <div class="room-background" id="roomBackground"></div>
+
+    <!-- Minimal Stats Display (Top Right Corner) -->
+    <div class="stats-mini">
+        <div class="stat-mini">
+            <span class="stat-mini-icon">😊</span>
+            <div class="stat-mini-bar">
+                <div class="stat-mini-fill happiness-bar" id="happinessBar"></div>
+            </div>
+        </div>
+        <div class="stat-mini">
+            <span class="stat-mini-icon">🍖</span>
+            <div class="stat-mini-bar">
+                <div class="stat-mini-fill hunger-bar" id="hungerBar"></div>
+            </div>
+        </div>
+        <div class="stat-mini">
+            <span class="stat-mini-icon">⚡</span>
+            <div class="stat-mini-bar">
+                <div class="stat-mini-fill energy-bar" id="energyBar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pet Container (Free Roaming) -->
+    <div class="pet-sprite-container" id="petContainer">
+        <img src="" alt="Gato" class="pet-sprite" id="petSprite">
+    </div>
+
+    <!-- Status Message -->
+    <div class="status-message" id="statusMessage"></div>
+
+    <!-- Food Button (appears when no food) -->
+    <button class="food-button" id="foodButton" style="display: none;">
+        🛒 Comprar Comida
+    </button>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

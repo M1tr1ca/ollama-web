@@ -116,6 +116,7 @@ const state = {
   order: [],
   activeId: null,
   currentModel: null,
+  chatMode: 'normal',
   loading: false,
 };
 
@@ -131,6 +132,8 @@ const scoreCanvasState = {
   docs: {} // conversationId -> scoreDocument
 };
 let scoreCanvasMode = false;
+let travelModeActive = false;
+let musicMode = false;
 let pendingScoreEdit = null; // For AI edit approval flow
 
 // Control de scroll para burbujas (fuera del streaming principal)
@@ -922,7 +925,15 @@ function processCanvasResponse(conversation, assistantMessage) {
   cleanContent = cleanContent.replace(/\{[\s\S]*?"type"\s*:\s*["']canvas["'][\s\S]*?\}/g, '');
 
   // Limpiar espacios en blanco excesivos
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:927',message:'Antes de limpiar espacios en blanco excesivos',data:{cleanContentBefore:cleanContent,cleanContentLengthBefore:cleanContent?.length,multipleNewlines:(cleanContent?.match(/\n{3,}/g) || []).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});;
+// #endregion
+
   cleanContent = cleanContent.replace(/\n{3,}/g, '\n\n').trim();
+
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:928',message:'Después de limpiar espacios en blanco excesivos',data:{cleanContentAfter:cleanContent,cleanContentLengthAfter:cleanContent?.length,multipleNewlinesAfter:(cleanContent?.match(/\n{3,}/g) || []).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});;
+// #endregion
 
   // Si después de limpiar queda texto útil, usarlo; sino crear mensaje por defecto
   let explanation = '';
@@ -1856,6 +1867,9 @@ function appendMessageElement(message) {
 
   // Agregar bloque de pensamiento si existe
   if (message.thinking && message.role === 'assistant') {
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1869',message:'Condición thinking assistant ejecutándose',data:{hasThinking:!!message.thinking,messageRole:message.role},timestamp:Date.now(),sessionId:"debug-session",runId:"run5",hypothesisId:"G"})}).catch(()=>{});;
+// #endregion
     content += createThinkingBlock(message.thinking, message.thinkingDuration, false);
   }
 
@@ -1872,6 +1886,9 @@ function appendMessageElement(message) {
     isResearchActive &&
     isCorrectMessage &&
     isCorrectConversation;
+
+  // Variable para almacenar datos de viaje parseados (accesible en todo el scope de la función)
+  let travelDataForRendering = null;
 
   // Si el mensaje tiene el flag pero ya tiene contenido, limpiar el flag (investigación terminada)
   if (message.isDeepResearchInProgress && message.content && message.deepResearch) {
@@ -1912,6 +1929,9 @@ function appendMessageElement(message) {
       });
     }
   } else if (message.role === 'assistant' && message.deepResearch && message.content) {
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1928',message:'Condición deepResearch assistant ejecutándose',data:{hasDeepResearch:!!message.deepResearch,messageRole:message.role,hasContent:!!message.content},timestamp:Date.now(),sessionId:"debug-session",runId:"run5",hypothesisId:"G"})}).catch(()=>{});;
+// #endregion
     // Es un mensaje de Deep Think completado - mostrar con encabezado especial
     content += `
       <div class="deep-research-report">
@@ -1952,6 +1972,9 @@ function appendMessageElement(message) {
       </button>
     `;
   } else if (message.role === 'assistant' && message.webSearchData && message.content) {
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1968',message:'Condición webSearch assistant ejecutándose',data:{hasWebSearchData:!!message.webSearchData,messageRole:message.role,hasContent:!!message.content},timestamp:Date.now(),sessionId:"debug-session",runId:"run5",hypothesisId:"G"})}).catch(()=>{});;
+// #endregion
     // Es un mensaje de búsqueda web normal completado - reconstruir la UI
     const webData = message.webSearchData;
     content += createWebSearchUIForRestore(webData);
@@ -1961,12 +1984,20 @@ function appendMessageElement(message) {
     content += '<div class="web-response-content">' + parseMarkdown(message.content) + '</div>';
     content += '</div>';
   } else if (message.content) {
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1977',message:'Entrando en rama message.content',data:{messageRole:message.role,contentLength:message.content?.length,contentPreview:message.content?.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'E'})}).catch(()=>{});;
+// #endregion
+
     // Comprobar si hay un canvas asociado a esta conversación
     const conversation = state.conversations[state.activeId];
     const canvasDoc = conversation ? getCanvasDoc(conversation.id) : null;
     const scoreDoc = conversation ? getScoreDoc(conversation.id) : null;
 
     // Si hay canvas y el mensaje tiene indicadores de canvas creado
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1987',message:'Verificando condición canvas',data:{hasCanvasDoc:!!canvasDoc,messageRole:message.role,hasCanvasId:!!message.canvasId,canvasCondition:canvasDoc && message.role === 'assistant' && message.canvasId === canvasDoc.id},timestamp:Date.now(),sessionId:"debug-session",runId:"run4",hypothesisId:"F"})}).catch(()=>{});;
+// #endregion
+
     if (canvasDoc && message.role === 'assistant' && message.canvasId === canvasDoc.id) {
       // Dividir el contenido en texto antes del canvas, tarjeta canvas, y texto después
       const parts = message.content.split('[CANVAS_ARTIFACT]');
@@ -2002,6 +2033,9 @@ function appendMessageElement(message) {
         });
       }
     } else if (scoreDoc && message.role === 'assistant' && message.scoreId === scoreDoc.id) {
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2022',message:'Verificando condición score',data:{hasScoreDoc:!!scoreDoc,messageRole:message.role,hasScoreId:!!message.scoreId,scoreCondition:scoreDoc && message.role === 'assistant' && message.scoreId === scoreDoc.id},timestamp:Date.now(),sessionId:"debug-session",runId:"run4",hypothesisId:"F"})}).catch(()=>{});;
+// #endregion
       // Si hay partitura y el mensaje la referencia
       const parts = message.content.split('[SCORE_ARTIFACT]');
       const messageVersion = message.scoreVersion || scoreDoc.version || 1;
@@ -2052,7 +2086,43 @@ function appendMessageElement(message) {
           </div>
         `;
       }
-      content += parseMarkdown(message.content);
+
+      // Verificar si hay comandos de viaje para limpiar ANTES del parseMarkdown
+      let messageContentToRender = message.content;
+      let travelDataForLater = null;
+
+      if (message.role === 'assistant' && message.content) {
+        const hasTravelContent = message.content.includes('[TRAVEL_MAP]') ||
+          message.content.includes('[PLACE:');
+
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2074',message:'Verificando si hay contenido de viaje',data:{hasTravelContent:hasTravelContent,messageRole:message.role,messageContentLength:message.content?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'D'})}).catch(()=>{});;
+// #endregion
+
+        if (hasTravelContent && window.travelMode?.parseCommands) {
+          // Parsear y limpiar los comandos de viaje
+          travelDataForLater = window.travelMode.parseCommands(message.content);
+          // Usar el texto limpio sin los comandos
+          messageContentToRender = travelDataForLater.text || '';
+
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2082',message:'Contenido a renderizar después de parsear viaje',data:{messageContentToRender:messageContentToRender,messageContentToRenderLength:messageContentToRender?.length,travelDataText:travelDataForLater?.text,travelDataPlacesCount:travelDataForLater?.places?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'D'})}).catch(()=>{});;
+// #endregion
+        }
+      }
+
+      // Ahora parsear el markdown con el contenido limpio
+      const parsedContent = parseMarkdown(messageContentToRender);
+      content += parsedContent;
+
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2095',message:'Contenido parseado agregado',data:{messageContentToRender:messageContentToRender,messageContentToRenderLength:messageContentToRender?.length,parsedContent:parsedContent,parsedContentLength:parsedContent?.length,finalContentLength:content?.length},timestamp:Date.now(),sessionId:"debug-session",runId:"run5",hypothesisId:"H"})}).catch(()=>{});;
+// #endregion
+
+      // Guardar la data de viaje para renderizar después
+      if (travelDataForLater) {
+        travelDataForRendering = travelDataForLater;
+      }
     }
   }
 
@@ -2191,6 +2261,51 @@ function appendMessageElement(message) {
       ],
       throwOnError: false
     });
+  }
+
+  // Renderizar mapas de viajes
+  if (message.role === 'assistant' && window.travelMode?.renderComponents) {
+    let travelData = null;
+
+    // PRIMERO: Verificar si hay travelPlaces guardado (desde localStorage)
+    if (message.travelPlaces && message.travelPlaces.length > 0) {
+      console.log('🗺️ Usando travelPlaces guardado:', message.travelPlaces.length, 'lugares');
+      travelData = {
+        hasTravel: true,
+        places: message.travelPlaces,
+        showMap: true
+      };
+    }
+    // SEGUNDO: Si no hay data guardada pero hay comandos en el contenido, parsear
+    else if (message.content) {
+      const hasTravelContent = message.content.includes('[TRAVEL_MAP]') ||
+        message.content.includes('[PLACE:');
+
+      if (hasTravelContent && window.travelMode?.parseCommands) {
+        travelData = window.travelMode.parseCommands(message.content);
+
+        // Usar el texto limpio de parseTravelCommands para actualizar el bubble
+        if (travelData.text !== message.content) {
+          // Solo actualizar si el texto cambió (tiene comandos para limpiar)
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2247',message:'Antes de actualizar bubble con travelData.text',data:{travelDataText:travelData.text,travelDataTextLength:travelData.text?.length,messageContentLength:message.content?.length,textChanged:travelData.text !== message.content},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});;
+// #endregion
+
+          bubble.innerHTML = travelData.text.replace(/\n/g, '<br>');
+
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2249',message:'Después de actualizar bubble - HTML generado',data:{bubbleInnerHTML:bubble.innerHTML,bubbleInnerHTMLLength:bubble.innerHTML?.length,brTags:(bubble.innerHTML?.match(/<br>/g) || []).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});;
+// #endregion
+        }
+      }
+    }
+
+    // Renderizar el mapa si hay data
+    if (travelData && travelData.hasTravel && travelData.places && travelData.places.length > 0) {
+      setTimeout(() => {
+        window.travelMode.renderComponents(bubble, travelData);
+      }, 300);
+    }
   }
 
   li.append(avatar, bubble);
@@ -3319,6 +3434,11 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                 }
               }
 
+              // Procesar comandos de viajes si estamos en modo travel
+              if (state.chatMode === 'travel' && assistantMessage.content) {
+                processTravelCommands(assistantMessage.content);
+              }
+
               pendingUpdate = true;
 
               // Programar actualización de forma asíncrona
@@ -3601,6 +3721,61 @@ async function streamAssistantResponse(conversation, payloadMessages) {
           processScoreResponse(conversation, assistantMessage, bubble);
         }
       }, 500);
+    }
+
+    // Procesar comandos de viajes (TRAVEL_MAP, PLACE, GMAPS_ROUTE)
+    const hasTravelCommands = assistantMessage.content?.includes('[TRAVEL_MAP]') ||
+      assistantMessage.content?.includes('[PLACE:') ||
+      assistantMessage.content?.includes('[GMAPS_ROUTE]');
+    if (hasTravelCommands && !wasCancelled) {
+      console.log('🗺️ Fin de stream - Procesando comandos de viaje detectados');
+      setTimeout(() => {
+        if (window.travelMode?.parseCommands && window.travelMode?.renderComponents) {
+          const travelData = window.travelMode.parseCommands(assistantMessage.content);
+          console.log('🗺️ Datos parseados:', travelData.hasTravel, 'Lugares:', travelData.places.length);
+          if (travelData.hasTravel && travelData.places.length > 0) {
+            // IMPORTANTE: Guardar data de viaje en el mensaje para persistencia
+            assistantMessage.travelPlaces = travelData.places;
+            assistantMessage.cleanContent = travelData.text; // Guardar contenido limpio
+
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:3698',message:'Guardando cleanContent en assistantMessage',data:{travelDataText:travelData.text,travelDataTextLength:travelData.text?.length,placesCount:travelData.places?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});;
+// #endregion
+
+            // Buscar el contenedor del mensaje
+            const chatList = document.getElementById('chat-list');
+            const lastMessage = chatList?.lastElementChild;
+            const messageBubble = lastMessage?.querySelector('.message-bubble');
+
+            console.log('🗺️ messageBubble encontrado:', !!messageBubble);
+
+            if (messageBubble) {
+              // Actualizar el texto del mensaje sin los comandos
+              const cleanContent = travelData.text;
+
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:3709',message:'Actualizando messageBubble con cleanContent',data:{cleanContent:cleanContent,cleanContentLength:cleanContent?.length,messageBubbleExists:!!messageBubble},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});;
+// #endregion
+              console.log('🗺️ Contenido limpio:', cleanContent.substring(0, 100) + '...');
+
+              // Limpiar directamente el innerHTML del bubble eliminando comandos RAW
+              let bubbleHtml = messageBubble.innerHTML;
+              bubbleHtml = bubbleHtml
+                .replace(/\[TRAVEL_MAP\]/g, '')
+                .replace(/\[\/TRAVEL_MAP\]/g, '')
+                .replace(/\[PLACE:[^\]]+\]/g, '');
+              messageBubble.innerHTML = bubbleHtml;
+
+              // Renderizar componentes de viaje
+              setTimeout(() => {
+                console.log('🗺️ Renderizando componentes de viaje...');
+                window.travelMode.renderComponents(messageBubble, travelData);
+                persistState(); // Persistir CON travelPlaces incluido
+              }, 100);
+            }
+          }
+        }
+      }, 700);
     }
   }
 }
@@ -3913,7 +4088,7 @@ async function regenerateResponse(messageId) {
     memoryContext = buildMemoryContext() || '';
   }
 
-  if (isFirstMessage || shouldIncludeProjectContext || window._studyModeActive || window._webSearchModeActive) {
+  if (isFirstMessage || shouldIncludeProjectContext || window._studyModeActive || window._webSearchModeActive || window._travelModeActive) {
     let systemContent = '';
 
     if (projectContext) {
@@ -4022,6 +4197,26 @@ INSTRUCCIONES:
       if (instructions) {
         if (finalContent) finalContent += '\n\n';
         finalContent += instructions;
+      }
+
+      // Añadir instrucciones de viajes si está activo
+      if (window._travelModeActive) {
+        const travelInstructions = window.travelMode?.getSystemPrompt ? window.travelMode.getSystemPrompt() : `
+Cuando el usuario pregunte sobre lugares, viajes, o qué hacer en algún sitio, usa estos comandos especiales:
+
+PARA MOSTRAR LUGARES EN UN MAPA:
+[TRAVEL_MAP]
+[PLACE:Nombre del lugar|latitud|longitud|categoría|descripción|valoración]
+[/TRAVEL_MAP]
+
+Ejemplo:
+[TRAVEL_MAP]
+[PLACE:Arena de Nimes|43.8362|4.3601|Monumento|Anfiteatro romano|4.6]
+[/TRAVEL_MAP]
+`;
+        if (finalContent) finalContent += '\n\n';
+        finalContent += travelInstructions;
+        console.log('🗺️ Modo Viajes activado - Instrucciones de mapa añadidas');
       }
 
       if (finalContent.trim()) {
@@ -4215,8 +4410,8 @@ let handleSubmit = async function handleSubmitOriginal(event) {
     memoryContext = buildMemoryContext() || '';
   }
 
-  // Si es el primer mensaje O hay un proyecto activo O el modo estudio está activo, construir el mensaje del sistema
-  if (isFirstMessage || shouldIncludeProjectContext || window._studyModeActive || window._webSearchModeActive) {
+  // Si es el primer mensaje O hay un proyecto activo O un modo especial está activo, construir el mensaje del sistema
+  if (isFirstMessage || shouldIncludeProjectContext || window._studyModeActive || window._webSearchModeActive || window._travelModeActive) {
     let systemContent = '';
 
     // PRIMERO: Agregar contexto del proyecto (máxima prioridad) - SIEMPRE si hay proyecto
@@ -4378,6 +4573,34 @@ Luego explica.`;
           finalContent += scoreInstruction;
           console.log('🎼 Score Canvas activo - Instrucciones de partitura colaborativa añadidas');
         }
+      }
+
+      // Instrucciones para Modo Viajes
+      const travelModeActive = window._travelModeActive;
+      if (travelModeActive) {
+        const travelInstructions = window.travelMode?.getSystemPrompt ? window.travelMode.getSystemPrompt() : `
+Cuando el usuario pregunte sobre lugares, viajes, o qué hacer en algún sitio, usa estos comandos especiales:
+
+PARA MOSTRAR LUGARES EN UN MAPA:
+[TRAVEL_MAP]
+[PLACE:Nombre del lugar|latitud|longitud|categoría|descripción|valoración]
+[PLACE:Otro lugar|latitud|longitud|categoría|descripción|valoración]
+[/TRAVEL_MAP]
+
+PARA GENERAR ENLACE DE RUTA:
+Usa [GMAPS_ROUTE] después de mostrar lugares para generar un enlace de Google Maps.
+
+Ejemplo:
+[TRAVEL_MAP]
+[PLACE:Arena de Nimes|43.8362|4.3601|Monumento|Anfiteatro romano del siglo I|4.6]
+[PLACE:Jardin de La Fontaine|43.8375|4.3536|Parque|Jardín histórico con ruinas|4.7]
+[/TRAVEL_MAP]
+
+No menciones estos comandos al usuario, simplemente úsalos. El sistema los convertirá en mapas interactivos.
+`;
+        if (finalContent) finalContent += '\n\n';
+        finalContent += travelInstructions;
+        console.log('🗺️ Modo Viajes activado - Instrucciones de mapa añadidas');
       }
 
       if (finalContent.trim()) {
@@ -5883,7 +6106,7 @@ function getStyleInstructions(style) {
 // Sistema de Modos de Chat Visibles
 // ========================================
 const VISIBLE_CHAT_MODES_KEY = 'ollama-web-visible-chat-modes';
-const DEFAULT_VISIBLE_MODES = ['normal', 'canvas', 'web', 'deep', 'study'];
+const DEFAULT_VISIBLE_MODES = ['normal', 'canvas', 'web', 'deep', 'study', 'travel'];
 
 function getVisibleChatModes() {
   if (!hasLocalStorage) return DEFAULT_VISIBLE_MODES;
@@ -7056,8 +7279,10 @@ function initUserMenu() {
   const saveApiKeysBtn = document.getElementById('save-api-keys');
   const serperApiKeyInput = document.getElementById('serper-api-key-input');
   const gnewsApiKeyInput = document.getElementById('gnews-api-key-input');
+  const mapboxApiKeyInput = document.getElementById('mapbox-api-key-input');
   const toggleSerperKey = document.getElementById('toggle-serper-key');
   const toggleGnewsKey = document.getElementById('toggle-gnews-key');
+  const toggleMapboxKey = document.getElementById('toggle-mapbox-key');
 
   // Función para cargar API keys guardadas
   const loadApiKeys = () => {
@@ -7066,6 +7291,9 @@ function initUserMenu() {
     }
     if (gnewsApiKeyInput) {
       gnewsApiKeyInput.value = localStorage.getItem('gnews-api-key') || '';
+    }
+    if (mapboxApiKeyInput) {
+      mapboxApiKeyInput.value = localStorage.getItem('mapbox-api-key') || '';
     }
   };
 
@@ -7126,11 +7354,20 @@ function initUserMenu() {
     });
   }
 
+  if (toggleMapboxKey && mapboxApiKeyInput) {
+    toggleMapboxKey.addEventListener('click', () => {
+      const type = mapboxApiKeyInput.type === 'password' ? 'text' : 'password';
+      mapboxApiKeyInput.type = type;
+      toggleMapboxKey.classList.toggle('active', type === 'text');
+    });
+  }
+
   // Guardar API Keys
   if (saveApiKeysBtn) {
     saveApiKeysBtn.addEventListener('click', () => {
       const serperKey = serperApiKeyInput?.value.trim() || '';
       const gnewsKey = gnewsApiKeyInput?.value.trim() || '';
+      const mapboxKey = mapboxApiKeyInput?.value.trim() || '';
 
       // Guardar o eliminar las keys según si están vacías
       if (serperKey) {
@@ -7143,6 +7380,16 @@ function initUserMenu() {
         localStorage.setItem('gnews-api-key', gnewsKey);
       } else {
         localStorage.removeItem('gnews-api-key');
+      }
+
+      if (mapboxKey) {
+        localStorage.setItem('mapbox-api-key', mapboxKey);
+        // Inicializar Mapbox si estamos en modo viajes
+        if (state.chatMode === 'travel' && window.travelMode) {
+          window.travelMode.init(mapboxKey);
+        }
+      } else {
+        localStorage.removeItem('mapbox-api-key');
       }
 
       closeApiKeysModalFunc();
@@ -7247,7 +7494,7 @@ function setCustomTheme(color) {
         colorDisplay.textContent = '';
       }
     }
-    
+
     // Actualizar favicon con el nuevo color
     setTimeout(updateFavicon, 50);
   } catch (error) {
@@ -7273,7 +7520,7 @@ function loadCustomTheme() {
 // Función para actualizar el favicon con el color del tema
 function updateFavicon() {
   const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-primary').trim();
-  
+
   const svg = `
     <svg viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="0" y="4" width="8" height="6" fill="${themeColor}"/>
@@ -7284,7 +7531,7 @@ function updateFavicon() {
       <rect x="32" y="11" width="8" height="6" fill="${themeColor}"/>
     </svg>
   `;
-  
+
   const favicon = document.querySelector('link[rel="icon"]');
   if (favicon) {
     favicon.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
@@ -7314,7 +7561,7 @@ function setTheme(themeName) {
     if (themeName === 'custom') {
       loadCustomTheme();
     }
-    
+
     // Actualizar favicon con el nuevo color
     setTimeout(updateFavicon, 50);
   } catch (error) {
@@ -7331,7 +7578,7 @@ function initThemeSystem() {
   if (savedTheme === 'custom') {
     loadCustomTheme();
   }
-  
+
   // Actualizar favicon inicial
   setTimeout(updateFavicon, 100);
 
@@ -8913,8 +9160,57 @@ function initProjectChatModeToggle() {
 
       // Sincronizar con los otros toggles
       syncChatModeToggles(mode);
+
+      // Mostrar/ocultar panel de viajes
+      handleTravelMode(mode);
     });
   });
+}
+
+// Manejar el modo viajes - ahora con mapas inline en el chat
+function handleTravelMode(mode) {
+  const travelPanel = document.getElementById('travel-panel');
+  const emptyState = document.getElementById('empty-state');
+  const chatState = document.getElementById('chat-state');
+  const projectsPanel = document.getElementById('projects-panel');
+  const newsPanel = document.getElementById('news-panel');
+
+  // El panel de viajes antiguo siempre permanece oculto
+  // Los mapas ahora aparecen inline en el chat
+  if (travelPanel) {
+    travelPanel.style.display = 'none';
+  }
+
+  if (mode === 'travel') {
+    // Ocultar otros paneles pero MANTENER el chat visible
+    // Los mapas aparecerán inline en los mensajes del chat
+    if (projectsPanel) projectsPanel.style.display = 'none';
+    if (newsPanel) newsPanel.style.display = 'none';
+
+    // Inicializar el módulo de viajes si está disponible
+    if (window.travelMode && typeof window.travelMode.init === 'function') {
+      const mapboxApiKey = localStorage.getItem('mapbox-api-key');
+      window.travelMode.init(mapboxApiKey);
+    }
+
+    // Mostrar el chat o empty state (los mapas irán inline)
+    if (state.activeId && state.conversations[state.activeId]) {
+      if (chatState) chatState.style.display = 'flex';
+      if (emptyState) emptyState.style.display = 'none';
+    } else {
+      if (emptyState) emptyState.style.display = 'flex';
+      if (chatState) chatState.style.display = 'none';
+    }
+  } else {
+    // Mostrar el chat o empty state según corresponda
+    if (state.activeId && state.conversations[state.activeId]) {
+      if (chatState) chatState.style.display = 'flex';
+      if (emptyState) emptyState.style.display = 'none';
+    } else {
+      if (emptyState) emptyState.style.display = 'flex';
+      if (chatState) chatState.style.display = 'none';
+    }
+  }
 }
 
 // Sincronizar todos los toggles de modo de chat
@@ -9021,6 +9317,7 @@ function toggleProjectsPanel() {
   const emptyState = document.getElementById('empty-state');
   const chatState = document.getElementById('chat-state');
   const newsPanel = document.getElementById('news-panel');
+  const travelPanel = document.getElementById('travel-panel');
 
   // Botones que deben ocultarse en el panel de proyectos
   const incognitoButtonEmpty = document.getElementById('incognito-toggle-empty');
@@ -9035,6 +9332,7 @@ function toggleProjectsPanel() {
     if (emptyState) emptyState.style.display = 'none';
     if (chatState) chatState.style.display = 'none';
     if (newsPanel) newsPanel.style.display = 'none';
+    if (travelPanel) travelPanel.style.display = 'none';
 
     // Ocultar botones del empty-state
     if (incognitoButtonEmpty) incognitoButtonEmpty.style.display = 'none';
@@ -10478,6 +10776,7 @@ function formatSearchResults(searchData) {
 
 // Función para cambiar el modo de chat
 function setChatMode(mode) {
+  state.chatMode = mode;
   // Actualizar estados globales
   deepResearchMode = mode === 'deep';
   studyMode = mode === 'study';
@@ -10489,6 +10788,10 @@ function setChatMode(mode) {
   // Modo música
   musicMode = mode === 'music';
   window._musicModeActive = musicMode;
+
+  // Modo viajes
+  travelModeActive = mode === 'travel';
+  window._travelModeActive = travelModeActive;
 
   // Actualizar todos los toggles
   const toggles = document.querySelectorAll('.chat-mode-toggle');
@@ -10517,7 +10820,8 @@ function setChatMode(mode) {
     'study': '📚 Modo Estudio',
     'web': '🌐 Búsqueda Web',
     'canvas': '📝 Canvas',
-    'music': '🎵 Música'
+    'music': '🎵 Música',
+    'travel': '🗺️ Modo Viajes'
   };
   console.log(`Modo de chat: ${modeNames[mode]}`);
 
@@ -10536,6 +10840,21 @@ function setChatMode(mode) {
     renderScoreCanvasPanel(conversation.id);
   } else {
     toggleScoreCanvasPanel(false);
+  }
+
+  // Gestionar modo viajes - el mapa ahora aparece inline en el chat, no en panel separado
+  const travelPanel = document.getElementById('travel-panel');
+  if (travelPanel) {
+    // Siempre ocultar el panel de viajes antiguo, ahora los mapas van inline en el chat
+    travelPanel.style.display = 'none';
+  }
+
+  if (travelModeActive) {
+    // Solo inicializar la API Key de Mapbox, el chat permanece visible
+    if (window.travelMode && typeof window.travelMode.init === 'function') {
+      const mapboxApiKey = localStorage.getItem('mapbox-api-key');
+      window.travelMode.init(mapboxApiKey);
+    }
   }
 }
 
@@ -14682,7 +15001,6 @@ Responde específicamente sobre este texto citado.`;
 // Music Mode - Generación de Partituras
 // ========================================
 
-let musicMode = false;
 let currentMusicScore = null;
 
 // Get DOM elements dynamically (they may not exist at script load time)
@@ -17424,35 +17742,35 @@ function deleteSubtask(subtaskId) {
 // Open project detail view
 function openProjectDetail(id) {
   plannedState.currentProjectId = id;
-  
+
   const detailView = document.getElementById('planned-project-detail-view');
   const plannedHeader = document.querySelector('.planned-header');
   const plannedSection = document.querySelector('.planned-section');
-  
+
   if (detailView) {
     // Ocultar la lista y header
     if (plannedHeader) plannedHeader.style.display = 'none';
     if (plannedSection) plannedSection.style.display = 'none';
-    
+
     // Mostrar el detalle
     detailView.style.display = 'flex';
   }
-  
+
   renderProjectDetail();
 }
 
 // Close project detail view
 function closeProjectDetail() {
   plannedState.currentProjectId = null;
-  
+
   const detailView = document.getElementById('planned-project-detail-view');
   const plannedHeader = document.querySelector('.planned-header');
   const plannedSection = document.querySelector('.planned-section');
-  
+
   if (detailView) {
     // Ocultar el detalle
     detailView.style.display = 'none';
-    
+
     // Mostrar la lista y header
     if (plannedHeader) plannedHeader.style.display = 'flex';
     if (plannedSection) plannedSection.style.display = 'flex';
@@ -18332,6 +18650,80 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
     initTodoPanel();
     initCalendarPanel();
   }, 100);
+}
+
+// ========================================
+// PROCESADOR DE COMANDOS DE VIAJES
+// ========================================
+
+let processedTravelCommands = new Set(); // Evitar procesar el mismo comando múltiples veces
+
+function processTravelCommands(text) {
+  if (!text || !window.travelMode) return;
+
+  // Buscar comandos en el texto usando expresiones regulares
+
+  // Comando para añadir lugar: [ADD_PLACE:nombre|lat|lng|categoria|descripcion]
+  const addPlaceRegex = /\[ADD_PLACE:(.*?)\|([-\d.]+)\|([-\d.]+)(?:\|(.*?))?(?:\|(.*?))?\]/g;
+  let match;
+
+  while ((match = addPlaceRegex.exec(text)) !== null) {
+    const commandId = match[0]; // El comando completo como ID único
+
+    // Solo procesar si no se ha procesado antes
+    if (!processedTravelCommands.has(commandId)) {
+      processedTravelCommands.add(commandId);
+
+      const name = match[1];
+      const lat = parseFloat(match[2]);
+      const lng = parseFloat(match[3]);
+      const category = match[4] || '';
+      const description = match[5] || '';
+
+      if (window.aiAddPlace) {
+        window.aiAddPlace(name, lat, lng, category, description);
+        console.log(`📍 Lugar añadido: ${name}`);
+      }
+    }
+  }
+
+  // Comando para crear ruta: [CREATE_ROUTE]
+  if (text.includes('[CREATE_ROUTE]') && !processedTravelCommands.has('[CREATE_ROUTE]')) {
+    processedTravelCommands.add('[CREATE_ROUTE]');
+    if (window.aiCreateRoute) {
+      window.aiCreateRoute();
+      console.log('🗺️ Creando ruta...');
+    }
+  }
+
+  // Comando para generar link de Google Maps: [GOOGLE_MAPS_LINK]
+  if (text.includes('[GOOGLE_MAPS_LINK]') && !processedTravelCommands.has('[GOOGLE_MAPS_LINK]')) {
+    processedTravelCommands.add('[GOOGLE_MAPS_LINK]');
+    if (window.aiGenerateGoogleMapsLink) {
+      window.aiGenerateGoogleMapsLink();
+      console.log('🔗 Generando link de Google Maps...');
+    }
+  }
+
+  // Comando para buscar lugares: [SEARCH_PLACES:query]
+  const searchPlacesRegex = /\[SEARCH_PLACES:(.*?)\]/g;
+  while ((match = searchPlacesRegex.exec(text)) !== null) {
+    const commandId = match[0];
+    if (!processedTravelCommands.has(commandId)) {
+      processedTravelCommands.add(commandId);
+      const query = match[1];
+      if (window.aiSearchPlaces) {
+        window.aiSearchPlaces(query).then(results => {
+          console.log(`🔍 Lugares encontrados para "${query}":`, results);
+        });
+      }
+    }
+  }
+}
+
+// Limpiar comandos procesados cuando se cambia de conversación
+function resetTravelCommands() {
+  processedTravelCommands.clear();
 }
 
 console.log('✅ TODO and Calendar modules loaded');

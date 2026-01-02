@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Pet Cat</title>
+    <link rel="stylesheet" href="/css/pet-cat.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .main-column {
+            width: 100%;
+            min-height: 100vh;
+            position: relative;
+            padding: 20px;
+        }
+
+        .test-info {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .instructions {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+
+        .instructions h3 {
+            margin-top: 0;
+            color: #667eea;
+        }
+
+        .instructions ul {
+            margin: 10px 0;
+        }
+
+        .instructions li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="main-column">
+        <div class="test-info">
+            <h1>🐱 Test del Gato Mascota</h1>
+            <p>Esta es una página de prueba para verificar que el gato funciona correctamente.</p>
+
+            <div class="instructions">
+                <h3>Instrucciones:</h3>
+                <ul>
+                    <li><strong>1 clic</strong> en el gato: Acariciar (muestra "¡Me encanta! 💕")</li>
+                    <li><strong>2 clics</strong> en el gato: Jugar (animaciones aleatorias)</li>
+                    <li><strong>3 clics</strong> en el gato: Dormir (el gato duerme 5 segundos)</li>
+                </ul>
+                <p><strong>Comportamiento automático:</strong> El gato camina, maúlla, se lame y bosteza
+                    automáticamente.</p>
+            </div>
+
+            <p style="margin-top: 20px; text-align: center; color: #666;">
+                El gato debería aparecer en la parte inferior de la pantalla. Si no lo ves, abre la consola del
+                navegador (F12) para ver posibles errores.
+            </p>
+        </div>
+    </div>
+
+    <script src="/js/pet-cat.js"></script>
+</body>
+
+</html>

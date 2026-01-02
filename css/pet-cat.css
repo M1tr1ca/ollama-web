@@ -1,0 +1,94 @@
+/* Pet Cat Styles - Integrated into Chat */
+
+/* Pet Container - Fixed position, scrolls with page */
+.pet-sprite-container {
+    position: fixed !important;
+    z-index: 1000000 !important;
+    transition: left 10s ease-in-out, bottom 0.5s ease;
+    cursor: pointer;
+    animation: fadeIn 0.8s ease-out;
+    pointer-events: none;
+    bottom: -25px !important;
+    left: 20%;
+}
+
+.pet-sprite {
+    width: 100px !important;
+    height: auto;
+    filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.5));
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    image-rendering: pixelated;
+    pointer-events: auto;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.pet-sprite {
+    max-width: 120px;
+    width: 120px;
+    height: auto;
+    filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.5));
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+}
+
+.pet-sprite:hover {
+    transform: scale(1.05);
+}
+
+.pet-sprite:active {
+    transform: scale(0.95);
+}
+
+/* Status Message */
+.pet-status-message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(20px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    padding: 16px 24px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    color: white;
+}
+
+.pet-status-message.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* Responsive Design - Mobile */
+@media (max-width: 768px) {
+    .pet-sprite {
+        max-width: 100px;
+        width: 100px;
+    }
+
+    .pet-status-message {
+        font-size: 1rem;
+        padding: 12px 20px;
+        max-width: 80%;
+    }
+}
