@@ -925,15 +925,15 @@ function processCanvasResponse(conversation, assistantMessage) {
   cleanContent = cleanContent.replace(/\{[\s\S]*?"type"\s*:\s*["']canvas["'][\s\S]*?\}/g, '');
 
   // Limpiar espacios en blanco excesivos
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:927',message:'Antes de limpiar espacios en blanco excesivos',data:{cleanContentBefore:cleanContent,cleanContentLengthBefore:cleanContent?.length,multipleNewlines:(cleanContent?.match(/\n{3,}/g) || []).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});;
-// #endregion
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:927', message: 'Antes de limpiar espacios en blanco excesivos', data: { cleanContentBefore: cleanContent, cleanContentLengthBefore: cleanContent?.length, multipleNewlines: (cleanContent?.match(/\n{3,}/g) || []).length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });;
+  // #endregion
 
   cleanContent = cleanContent.replace(/\n{3,}/g, '\n\n').trim();
 
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:928',message:'Después de limpiar espacios en blanco excesivos',data:{cleanContentAfter:cleanContent,cleanContentLengthAfter:cleanContent?.length,multipleNewlinesAfter:(cleanContent?.match(/\n{3,}/g) || []).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});;
-// #endregion
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:928', message: 'Después de limpiar espacios en blanco excesivos', data: { cleanContentAfter: cleanContent, cleanContentLengthAfter: cleanContent?.length, multipleNewlinesAfter: (cleanContent?.match(/\n{3,}/g) || []).length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });;
+  // #endregion
 
   // Si después de limpiar queda texto útil, usarlo; sino crear mensaje por defecto
   let explanation = '';
@@ -1867,9 +1867,9 @@ function appendMessageElement(message) {
 
   // Agregar bloque de pensamiento si existe
   if (message.thinking && message.role === 'assistant') {
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1869',message:'Condición thinking assistant ejecutándose',data:{hasThinking:!!message.thinking,messageRole:message.role},timestamp:Date.now(),sessionId:"debug-session",runId:"run5",hypothesisId:"G"})}).catch(()=>{});;
-// #endregion
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:1869', message: 'Condición thinking assistant ejecutándose', data: { hasThinking: !!message.thinking, messageRole: message.role }, timestamp: Date.now(), sessionId: "debug-session", runId: "run5", hypothesisId: "G" }) }).catch(() => { });;
+    // #endregion
     content += createThinkingBlock(message.thinking, message.thinkingDuration, false);
   }
 
@@ -1929,9 +1929,9 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
       });
     }
   } else if (message.role === 'assistant' && message.deepResearch && message.content) {
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1928',message:'Condición deepResearch assistant ejecutándose',data:{hasDeepResearch:!!message.deepResearch,messageRole:message.role,hasContent:!!message.content},timestamp:Date.now(),sessionId:"debug-session",runId:"run5",hypothesisId:"G"})}).catch(()=>{});;
-// #endregion
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:1928', message: 'Condición deepResearch assistant ejecutándose', data: { hasDeepResearch: !!message.deepResearch, messageRole: message.role, hasContent: !!message.content }, timestamp: Date.now(), sessionId: "debug-session", runId: "run5", hypothesisId: "G" }) }).catch(() => { });;
+    // #endregion
     // Es un mensaje de Deep Think completado - mostrar con encabezado especial
     content += `
       <div class="deep-research-report">
@@ -1972,9 +1972,9 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
       </button>
     `;
   } else if (message.role === 'assistant' && message.webSearchData && message.content) {
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1968',message:'Condición webSearch assistant ejecutándose',data:{hasWebSearchData:!!message.webSearchData,messageRole:message.role,hasContent:!!message.content},timestamp:Date.now(),sessionId:"debug-session",runId:"run5",hypothesisId:"G"})}).catch(()=>{});;
-// #endregion
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:1968', message: 'Condición webSearch assistant ejecutándose', data: { hasWebSearchData: !!message.webSearchData, messageRole: message.role, hasContent: !!message.content }, timestamp: Date.now(), sessionId: "debug-session", runId: "run5", hypothesisId: "G" }) }).catch(() => { });;
+    // #endregion
     // Es un mensaje de búsqueda web normal completado - reconstruir la UI
     const webData = message.webSearchData;
     content += createWebSearchUIForRestore(webData);
@@ -1984,9 +1984,9 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
     content += '<div class="web-response-content">' + parseMarkdown(message.content) + '</div>';
     content += '</div>';
   } else if (message.content) {
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1977',message:'Entrando en rama message.content',data:{messageRole:message.role,contentLength:message.content?.length,contentPreview:message.content?.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'E'})}).catch(()=>{});;
-// #endregion
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:1977', message: 'Entrando en rama message.content', data: { messageRole: message.role, contentLength: message.content?.length, contentPreview: message.content?.substring(0, 100) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run3', hypothesisId: 'E' }) }).catch(() => { });;
+    // #endregion
 
     // Comprobar si hay un canvas asociado a esta conversación
     const conversation = state.conversations[state.activeId];
@@ -1994,9 +1994,9 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
     const scoreDoc = conversation ? getScoreDoc(conversation.id) : null;
 
     // Si hay canvas y el mensaje tiene indicadores de canvas creado
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1987',message:'Verificando condición canvas',data:{hasCanvasDoc:!!canvasDoc,messageRole:message.role,hasCanvasId:!!message.canvasId,canvasCondition:canvasDoc && message.role === 'assistant' && message.canvasId === canvasDoc.id},timestamp:Date.now(),sessionId:"debug-session",runId:"run4",hypothesisId:"F"})}).catch(()=>{});;
-// #endregion
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:1987', message: 'Verificando condición canvas', data: { hasCanvasDoc: !!canvasDoc, messageRole: message.role, hasCanvasId: !!message.canvasId, canvasCondition: canvasDoc && message.role === 'assistant' && message.canvasId === canvasDoc.id }, timestamp: Date.now(), sessionId: "debug-session", runId: "run4", hypothesisId: "F" }) }).catch(() => { });;
+    // #endregion
 
     if (canvasDoc && message.role === 'assistant' && message.canvasId === canvasDoc.id) {
       // Dividir el contenido en texto antes del canvas, tarjeta canvas, y texto después
@@ -2033,9 +2033,9 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
         });
       }
     } else if (scoreDoc && message.role === 'assistant' && message.scoreId === scoreDoc.id) {
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2022',message:'Verificando condición score',data:{hasScoreDoc:!!scoreDoc,messageRole:message.role,hasScoreId:!!message.scoreId,scoreCondition:scoreDoc && message.role === 'assistant' && message.scoreId === scoreDoc.id},timestamp:Date.now(),sessionId:"debug-session",runId:"run4",hypothesisId:"F"})}).catch(()=>{});;
-// #endregion
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2022', message: 'Verificando condición score', data: { hasScoreDoc: !!scoreDoc, messageRole: message.role, hasScoreId: !!message.scoreId, scoreCondition: scoreDoc && message.role === 'assistant' && message.scoreId === scoreDoc.id }, timestamp: Date.now(), sessionId: "debug-session", runId: "run4", hypothesisId: "F" }) }).catch(() => { });;
+      // #endregion
       // Si hay partitura y el mensaje la referencia
       const parts = message.content.split('[SCORE_ARTIFACT]');
       const messageVersion = message.scoreVersion || scoreDoc.version || 1;
@@ -2095,9 +2095,9 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
         const hasTravelContent = message.content.includes('[TRAVEL_MAP]') ||
           message.content.includes('[PLACE:');
 
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2074',message:'Verificando si hay contenido de viaje',data:{hasTravelContent:hasTravelContent,messageRole:message.role,messageContentLength:message.content?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'D'})}).catch(()=>{});;
-// #endregion
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2074', message: 'Verificando si hay contenido de viaje', data: { hasTravelContent: hasTravelContent, messageRole: message.role, messageContentLength: message.content?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run2', hypothesisId: 'D' }) }).catch(() => { });;
+        // #endregion
 
         if (hasTravelContent && window.travelMode?.parseCommands) {
           // Parsear y limpiar los comandos de viaje
@@ -2105,9 +2105,9 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
           // Usar el texto limpio sin los comandos
           messageContentToRender = travelDataForLater.text || '';
 
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2082',message:'Contenido a renderizar después de parsear viaje',data:{messageContentToRender:messageContentToRender,messageContentToRenderLength:messageContentToRender?.length,travelDataText:travelDataForLater?.text,travelDataPlacesCount:travelDataForLater?.places?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'D'})}).catch(()=>{});;
-// #endregion
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2082', message: 'Contenido a renderizar después de parsear viaje', data: { messageContentToRender: messageContentToRender, messageContentToRenderLength: messageContentToRender?.length, travelDataText: travelDataForLater?.text, travelDataPlacesCount: travelDataForLater?.places?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run2', hypothesisId: 'D' }) }).catch(() => { });;
+          // #endregion
         }
       }
 
@@ -2115,9 +2115,9 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
       const parsedContent = parseMarkdown(messageContentToRender);
       content += parsedContent;
 
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2095',message:'Contenido parseado agregado',data:{messageContentToRender:messageContentToRender,messageContentToRenderLength:messageContentToRender?.length,parsedContent:parsedContent,parsedContentLength:parsedContent?.length,finalContentLength:content?.length},timestamp:Date.now(),sessionId:"debug-session",runId:"run5",hypothesisId:"H"})}).catch(()=>{});;
-// #endregion
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2095', message: 'Contenido parseado agregado', data: { messageContentToRender: messageContentToRender, messageContentToRenderLength: messageContentToRender?.length, parsedContent: parsedContent, parsedContentLength: parsedContent?.length, finalContentLength: content?.length }, timestamp: Date.now(), sessionId: "debug-session", runId: "run5", hypothesisId: "H" }) }).catch(() => { });;
+      // #endregion
 
       // Guardar la data de viaje para renderizar después
       if (travelDataForLater) {
@@ -2287,15 +2287,15 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
         // Usar el texto limpio de parseTravelCommands para actualizar el bubble
         if (travelData.text !== message.content) {
           // Solo actualizar si el texto cambió (tiene comandos para limpiar)
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2247',message:'Antes de actualizar bubble con travelData.text',data:{travelDataText:travelData.text,travelDataTextLength:travelData.text?.length,messageContentLength:message.content?.length,textChanged:travelData.text !== message.content},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});;
-// #endregion
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2247', message: 'Antes de actualizar bubble con travelData.text', data: { travelDataText: travelData.text, travelDataTextLength: travelData.text?.length, messageContentLength: message.content?.length, textChanged: travelData.text !== message.content }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });;
+          // #endregion
 
           bubble.innerHTML = travelData.text.replace(/\n/g, '<br>');
 
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:2249',message:'Después de actualizar bubble - HTML generado',data:{bubbleInnerHTML:bubble.innerHTML,bubbleInnerHTMLLength:bubble.innerHTML?.length,brTags:(bubble.innerHTML?.match(/<br>/g) || []).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});;
-// #endregion
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2249', message: 'Después de actualizar bubble - HTML generado', data: { bubbleInnerHTML: bubble.innerHTML, bubbleInnerHTMLLength: bubble.innerHTML?.length, brTags: (bubble.innerHTML?.match(/<br>/g) || []).length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });;
+          // #endregion
         }
       }
     }
@@ -3738,9 +3738,9 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             assistantMessage.travelPlaces = travelData.places;
             assistantMessage.cleanContent = travelData.text; // Guardar contenido limpio
 
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:3698',message:'Guardando cleanContent en assistantMessage',data:{travelDataText:travelData.text,travelDataTextLength:travelData.text?.length,placesCount:travelData.places?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});;
-// #endregion
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:3698', message: 'Guardando cleanContent en assistantMessage', data: { travelDataText: travelData.text, travelDataTextLength: travelData.text?.length, placesCount: travelData.places?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });;
+            // #endregion
 
             // Buscar el contenedor del mensaje
             const chatList = document.getElementById('chat-list');
@@ -3753,9 +3753,9 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
               // Actualizar el texto del mensaje sin los comandos
               const cleanContent = travelData.text;
 
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:3709',message:'Actualizando messageBubble con cleanContent',data:{cleanContent:cleanContent,cleanContentLength:cleanContent?.length,messageBubbleExists:!!messageBubble},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});;
-// #endregion
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:3709', message: 'Actualizando messageBubble con cleanContent', data: { cleanContent: cleanContent, cleanContentLength: cleanContent?.length, messageBubbleExists: !!messageBubble }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });;
+              // #endregion
               console.log('🗺️ Contenido limpio:', cleanContent.substring(0, 100) + '...');
 
               // Limpiar directamente el innerHTML del bubble eliminando comandos RAW
@@ -8522,6 +8522,9 @@ function updateProjectBadge() {
   const badgeEmpty = document.getElementById('project-badge-empty');
   const badgeNameEmpty = document.getElementById('project-badge-name-empty');
 
+  // Botón de proyectos en sidebar (para modo minimizado)
+  const projectsBtn = document.getElementById('projects-panel-btn');
+
   const project = getActiveProject();
 
   if (project) {
@@ -8536,12 +8539,26 @@ function updateProjectBadge() {
       badgeEmpty.style.display = 'flex';
     }
 
+    // Marcar el botón de proyectos como activo (naranja en modo minimizado)
+    if (projectsBtn) {
+      projectsBtn.classList.add('has-active-project');
+      projectsBtn.setAttribute('data-active-project', project.name);
+      projectsBtn.setAttribute('title', `Proyecto activo: ${project.name}`);
+    }
+
     // Actualizar indicadores compactos de contexto
     updateCompactContextIndicators(project);
   } else {
     // Ocultar ambos badges
     if (badge) badge.style.display = 'none';
     if (badgeEmpty) badgeEmpty.style.display = 'none';
+
+    // Quitar clase activa del botón de proyectos
+    if (projectsBtn) {
+      projectsBtn.classList.remove('has-active-project');
+      projectsBtn.removeAttribute('data-active-project');
+      projectsBtn.setAttribute('title', 'Proyectos');
+    }
   }
 }
 

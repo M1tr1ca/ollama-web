@@ -293,62 +293,46 @@ body {
   transform: rotate(180deg);
 }
 
-/* Proyectos en modo minimizado */
+/* Proyectos en modo minimizado - OCULTAR lista individual, solo mostrar botón único */
 .sidebar.minimized .projects-section {
-  display: block;
-}
-
-.sidebar.minimized .projects-header {
   display: none;
 }
 
-.sidebar.minimized .projects-list {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
+/* Estilo para cuando hay un proyecto activo - botón de proyectos se pone naranja */
+.sidebar-quick-actions .quick-action-btn#projects-panel-btn.has-active-project {
+  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-dark));
+  color: white;
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 12px var(--theme-primary-shadow);
 }
 
-.sidebar.minimized .project-item {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  position: relative;
+.sidebar-quick-actions .quick-action-btn#projects-panel-btn.has-active-project:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 16px var(--theme-primary-shadow);
 }
 
-.sidebar.minimized .project-item-icon {
-  width: 32px;
-  height: 32px;
-  font-size: 16px;
-}
-
-.sidebar.minimized .project-item-info,
-.sidebar.minimized .project-item-actions {
-  display: none;
-}
-
-.sidebar.minimized .project-item:hover::after {
-  content: attr(data-project-name);
+/* Tooltip para el botón de proyectos cuando está activo */
+.sidebar.minimized .quick-action-btn#projects-panel-btn.has-active-project::after {
+  content: attr(data-active-project);
   position: absolute;
   left: calc(100% + 12px);
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(20, 20, 20, 0.95);
-  color: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(135deg, var(--theme-primary), var(--theme-primary-dark));
+  color: white;
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 12px;
   white-space: nowrap;
   pointer-events: none;
   z-index: 1000;
-  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar.minimized .quick-action-btn#projects-panel-btn.has-active-project:hover::after {
+  opacity: 1;
 }
 
 .layout.sidebar-minimized {
