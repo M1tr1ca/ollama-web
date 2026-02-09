@@ -864,6 +864,9 @@ body {
   z-index: 101;
   animation: slideUp 0.2s ease;
   min-width: 200px;
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .settings-divider {
@@ -1004,13 +1007,17 @@ body {
 
 /* Submenú de idiomas */
 .settings-submenu {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 6px;
-  padding: 4px;
-  margin-top: 4px;
-  margin-left: 32px;
-  margin-right: 0;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  padding: 6px;
+  margin-top: 6px;
+  margin-left: 8px;
+  margin-right: 8px;
+  margin-bottom: 6px;
   animation: slideDown 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  max-height: none;
+  overflow: visible;
 }
 
 .settings-submenu .language-option {
@@ -1018,17 +1025,35 @@ body {
   padding: 8px 12px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.15s ease, color 0.15s ease;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .settings-submenu .language-option:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
+}
+
+.settings-submenu .language-option .lang-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
 }
 
 .font-option.active .font-name {
@@ -3151,6 +3176,21 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   user-select: none;
 }
 
+/* Indicador de modelo (en línea con la hora) */
+.message-model-indicator {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 500;
+  user-select: none;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  display: inline-block;
+  margin-right: 6px;
+  width: fit-content;
+}
+
 .thinking-block {
   background: transparent;
   border: none;
@@ -3910,17 +3950,19 @@ input:checked+.slider:before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 4px;
-  margin-bottom: 4px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  gap: 8px;
 }
 
 .projects-header h2 {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
   margin: 0;
+  flex: 1;
 }
 
 .new-project-btn {
@@ -3972,18 +4014,19 @@ input:checked+.slider:before {
 .project-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   border: 1px solid transparent;
   position: relative;
-  margin: 0 2px;
+  margin: 4px 6px;
 }
 
 .project-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateX(4px);
 }
 
 .project-item.active {
@@ -4013,13 +4056,14 @@ input:checked+.slider:before {
 }
 
 .project-item-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px; /* Aumentado de 12px */
+  font-weight: 600; /* Aumentado de 500 */
+  color: rgba(255, 255, 255, 0.95); /* Más vibrante */
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 180px; /* Añadido un límite razonable */
 }
 
 .project-item-meta {
@@ -4245,7 +4289,7 @@ input:checked+.slider:before {
   font-size: 12px;
   font-weight: 600;
   color: var(--theme-primary);
-  max-width: 150px;
+  max-width: 300px; /* Aumentado de 150px */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4277,8 +4321,7 @@ input:checked+.slider:before {
 .project-badge-floating {
   position: fixed;
   top: 24px;
-  left: 340px;
-  /* Después del sidebar */
+  left: 310px; /* Reducido de 340px para estar más cerca del sidebar */
   z-index: 100;
   padding: 8px 16px;
   background: rgba(255, 255, 255, 0.05);
@@ -4289,8 +4332,12 @@ input:checked+.slider:before {
   display: flex;
   align-items: center;
   gap: 10px;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   animation: floatingBadgeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.layout.sidebar-minimized .project-badge-floating {
+  left: 84px;
 }
 
 .project-badge-floating:hover {
@@ -15871,25 +15918,357 @@ body.research-report-visible .research-report-panel {
   min-height: 380px;
 }
 
-/* Leaflet overrides para tema oscuro */
-.chat-travel-map .leaflet-control-zoom a {
-  background: rgba(30, 30, 35, 0.95);
-  color: white;
+/* Controles overlay del mapa */
+.travel-map-overlay-controls {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 800;
+  pointer-events: none;
+}
+
+.travel-map-overlay-controls > * {
+  pointer-events: auto;
+}
+
+/* Info de ruta (tiempo, distancia) */
+.travel-route-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 15, 20, 0.9);
+  backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.chat-travel-map .leaflet-control-zoom a:hover {
-  background: rgba(50, 50, 55, 0.95);
+.route-info-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.chat-travel-map .leaflet-control-attribution {
-  background: rgba(0, 0, 0, 0.6);
+.route-info-item svg {
+  opacity: 0.7;
+}
+
+.route-info-separator {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 16px;
+}
+
+/* Botón expandir mapa */
+.travel-map-expand-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(15, 15, 20, 0.9);
+  backdrop-filter: blur(12px);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.travel-map-expand-btn:hover {
+  background: rgba(30, 30, 40, 0.95);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+/* Marcadores de inicio y fin */
+.travel-marker-start {
+  background: #22c55e !important;
+  border-color: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 3px 12px rgba(34, 197, 94, 0.5) !important;
+}
+
+.travel-marker-end {
+  background: #ef4444 !important;
+  border-color: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 3px 12px rgba(239, 68, 68, 0.5) !important;
+}
+
+/* ========================================
+   MAPA PANTALLA COMPLETA
+   ======================================== */
+.travel-map-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: #0f0f14;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: scale(0.96);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.travel-map-fullscreen.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.fullscreen-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: rgba(15, 15, 20, 0.98);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.fullscreen-map-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.fullscreen-map-title svg {
+  color: var(--theme-primary, #d4956a);
+}
+
+.fullscreen-route-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.route-badge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.fullscreen-map-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fullscreen-gmaps-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: rgba(66, 133, 244, 0.15);
+  border: 1px solid rgba(66, 133, 244, 0.3);
+  border-radius: 10px;
+  color: #6ea8fe;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.fullscreen-gmaps-btn:hover {
+  background: rgba(66, 133, 244, 0.25);
+  color: #93c5fd;
+}
+
+.fullscreen-map-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.fullscreen-map-close:hover {
+  background: rgba(255, 80, 80, 0.15);
+  border-color: rgba(255, 80, 80, 0.3);
+  color: #ff6b6b;
+}
+
+.fullscreen-map-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  overflow: hidden;
+}
+
+.fullscreen-map-container {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.fullscreen-places-sidebar {
+  background: rgba(18, 18, 22, 0.98);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fullscreen-places-sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.fullscreen-places-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+.fullscreen-place-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.fullscreen-place-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.fullscreen-place-item.active {
+  background: rgba(66, 133, 244, 0.1);
+  border-color: rgba(66, 133, 244, 0.3);
+}
+
+.fullscreen-place-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--theme-primary, #d4956a);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.fullscreen-place-item:first-child .fullscreen-place-number {
+  background: #22c55e;
+}
+
+.fullscreen-place-item:last-child .fullscreen-place-number {
+  background: #ef4444;
+}
+
+.fullscreen-place-info {
+  min-width: 0;
+}
+
+.fullscreen-place-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fullscreen-place-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.fullscreen-place-cat {
+  font-size: 11px;
+  color: var(--theme-primary, #d4956a);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.fullscreen-place-rating {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+@media (max-width: 768px) {
+  .fullscreen-map-body {
+    grid-template-columns: 1fr;
+  }
+
+  .fullscreen-places-sidebar {
+    max-height: 200px;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .fullscreen-route-info {
+    display: none;
+  }
+}
+
+/* Leaflet overrides para tema oscuro */
+.chat-travel-map .leaflet-control-zoom a,
+.fullscreen-map-container .leaflet-control-zoom a {
+  background: rgba(15, 15, 20, 0.9);
+  backdrop-filter: blur(8px);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  font-size: 16px;
+}
+
+.chat-travel-map .leaflet-control-zoom a:hover,
+.fullscreen-map-container .leaflet-control-zoom a:hover {
+  background: rgba(30, 30, 40, 0.95);
+}
+
+.chat-travel-map .leaflet-control-zoom,
+.fullscreen-map-container .leaflet-control-zoom {
+  border: none;
+  box-shadow: none;
+}
+
+.chat-travel-map .leaflet-control-attribution,
+.fullscreen-map-container .leaflet-control-attribution {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.3);
+  border-radius: 4px 0 0 0;
 }
 
-.chat-travel-map .leaflet-control-attribution a {
-  color: rgba(255, 255, 255, 0.5);
+.chat-travel-map .leaflet-control-attribution a,
+.fullscreen-map-container .leaflet-control-attribution a {
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /* MARCADORES PERSONALIZADOS */
@@ -15922,13 +16301,13 @@ body.research-report-visible .research-report-panel {
 
 /* Popup del mapa */
 .travel-popup {
-  padding: 4px;
+  padding: 6px;
 }
 
 .travel-popup strong {
   display: block;
   font-size: 14px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .travel-popup .popup-cat {
@@ -15937,14 +16316,16 @@ body.research-report-visible .research-report-panel {
 }
 
 .leaflet-popup-content-wrapper {
-  background: rgba(25, 25, 30, 0.98);
+  background: rgba(20, 20, 25, 0.98);
+  backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   color: white;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .leaflet-popup-tip {
-  background: rgba(25, 25, 30, 0.98);
+  background: rgba(20, 20, 25, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -16399,6 +16780,18 @@ body.research-report-visible .research-report-panel {
 .chat-travel-place-item:hover .place-item-number {
   background: var(--theme-primary);
   border-color: var(--theme-primary);
+}
+
+.chat-travel-place-item:first-child .place-item-number {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #4ade80;
+}
+
+.chat-travel-place-item:last-child .place-item-number {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
 }
 
 .place-item-info {
@@ -17071,4 +17464,1825 @@ body.research-report-visible .research-report-panel {
   width: 24px;
   height: 24px;
   display: inline-block;
+}
+
+/* ========================================
+   MODO SALUD v2.0 - Glass Morphism Design
+   ======================================== */
+
+/* ---- Grid de Sugerencias ---- */
+.health-suggestions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+  animation: healthFadeIn 0.4s ease;
+}
+
+.health-suggestion-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(10px);
+}
+
+.health-suggestion-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.suggestion-image-wrap {
+  width: 100%;
+  height: 130px;
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(135deg, rgba(30, 30, 50, 0.8) 0%, rgba(20, 20, 40, 0.9) 100%);
+}
+
+.suggestion-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.health-suggestion-card:hover .suggestion-image {
+  transform: scale(1.05);
+}
+
+.suggestion-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.suggestion-image-loader {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  animation: healthSpin 0.8s linear infinite;
+}
+
+.suggestion-info {
+  padding: 12px 14px;
+}
+
+.suggestion-name {
+  font-weight: 600;
+  font-size: 0.92em;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.suggestion-desc {
+  font-size: 0.78em;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.suggestion-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.suggestion-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.suggestion-meta-item svg {
+  opacity: 0.7;
+}
+
+/* ---- Tarjetas base ---- */
+.health-recipe-card,
+.health-routine-card,
+.health-plan-card,
+.health-wellness-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  margin: 16px 0;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(20px);
+  animation: healthFadeIn 0.4s ease;
+}
+
+.health-recipe-card:hover,
+.health-routine-card:hover,
+.health-plan-card:hover,
+.health-wellness-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.15);
+}
+
+/* ---- Hero de receta ---- */
+.recipe-hero {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  background: linear-gradient(135deg, rgba(15, 15, 30, 0.4) 0%, rgba(20, 20, 40, 0.3) 100%);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+  transition: all 0.4s ease;
+}
+
+.recipe-hero.has-image::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.05) 50%, transparent 100%);
+  z-index: 1;
+}
+
+.recipe-hero-loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-top-color: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  animation: healthSpin 0.8s linear infinite;
+}
+
+.recipe-hero-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px 20px 16px;
+  z-index: 2;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.35));
+}
+
+.recipe-hero-title {
+  margin: 0 0 8px;
+  font-size: 1.3em;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.recipe-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.recipe-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.73em;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.recipe-badge svg {
+  opacity: 0.8;
+}
+
+/* ---- Video embed ---- */
+.recipe-video-section {
+  margin: 0;
+}
+
+.recipe-video-container {
+  padding: 16px 20px;
+}
+
+.recipe-video-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 12px;
+}
+
+.recipe-video-header svg {
+  color: #ef4444;
+}
+
+.recipe-video-embed {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+
+.recipe-video-embed iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* ---- Ingredientes (caja transparente) ---- */
+.recipe-ingredients-box {
+  margin: 16px 16px 0;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.recipe-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.recipe-section-header svg {
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.recipe-ingredients-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recipe-ingredient-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.86em;
+}
+
+.recipe-ingredient-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.recipe-ingredient-row.checked {
+  opacity: 0.45;
+}
+
+.recipe-ingredient-row.checked .ingredient-text {
+  text-decoration: line-through;
+}
+
+.ingredient-check-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.25);
+  transition: color 0.2s;
+}
+
+.recipe-ingredient-row.checked .ingredient-check-icon {
+  color: #10b981;
+}
+
+.ingredient-text {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.4;
+}
+
+.ingredient-text strong {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+}
+
+.ingredient-cal {
+  flex-shrink: 0;
+  font-size: 0.8em;
+  color: rgba(239, 68, 68, 0.65);
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ---- Pasos (estilo chat bubble) ---- */
+.recipe-steps-section {
+  padding: 16px 20px;
+}
+
+.recipe-steps-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.recipe-step-bubble {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px 12px 12px 4px;
+  transition: all 0.2s;
+}
+
+.recipe-step-bubble:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.step-number-badge {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  font-size: 0.8em;
+  font-weight: 700;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  margin-top: 1px;
+}
+
+.step-content {
+  flex: 1;
+  font-size: 0.88em;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.step-content strong {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 600;
+}
+
+.step-content em {
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
+
+.step-content code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  color: #fbbf24;
+}
+
+/* ---- Nutricion chips ---- */
+.recipe-nutrition-bar {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.recipe-nutrition-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 600px;
+  margin: 0 auto;
+  justify-content: center;
+}
+
+.nutrition-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 80px;
+  position: relative;
+}
+
+.nutrition-chip::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--nut-color, rgba(255,255,255,0.2));
+}
+
+.nutrition-chip-value {
+  font-size: 0.88em;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 2px;
+}
+
+.nutrition-chip-label {
+  font-size: 0.68em;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ---- Tip bar ---- */
+.recipe-tip-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 20px;
+  background: rgba(245, 158, 11, 0.05);
+  border-top: 1px solid rgba(245, 158, 11, 0.1);
+  font-size: 0.84em;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.recipe-tip-bar svg {
+  flex-shrink: 0;
+  color: rgba(245, 158, 11, 0.6);
+  margin-top: 1px;
+}
+
+/* ---- Cabecera de tarjeta (rutina, plan, wellness) ---- */
+.health-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 20px 12px;
+}
+
+.health-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}
+
+.health-card-title h3 {
+  margin: 0 0 6px;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.health-card-subtitle {
+  font-size: 0.82em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
+}
+
+.health-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.73em;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.health-badge.beginner {
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.health-badge.intermediate {
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.health-badge.advanced {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ---- Secciones ---- */
+.health-section {
+  padding: 16px 20px;
+}
+
+.health-section p {
+  margin: 0;
+  font-size: 0.86em;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ---- Ejercicios ---- */
+.health-exercises-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.health-exercise-item {
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.health-exercise-item:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.exercise-header {
+  display: flex;
+  gap: 12px;
+  padding: 10px 14px;
+  align-items: center;
+}
+
+.exercise-number {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  font-size: 0.78em;
+  font-weight: 700;
+}
+
+.exercise-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.exercise-name {
+  font-weight: 600;
+  font-size: 0.88em;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 3px;
+}
+
+.exercise-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.75em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.exercise-meta span {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.exercise-description {
+  padding: 10px 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  animation: healthFadeIn 0.3s ease;
+}
+
+.exercise-description p {
+  margin: 0;
+  font-size: 0.83em;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* ---- Warning box ---- */
+.health-warning-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 20px;
+  background: rgba(239, 68, 68, 0.06);
+  border-top: 1px solid rgba(239, 68, 68, 0.1);
+  font-size: 0.84em;
+  line-height: 1.5;
+  color: rgba(239, 68, 68, 0.7);
+}
+
+.health-warning-box svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ---- Plan semanal ---- */
+.health-plan-days {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px 16px;
+}
+
+.health-plan-day {
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.plan-day-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.88em;
+  color: rgba(255, 255, 255, 0.8);
+  transition: background 0.2s;
+}
+
+.plan-day-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.day-name {
+  font-weight: 600;
+}
+
+.plan-day-meals {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.health-plan-day.expanded .plan-day-meals {
+  max-height: 500px;
+}
+
+.health-plan-day.expanded {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.plan-meal-item {
+  padding: 7px 14px 7px 36px;
+  font-size: 0.82em;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* ---- Calentamiento y enfriamiento ---- */
+.warmup-section {
+  background: rgba(245, 158, 11, 0.04);
+  border-radius: 10px;
+  margin: 8px 16px;
+}
+
+.cooldown-section {
+  background: rgba(59, 130, 246, 0.04);
+  border-radius: 10px;
+  margin: 8px 16px;
+}
+
+/* ========================================
+   RUNNING PLAN - Glass Style
+   ======================================== */
+
+.health-running-plan-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  margin: 16px 0;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  animation: healthFadeIn 0.4s ease;
+}
+
+.running-plan-header {
+  padding: 24px 24px 20px;
+  background: linear-gradient(135deg, rgba(10, 10, 30, 0.3) 0%, rgba(20, 20, 50, 0.2) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  position: relative;
+}
+
+.running-plan-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, rgba(168, 85, 247, 0.04) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.running-plan-header-content {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.running-plan-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a5b4fc;
+  flex-shrink: 0;
+}
+
+.running-plan-title-section {
+  flex: 1;
+}
+
+.running-plan-title {
+  margin: 0 0 10px;
+  font-size: 1.2em;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: -0.01em;
+}
+
+.running-plan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.running-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.72em;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.running-badge.beginner {
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.running-badge.intermediate {
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.running-badge.advanced {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.running-badge-goal {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.72em;
+  font-weight: 500;
+  background: rgba(99, 102, 241, 0.08);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+/* Días del plan */
+.running-plan-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  padding: 18px;
+}
+
+.running-day-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 14px 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+}
+
+.running-day-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(99, 102, 241, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.running-day-card.running-day-rest {
+  background: rgba(59, 130, 246, 0.03);
+  border-color: rgba(59, 130, 246, 0.1);
+}
+
+.running-day-card.running-day-rest:hover {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.running-day-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.running-day-number {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.1));
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a5b4fc;
+  font-size: 0.8em;
+  font-weight: 700;
+}
+
+.running-day-rest .running-day-number {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(96, 165, 250, 0.1));
+  border-color: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+}
+
+.running-day-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.running-day-name {
+  font-weight: 600;
+  font-size: 0.82em;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 3px;
+  text-transform: capitalize;
+}
+
+.running-day-type {
+  font-size: 0.88em;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.3;
+}
+
+.running-day-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.running-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.running-detail-item svg {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.running-day-notes {
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  font-size: 0.74em;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+/* Secciones */
+.running-plan-section {
+  padding: 14px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.running-plan-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+}
+
+.running-plan-section-header svg {
+  opacity: 0.5;
+}
+
+.running-plan-section p {
+  margin: 0;
+  font-size: 0.84em;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.running-plan-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 18px;
+  background: rgba(245, 158, 11, 0.03);
+  border-top: 1px solid rgba(245, 158, 11, 0.08);
+  font-size: 0.82em;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.running-plan-tip svg {
+  flex-shrink: 0;
+  color: rgba(245, 158, 11, 0.5);
+  margin-top: 1px;
+}
+
+.running-plan-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 18px;
+  background: rgba(239, 68, 68, 0.04);
+  border-top: 1px solid rgba(239, 68, 68, 0.08);
+  font-size: 0.82em;
+  line-height: 1.5;
+  color: rgba(239, 68, 68, 0.65);
+}
+
+.running-plan-warning svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ========================================
+   EXERCISEDB - Rutina Hero Banner
+   ======================================== */
+
+.routine-hero-banner {
+  position: relative;
+  background: linear-gradient(135deg, rgba(10, 10, 30, 0.3) 0%, rgba(20, 20, 50, 0.2) 100%);
+  padding: 28px 24px 22px;
+  overflow: hidden;
+}
+
+.routine-hero-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.routine-hero-banner::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.3), transparent);
+}
+
+.routine-hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+.routine-hero-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #a5b4fc;
+  margin-bottom: 14px;
+}
+
+.routine-hero-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.routine-hero-title {
+  margin: 0 0 12px;
+  font-size: 1.35em;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.routine-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ========================================
+   EXERCISEDB - Exercise Cards Grid
+   ======================================== */
+
+.exdb-exercises-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.exdb-exercise-card {
+  position: relative;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.exdb-exercise-card:hover {
+  border-color: rgba(99, 102, 241, 0.25);
+  background: rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.exdb-exercise-card.expanded {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(0, 0, 0, 0.25);
+  grid-column: 1 / -1;
+}
+
+/* GIF section */
+.exdb-exercise-gif-wrap {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0a0a1a 0%, #111827 100%);
+}
+
+.exdb-exercise-gif {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+
+.exdb-exercise-card:hover .exdb-exercise-gif {
+  transform: scale(1.03);
+}
+
+.exdb-gif-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.12);
+}
+
+.exdb-gif-placeholder svg {
+  width: 40px;
+  height: 40px;
+}
+
+.exdb-gif-loader {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(99, 102, 241, 0.1);
+  border-top-color: rgba(99, 102, 241, 0.5);
+  border-radius: 50%;
+  animation: healthSpin 0.7s linear infinite;
+}
+
+/* Body section */
+.exdb-exercise-body {
+  padding: 14px 16px 12px;
+  position: relative;
+}
+
+.exdb-exercise-number {
+  position: absolute;
+  top: -14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 0.75em;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  border: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+.exdb-exercise-title {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 8px;
+  line-height: 1.3;
+  text-transform: capitalize;
+}
+
+.exdb-exercise-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.exdb-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.7em;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.1);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.exdb-tag-rest {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.7em;
+  font-weight: 500;
+  background: rgba(245, 158, 11, 0.08);
+  color: rgba(252, 211, 77, 0.8);
+  border: 1px solid rgba(245, 158, 11, 0.12);
+}
+
+.exdb-tag-rest svg {
+  width: 10px;
+  height: 10px;
+  opacity: 0.7;
+}
+
+.exdb-exercise-muscles {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72em;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 4px;
+}
+
+.exdb-exercise-muscles svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+/* ========================================
+   EXERCISEDB - Expanded Detail
+   ======================================== */
+
+.exdb-exercise-detail {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 16px;
+  animation: healthFadeIn 0.3s ease;
+}
+
+.exdb-detail-technique {
+  margin-bottom: 14px;
+}
+
+.exdb-detail-technique p {
+  margin: 0;
+  font-size: 0.84em;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.exdb-detail-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.exdb-detail-label svg {
+  opacity: 0.6;
+}
+
+.exdb-detail-section {
+  margin-bottom: 14px;
+}
+
+.exdb-detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.exdb-chip {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72em;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.exdb-chip-primary {
+  background: rgba(16, 185, 129, 0.1);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.exdb-chip-secondary {
+  background: rgba(99, 102, 241, 0.08);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.exdb-chip-equip {
+  background: rgba(245, 158, 11, 0.08);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.exdb-detail-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exdb-instruction-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.2s;
+}
+
+.exdb-instruction-step:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.exdb-inst-num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  font-size: 0.7em;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.exdb-inst-text {
+  flex: 1;
+  font-size: 0.8em;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* API Data box */
+.exdb-api-data {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.04);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.exdb-api-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #a5b4fc;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.exdb-api-header svg {
+  color: #a5b4fc;
+}
+
+/* ========================================
+   EXERCISEDB - Explorer
+   ======================================== */
+
+.exdb-explorer {
+  margin: 16px 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  animation: healthFadeIn 0.4s ease;
+}
+
+.exdb-explorer-header {
+  padding: 24px 24px 16px;
+  background: linear-gradient(135deg, rgba(10, 10, 30, 0.3) 0%, rgba(20, 20, 50, 0.2) 100%);
+  position: relative;
+}
+
+.exdb-explorer-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 30% 70%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 70% 30%, rgba(168, 85, 247, 0.04) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.exdb-explorer-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.3), transparent);
+}
+
+.exdb-explorer-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.15em;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.exdb-explorer-title svg {
+  color: #a5b4fc;
+}
+
+.exdb-explorer-subtitle {
+  position: relative;
+  margin: 0;
+  font-size: 0.82em;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.4;
+}
+
+/* Body parts grid */
+.exdb-bodyparts-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 16px;
+}
+
+.exdb-bodypart-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.78em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+}
+
+.exdb-bodypart-btn:hover {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.2);
+  color: rgba(255, 255, 255, 0.85);
+  transform: translateY(-1px);
+}
+
+.exdb-bodypart-btn.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.12));
+  border-color: rgba(99, 102, 241, 0.35);
+  color: #a5b4fc;
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.2);
+}
+
+.exdb-bodypart-btn svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+
+.exdb-bodypart-btn.active svg {
+  opacity: 1;
+}
+
+/* Results section */
+.exdb-explorer-results {
+  padding: 0 16px 16px;
+}
+
+.exdb-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 14px;
+}
+
+.exdb-results-title {
+  font-size: 0.95em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.exdb-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.exdb-refresh-btn:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: #a5b4fc;
+}
+
+.exdb-refresh-btn:active svg {
+  animation: healthSpin 0.4s ease;
+}
+
+/* Results grid */
+.exdb-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+/* Explore cards */
+.exdb-explore-card {
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.exdb-explore-card:hover {
+  border-color: rgba(99, 102, 241, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+.exdb-explore-card.expanded {
+  grid-column: 1 / -1;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.exdb-explore-gif-wrap {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #080812, #111827);
+}
+
+.exdb-explore-gif {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+
+.exdb-explore-card:hover .exdb-explore-gif {
+  transform: scale(1.05);
+}
+
+.exdb-explore-gif-fallback {
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.08);
+}
+
+.exdb-explore-gif-fallback svg {
+  width: 36px;
+  height: 36px;
+}
+
+.exdb-explore-info {
+  padding: 12px 14px 10px;
+}
+
+.exdb-explore-name {
+  font-weight: 600;
+  font-size: 0.82em;
+  color: rgba(255, 255, 255, 0.88);
+  text-transform: capitalize;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+.exdb-explore-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.exdb-explore-muscles,
+.exdb-explore-equip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7em;
+  color: rgba(255, 255, 255, 0.4);
+  flex-wrap: wrap;
+}
+
+.exdb-explore-muscles svg,
+.exdb-explore-equip svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.exdb-explore-muscles span,
+.exdb-explore-equip span {
+  text-transform: capitalize;
+}
+
+.exdb-explore-muscles {
+  color: rgba(110, 231, 183, 0.6);
+}
+
+.exdb-explore-equip {
+  color: rgba(252, 211, 77, 0.5);
+}
+
+/* Explore detail (expanded) */
+.exdb-explore-detail {
+  padding: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  animation: healthFadeIn 0.3s ease;
+}
+
+.exdb-explore-secondary {
+  margin-bottom: 14px;
+}
+
+.exdb-explore-instructions {
+  margin-top: 10px;
+}
+
+/* Loading state */
+.exdb-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 20px;
+  grid-column: 1 / -1;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85em;
+}
+
+.exdb-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(99, 102, 241, 0.1);
+  border-top-color: rgba(99, 102, 241, 0.5);
+  border-radius: 50%;
+  animation: healthSpin 0.7s linear infinite;
+}
+
+.exdb-no-results {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 20px;
+  grid-column: 1 / -1;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.85em;
+}
+
+.exdb-no-results svg {
+  opacity: 0.4;
+}
+
+/* ---- Animaciones ---- */
+@keyframes healthFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes healthSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes healthPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 600px) {
+  .health-suggestions-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .suggestion-image-wrap {
+    height: 100px;
+  }
+
+  .recipe-hero {
+    height: 170px;
+  }
+
+  .recipe-nutrition-items {
+    gap: 6px;
+  }
+
+  .nutrition-chip {
+    min-width: 65px;
+    padding: 8px 10px;
+  }
+
+  .health-card-badges {
+    flex-direction: column;
+  }
+
+  .exdb-exercises-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exdb-exercise-gif-wrap {
+    height: 160px;
+  }
+
+  .exdb-results-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+  }
+
+  .exdb-explore-gif-wrap {
+    height: 130px;
+  }
+
+  .exdb-bodyparts-grid {
+    gap: 5px;
+    padding: 12px;
+  }
+
+  .exdb-bodypart-btn {
+    padding: 6px 10px;
+    font-size: 0.72em;
+  }
+
+  .routine-hero-banner {
+    padding: 20px 16px 18px;
+  }
+
+  .routine-hero-title {
+    font-size: 1.15em;
+  }
+
+  .running-plan-days {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .running-plan-header {
+    padding: 18px 16px 16px;
+  }
+
+  .running-plan-title {
+    font-size: 1.05em;
+  }
+}
+
+@media (max-width: 400px) {
+  .health-suggestions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exdb-results-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .running-plan-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

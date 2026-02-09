@@ -1,6 +1,6 @@
 // ========================================
 // MÓDULO DE VIAJES - LEAFLET + OPENSTREETMAP
-// Versión 5.0 - Fotos reales de Wikipedia
+// Versión 6.0 - Rutas reales por calles (OSRM)
 // ========================================
 
 // Estado por conversación
@@ -9,6 +9,49 @@ const travelState = {
   inlineMaps: {},
   currentConversationId: null
 };
+
+// ========================================
+// OSRM ROUTING - Rutas reales por calles
+// ========================================
+
+async function fetchOSRMRoute(places) {
+  if (!places || places.length < 2) return null;
+
+  // Construir coordenadas para OSRM (lng,lat format)
+  const coords = places.map(p => `${p.lng},${p.lat}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson&steps=true`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.routes && data.routes.length > 0) {
+      const route = data.routes[0];
+      return {
+        coordinates: route.geometry.coordinates, // [lng, lat] pairs
+        duration: route.duration, // seconds
+        distance: route.distance, // meters
+        legs: route.legs || []
+      };
+    }
+  } catch (error) {
+    console.warn('OSRM route fetch failed, falling back to straight lines:', error);
+  }
+  return null;
+}
+
+function formatRouteDuration(seconds) {
+  const mins = Math.round(seconds / 60);
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  const remainingMins = mins % 60;
+  return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
+}
+
+function formatRouteDistance(meters) {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(1)} km`;
+}
 
 // ========================================
 // CREAR MAPAS INLINE EN EL CHAT (LEAFLET)
@@ -38,23 +81,45 @@ function createInlineChatMap(containerId, places = [], options = {}) {
   }
 
   try {
-    const map = L.map(containerId, { zoomControl: false }).setView(center, zoom);
+    const map = L.map(containerId, {
+      zoomControl: false,
+      attributionControl: false
+    }).setView(center, zoom);
 
+    // Tile layer oscuro premium (CartoDB Dark Matter)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(map);
 
+    // Control de zoom en esquina superior derecha
     L.control.zoom({ position: 'topright' }).addTo(map);
 
+    // Atribución pequeña y sutil
+    L.control.attribution({ position: 'bottomleft', prefix: false })
+      .addAttribution('Leaflet | © OpenStreetMap © CARTO')
+      .addTo(map);
+
     const markers = [];
-    const routeCoordinates = []; // Para la polyline de ruta
 
     places.forEach((place, index) => {
+      const isFirst = index === 0;
+      const isLast = index === places.length - 1 && places.length > 1;
+
+      // Marcador especial para inicio y fin
+      let markerHTML;
+      if (isFirst && places.length > 1) {
+        markerHTML = `<div class="travel-marker travel-marker-start"><span>${index + 1}</span></div>`;
+      } else if (isLast) {
+        markerHTML = `<div class="travel-marker travel-marker-end"><span>${index + 1}</span></div>`;
+      } else {
+        markerHTML = `<div class="travel-marker"><span>${place.rating || (index + 1)}</span></div>`;
+      }
+
       const customIcon = L.divIcon({
         className: 'travel-marker-icon',
-        html: `<div class="travel-marker"><span>${place.rating || (index + 1)}</span></div>`,
+        html: markerHTML,
         iconSize: [40, 40],
         iconAnchor: [20, 40],
         popupAnchor: [0, -40]
@@ -62,37 +127,118 @@ function createInlineChatMap(containerId, places = [], options = {}) {
 
       const marker = L.marker([place.lat, place.lng], { icon: customIcon })
         .addTo(map)
-        .bindPopup(`<div class="travel-popup"><strong>${place.name}</strong></div>`);
+        .bindPopup(`<div class="travel-popup"><strong>${place.name}</strong><span class="popup-cat">${place.category || ''}</span></div>`);
 
       marker.on('click', () => showPlaceDetailModal(place));
       markers.push(marker);
-      routeCoordinates.push([place.lat, place.lng]);
     });
 
-    // Añadir línea de ruta conectando todos los lugares
+    // Obtener ruta REAL por calles usando OSRM
     if (places.length > 1) {
-      // Línea de ruta principal (punteada, estilo atractivo)
-      const routeLine = L.polyline(routeCoordinates, {
-        color: '#d4956a',
-        weight: 3,
-        opacity: 0.8,
-        dashArray: '10, 10',
-        lineCap: 'round',
-        lineJoin: 'round'
+      // Mostrar línea temporal punteada mientras carga OSRM
+      const tempCoords = places.map(p => [p.lat, p.lng]);
+      const tempLine = L.polyline(tempCoords, {
+        color: 'rgba(100,100,120,0.3)',
+        weight: 2,
+        dashArray: '6, 8'
       }).addTo(map);
 
-      const group = L.featureGroup([...markers, routeLine]);
-      map.fitBounds(group.getBounds().pad(0.1));
+      // Ajustar vista
+      const group = L.featureGroup(markers);
+      map.fitBounds(group.getBounds().pad(0.15));
+
+      // Obtener ruta real de OSRM
+      fetchOSRMRoute(places).then(routeData => {
+        // Quitar línea temporal
+        map.removeLayer(tempLine);
+
+        if (routeData && routeData.coordinates.length > 0) {
+          // Las coordenadas de OSRM vienen como [lng, lat], Leaflet necesita [lat, lng]
+          const routeLatLngs = routeData.coordinates.map(c => [c[1], c[0]]);
+
+          // Sombra de la ruta (da efecto de profundidad)
+          L.polyline(routeLatLngs, {
+            color: '#000000',
+            weight: 8,
+            opacity: 0.3,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }).addTo(map);
+
+          // Ruta principal - línea sólida azul brillante
+          const mainRoute = L.polyline(routeLatLngs, {
+            color: '#4285F4',
+            weight: 5,
+            opacity: 0.9,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }).addTo(map);
+
+          // Brillo encima de la ruta
+          L.polyline(routeLatLngs, {
+            color: '#6ea8fe',
+            weight: 2,
+            opacity: 0.5,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }).addTo(map);
+
+          // Ajustar vista a la ruta completa
+          const allElements = [...markers, mainRoute];
+          const routeGroup = L.featureGroup(allElements);
+          map.fitBounds(routeGroup.getBounds().pad(0.12));
+
+          // Actualizar info de ruta en el panel
+          const routeInfoEl = container.closest('.chat-travel-embed')?.querySelector('.travel-route-info');
+          if (routeInfoEl) {
+            routeInfoEl.innerHTML = `
+              <div class="route-info-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>${formatRouteDuration(routeData.duration)}</span>
+              </div>
+              <div class="route-info-separator">·</div>
+              <div class="route-info-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                <span>${formatRouteDistance(routeData.distance)}</span>
+              </div>
+              <div class="route-info-separator">·</div>
+              <div class="route-info-item">
+                <span>${places.length} paradas</span>
+              </div>
+            `;
+            routeInfoEl.style.display = 'flex';
+          }
+
+          console.log('🗺️ Ruta OSRM dibujada:', formatRouteDistance(routeData.distance), '-', formatRouteDuration(routeData.duration));
+        } else {
+          // Fallback: línea directa si OSRM falla
+          const fallbackCoords = places.map(p => [p.lat, p.lng]);
+          L.polyline(fallbackCoords, {
+            color: '#4285F4',
+            weight: 4,
+            opacity: 0.7,
+            dashArray: '8, 12',
+            lineCap: 'round',
+            lineJoin: 'round'
+          }).addTo(map);
+
+          const routeGroup = L.featureGroup(markers);
+          map.fitBounds(routeGroup.getBounds().pad(0.12));
+        }
+      });
+    } else if (markers.length === 1) {
+      map.setView([places[0].lat, places[0].lng], 15);
     }
 
     travelState.inlineMaps[containerId] = map;
 
-    // IMPORTANTE: Forzar el redimensionado del mapa después de que el DOM se asiente
-    // Esto evita las "rejillas blancas" y asegura que las teselas carguen bien
+    // Forzar el redimensionado del mapa
     setTimeout(() => {
       map.invalidateSize();
-      console.log('🗺️ Tamaño del mapa validado (invalidateSize)');
     }, 400);
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 1000);
 
     console.log('🗺️ Mapa Leaflet creado correctamente con', places.length, 'lugares');
     return map;
@@ -284,7 +430,7 @@ function generateTravelMapHTML(places, mapId) {
   const displayPlaces = places.slice(0, 10);
 
   // Crear URL de ruta a pie con todos los lugares
-  const routePlaces = places.slice(0, 10); // Máximo 10 para Google Maps
+  const routePlaces = places.slice(0, 10);
   const origin = `${routePlaces[0].lat},${routePlaces[0].lng}`;
   const destination = `${routePlaces[routePlaces.length - 1].lat},${routePlaces[routePlaces.length - 1].lng}`;
   const waypoints = routePlaces.slice(1, -1).map(p => `${p.lat},${p.lng}`).join('|');
@@ -317,7 +463,7 @@ function generateTravelMapHTML(places, mapId) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"></path>
           </svg>
-          <span>Ruta a pie (${routePlaces.length} lugares)</span>
+          <span>Abrir en Google Maps</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 3 21 3 21 9"></polyline>
             <line x1="10" y1="14" x2="21" y2="3"></line>
@@ -332,6 +478,17 @@ function generateTravelMapHTML(places, mapId) {
       <div class="chat-travel-layout">
         <div class="chat-travel-map-container">
           <div id="${id}" class="chat-travel-map"></div>
+          <div class="travel-map-overlay-controls">
+            <div class="travel-route-info" style="display:none;"></div>
+            <button class="travel-map-expand-btn" title="Ver mapa grande" data-map-id="${id}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            </button>
+          </div>
         </div>
         ${placesListHTML}
       </div>
@@ -379,21 +536,9 @@ function parseTravelCommands(content) {
 
   if (!content) return result;
 
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'js/viajes.js:369',message:'Inicio parseTravelCommands',data:{contentLength:content?.length,hasContent:!!content,contentPreview:content?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});;
-// #endregion
-
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'js/viajes.js:370',message:'Contenido original con saltos de línea',data:{contentRaw:content,newlines:content?.split('\n').length - 1,emptyLines:(content?.match(/^\s*$/gm) || []).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});;
-// #endregion
-
   // Detectar bloque de mapa con lugares
   const mapBlockRegex = /\[TRAVEL_MAP\]([\s\S]*?)\[\/TRAVEL_MAP\]/g;
   const mapMatch = content.match(mapBlockRegex);
-
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'js/viajes.js:382',message:'Bloques TRAVEL_MAP encontrados',data:{mapMatchCount:mapMatch?.length || 0,originalContent:content},timestamp:Date.now(),sessionId:'debug-session',runId:'run4',hypothesisId:'A'})}).catch(()=>{});;
-// #endregion
 
   if (mapMatch) {
     console.log('🗺️ Encontrado bloque TRAVEL_MAP');
@@ -428,10 +573,6 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
     // Cuando hay TRAVEL_MAP, NO mostrar ningún texto - solo el mapa
     // IMPORTANTE: Limpiar TODO el contenido, incluyendo texto antes y después del bloque TRAVEL_MAP
     result.text = '';
-
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'js/viajes.js:415',message:'TRAVEL_MAP detectado - TEXTO COMPLETAMENTE VACÍO, solo mapa',data:{placesCount:result.places.length,originalContentLength:content.length,textSetToEmpty:result.text === ''},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'A'})}).catch(()=>{});
-// #endregion
 
     return result; // Salir temprano, no hacer más procesamiento
   }
@@ -477,10 +618,6 @@ fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{metho
   }
 
   console.log('🗺️ Resultado final - hasTravel:', result.hasTravel, 'places:', result.places.length);
-
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'js/viajes.js:465',message:'Resultado final parseTravelCommands',data:{hasTravel:result.hasTravel,placesCount:result.places.length,showMap:result.showMap,showRoute:result.showRoute,finalText:result.text,finalTextLength:result.text.length,finalTextPreview:result.text?.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});;
-// #endregion
 
   return result;
 }
@@ -532,9 +669,149 @@ function renderTravelComponents(messageContainer, travelData) {
             if (place) showPlaceDetailModal(place);
           });
         });
+
+        // Evento botón expandir mapa
+        const expandBtn = travelContainer.querySelector('.travel-map-expand-btn');
+        if (expandBtn) {
+          expandBtn.addEventListener('click', () => {
+            toggleMapFullscreen(mapId, travelData.places);
+          });
+        }
       }
     }, 500);
   }
+}
+
+// ========================================
+// MAPA A PANTALLA COMPLETA
+// ========================================
+
+function toggleMapFullscreen(mapId, places) {
+  const existingFullscreen = document.getElementById('travel-map-fullscreen');
+  if (existingFullscreen) {
+    closeMapFullscreen();
+    return;
+  }
+
+  const fullscreenEl = document.createElement('div');
+  fullscreenEl.id = 'travel-map-fullscreen';
+  fullscreenEl.className = 'travel-map-fullscreen';
+
+  // Crear URL ruta Google Maps
+  let gmapsUrl = '#';
+  if (places && places.length >= 2) {
+    const origin = `${places[0].lat},${places[0].lng}`;
+    const destination = `${places[places.length - 1].lat},${places[places.length - 1].lng}`;
+    const waypoints = places.slice(1, -1).map(p => `${p.lat},${p.lng}`).join('|');
+    gmapsUrl = waypoints
+      ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=walking`
+      : `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`;
+  }
+
+  fullscreenEl.innerHTML = `
+    <div class="fullscreen-map-header">
+      <div class="fullscreen-map-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+        </svg>
+        <span>Mapa del viaje</span>
+        <div class="fullscreen-route-info"></div>
+      </div>
+      <div class="fullscreen-map-actions">
+        <a href="${gmapsUrl}" target="_blank" class="fullscreen-gmaps-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+          </svg>
+          Google Maps
+        </a>
+        <button class="fullscreen-map-close" id="fullscreen-map-close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="fullscreen-map-body">
+      <div id="fullscreen-map-container" class="fullscreen-map-container"></div>
+      <div class="fullscreen-places-sidebar">
+        ${places ? places.map((place, index) => `
+          <div class="fullscreen-place-item" data-index="${index}">
+            <div class="fullscreen-place-number">${index + 1}</div>
+            <div class="fullscreen-place-info">
+              <div class="fullscreen-place-name">${place.name}</div>
+              <div class="fullscreen-place-meta">
+                ${place.category ? `<span class="fullscreen-place-cat">${place.category}</span>` : ''}
+                ${place.rating ? `<span class="fullscreen-place-rating">★ ${place.rating}</span>` : ''}
+              </div>
+            </div>
+          </div>
+        `).join('') : ''}
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(fullscreenEl);
+
+  // Animación de entrada
+  requestAnimationFrame(() => {
+    fullscreenEl.classList.add('visible');
+  });
+
+  // Crear mapa fullscreen
+  setTimeout(() => {
+    const fullMap = createInlineChatMap('fullscreen-map-container', places || []);
+
+    // Eventos de lugares
+    fullscreenEl.querySelectorAll('.fullscreen-place-item').forEach((item, idx) => {
+      item.addEventListener('click', () => {
+        const place = places[idx];
+        if (place && fullMap) {
+          fullMap.flyTo([place.lat, place.lng], 16, { duration: 1 });
+          // Destacar item
+          fullscreenEl.querySelectorAll('.fullscreen-place-item').forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+        }
+      });
+    });
+
+    // Actualizar info ruta en header
+    if (places && places.length > 1) {
+      fetchOSRMRoute(places).then(routeData => {
+        if (routeData) {
+          const routeInfo = fullscreenEl.querySelector('.fullscreen-route-info');
+          if (routeInfo) {
+            routeInfo.innerHTML = `
+              <span class="route-badge">${formatRouteDuration(routeData.duration)}</span>
+              <span class="route-badge">${formatRouteDistance(routeData.distance)}</span>
+              <span class="route-badge">${places.length} paradas</span>
+            `;
+          }
+        }
+      });
+    }
+  }, 100);
+
+  // Cerrar
+  fullscreenEl.querySelector('#fullscreen-map-close').addEventListener('click', closeMapFullscreen);
+  fullscreenEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeMapFullscreen();
+  });
+}
+
+function closeMapFullscreen() {
+  const el = document.getElementById('travel-map-fullscreen');
+  if (!el) return;
+  el.classList.remove('visible');
+  setTimeout(() => {
+    // Limpiar mapa
+    const mapInstance = travelState.inlineMaps['fullscreen-map-container'];
+    if (mapInstance && typeof mapInstance.remove === 'function') {
+      mapInstance.remove();
+      delete travelState.inlineMaps['fullscreen-map-container'];
+    }
+    el.remove();
+  }, 300);
 }
 
 // ========================================
@@ -616,7 +893,8 @@ window.travelMode = {
     window._travelModeActive = active;
     console.log(active ? '🗺️ Modo Viajes activado' : '🗺️ Modo Viajes desactivado');
   },
-  init: () => console.log('🗺️ Leaflet Maps v5.0 listo')
+  init: () => console.log('🗺️ Leaflet Maps v6.0 listo'),
+  toggleFullscreen: toggleMapFullscreen
 };
 
 // Toggle setup
@@ -638,4 +916,4 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(setup, 1000);
 });
 
-console.log('📍 Módulo de viajes v5.0 - Wikipedia images');
+console.log('📍 Módulo de viajes v6.0 - Rutas OSRM + Fullscreen');

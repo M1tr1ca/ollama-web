@@ -925,15 +925,7 @@ function processCanvasResponse(conversation, assistantMessage) {
   cleanContent = cleanContent.replace(/\{[\s\S]*?"type"\s*:\s*["']canvas["'][\s\S]*?\}/g, '');
 
   // Limpiar espacios en blanco excesivos
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:927', message: 'Antes de limpiar espacios en blanco excesivos', data: { cleanContentBefore: cleanContent, cleanContentLengthBefore: cleanContent?.length, multipleNewlines: (cleanContent?.match(/\n{3,}/g) || []).length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });;
-  // #endregion
-
   cleanContent = cleanContent.replace(/\n{3,}/g, '\n\n').trim();
-
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:928', message: 'Después de limpiar espacios en blanco excesivos', data: { cleanContentAfter: cleanContent, cleanContentLengthAfter: cleanContent?.length, multipleNewlinesAfter: (cleanContent?.match(/\n{3,}/g) || []).length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });;
-  // #endregion
 
   // Si después de limpiar queda texto útil, usarlo; sino crear mensaje por defecto
   let explanation = '';
@@ -1867,9 +1859,6 @@ function appendMessageElement(message) {
 
   // Agregar bloque de pensamiento si existe
   if (message.thinking && message.role === 'assistant') {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:1869', message: 'Condición thinking assistant ejecutándose', data: { hasThinking: !!message.thinking, messageRole: message.role }, timestamp: Date.now(), sessionId: "debug-session", runId: "run5", hypothesisId: "G" }) }).catch(() => { });;
-    // #endregion
     content += createThinkingBlock(message.thinking, message.thinkingDuration, false);
   }
 
@@ -1929,9 +1918,6 @@ function appendMessageElement(message) {
       });
     }
   } else if (message.role === 'assistant' && message.deepResearch && message.content) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:1928', message: 'Condición deepResearch assistant ejecutándose', data: { hasDeepResearch: !!message.deepResearch, messageRole: message.role, hasContent: !!message.content }, timestamp: Date.now(), sessionId: "debug-session", runId: "run5", hypothesisId: "G" }) }).catch(() => { });;
-    // #endregion
     // Es un mensaje de Deep Think completado - mostrar con encabezado especial
     content += `
       <div class="deep-research-report">
@@ -1972,9 +1958,6 @@ function appendMessageElement(message) {
       </button>
     `;
   } else if (message.role === 'assistant' && message.webSearchData && message.content) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:1968', message: 'Condición webSearch assistant ejecutándose', data: { hasWebSearchData: !!message.webSearchData, messageRole: message.role, hasContent: !!message.content }, timestamp: Date.now(), sessionId: "debug-session", runId: "run5", hypothesisId: "G" }) }).catch(() => { });;
-    // #endregion
     // Es un mensaje de búsqueda web normal completado - reconstruir la UI
     const webData = message.webSearchData;
     content += createWebSearchUIForRestore(webData);
@@ -1984,20 +1967,12 @@ function appendMessageElement(message) {
     content += '<div class="web-response-content">' + parseMarkdown(message.content) + '</div>';
     content += '</div>';
   } else if (message.content) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:1977', message: 'Entrando en rama message.content', data: { messageRole: message.role, contentLength: message.content?.length, contentPreview: message.content?.substring(0, 100) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run3', hypothesisId: 'E' }) }).catch(() => { });;
-    // #endregion
-
     // Comprobar si hay un canvas asociado a esta conversación
     const conversation = state.conversations[state.activeId];
     const canvasDoc = conversation ? getCanvasDoc(conversation.id) : null;
     const scoreDoc = conversation ? getScoreDoc(conversation.id) : null;
 
     // Si hay canvas y el mensaje tiene indicadores de canvas creado
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:1987', message: 'Verificando condición canvas', data: { hasCanvasDoc: !!canvasDoc, messageRole: message.role, hasCanvasId: !!message.canvasId, canvasCondition: canvasDoc && message.role === 'assistant' && message.canvasId === canvasDoc.id }, timestamp: Date.now(), sessionId: "debug-session", runId: "run4", hypothesisId: "F" }) }).catch(() => { });;
-    // #endregion
-
     if (canvasDoc && message.role === 'assistant' && message.canvasId === canvasDoc.id) {
       // Dividir el contenido en texto antes del canvas, tarjeta canvas, y texto después
       const parts = message.content.split('[CANVAS_ARTIFACT]');
@@ -2033,9 +2008,6 @@ function appendMessageElement(message) {
         });
       }
     } else if (scoreDoc && message.role === 'assistant' && message.scoreId === scoreDoc.id) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2022', message: 'Verificando condición score', data: { hasScoreDoc: !!scoreDoc, messageRole: message.role, hasScoreId: !!message.scoreId, scoreCondition: scoreDoc && message.role === 'assistant' && message.scoreId === scoreDoc.id }, timestamp: Date.now(), sessionId: "debug-session", runId: "run4", hypothesisId: "F" }) }).catch(() => { });;
-      // #endregion
       // Si hay partitura y el mensaje la referencia
       const parts = message.content.split('[SCORE_ARTIFACT]');
       const messageVersion = message.scoreVersion || scoreDoc.version || 1;
@@ -2095,29 +2067,22 @@ function appendMessageElement(message) {
         const hasTravelContent = message.content.includes('[TRAVEL_MAP]') ||
           message.content.includes('[PLACE:');
 
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2074', message: 'Verificando si hay contenido de viaje', data: { hasTravelContent: hasTravelContent, messageRole: message.role, messageContentLength: message.content?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run2', hypothesisId: 'D' }) }).catch(() => { });;
-        // #endregion
-
         if (hasTravelContent && window.travelMode?.parseCommands) {
           // Parsear y limpiar los comandos de viaje
           travelDataForLater = window.travelMode.parseCommands(message.content);
           // Usar el texto limpio sin los comandos
           messageContentToRender = travelDataForLater.text || '';
+        }
 
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2082', message: 'Contenido a renderizar después de parsear viaje', data: { messageContentToRender: messageContentToRender, messageContentToRenderLength: messageContentToRender?.length, travelDataText: travelDataForLater?.text, travelDataPlacesCount: travelDataForLater?.places?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run2', hypothesisId: 'D' }) }).catch(() => { });;
-          // #endregion
+        // Limpiar tags de salud antes de parsear markdown
+        if (window.healthMode?.hasContent && window.healthMode.hasContent(messageContentToRender)) {
+          messageContentToRender = window.healthMode.cleanTags(messageContentToRender);
         }
       }
 
       // Ahora parsear el markdown con el contenido limpio
       const parsedContent = parseMarkdown(messageContentToRender);
       content += parsedContent;
-
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2095', message: 'Contenido parseado agregado', data: { messageContentToRender: messageContentToRender, messageContentToRenderLength: messageContentToRender?.length, parsedContent: parsedContent, parsedContentLength: parsedContent?.length, finalContentLength: content?.length }, timestamp: Date.now(), sessionId: "debug-session", runId: "run5", hypothesisId: "H" }) }).catch(() => { });;
-      // #endregion
 
       // Guardar la data de viaje para renderizar después
       if (travelDataForLater) {
@@ -2231,16 +2196,27 @@ function appendMessageElement(message) {
   timeElement.textContent = formatTime(messageTime);
 
   copyContainer.appendChild(copyButton);
-  copyContainer.appendChild(timeElement)
-
-
-  // Orden correcto: regenerar (ya añadido) → copiar → fuentes → hora
-  copyContainer.appendChild(copyButton);
 
   // Añadir botón de fuentes web después del copiar (si existe)
   if (webSourcesBtn) {
     copyContainer.appendChild(webSourcesBtn);
     copyContainer.appendChild(webSourcesPopup);
+  }
+
+  // Añadir indicador de modelo antes de la hora (solo para mensajes del asistente)
+  if (message.role === 'assistant' && message.model) {
+    const modelIndicator = document.createElement('span');
+    modelIndicator.className = 'message-model-indicator';
+    
+    // Mostrar modelo y tokens/segundo si está disponible
+    let displayText = message.model;
+    if (message.tokensPerSecond && message.tokensPerSecond > 0) {
+      displayText += ` • ${message.tokensPerSecond} t/s`;
+    }
+    
+    modelIndicator.textContent = displayText;
+    modelIndicator.title = `Respondido por ${message.model}${message.tokensPerSecond ? ` (${message.tokensPerSecond} tokens/segundo)` : ''}`;
+    copyContainer.appendChild(modelIndicator);
   }
 
   copyContainer.appendChild(timeElement);
@@ -2250,6 +2226,7 @@ function appendMessageElement(message) {
   if (!isActiveDeepResearch) {
     bubble.innerHTML = content;
   }
+
   bubble.appendChild(copyContainer);
 
   // Renderizar matemáticas con KaTeX
@@ -2287,15 +2264,7 @@ function appendMessageElement(message) {
         // Usar el texto limpio de parseTravelCommands para actualizar el bubble
         if (travelData.text !== message.content) {
           // Solo actualizar si el texto cambió (tiene comandos para limpiar)
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2247', message: 'Antes de actualizar bubble con travelData.text', data: { travelDataText: travelData.text, travelDataTextLength: travelData.text?.length, messageContentLength: message.content?.length, textChanged: travelData.text !== message.content }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });;
-          // #endregion
-
           bubble.innerHTML = travelData.text.replace(/\n/g, '<br>');
-
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:2249', message: 'Después de actualizar bubble - HTML generado', data: { bubbleInnerHTML: bubble.innerHTML, bubbleInnerHTMLLength: bubble.innerHTML?.length, brTags: (bubble.innerHTML?.match(/<br>/g) || []).length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });;
-          // #endregion
         }
       }
     }
@@ -2304,6 +2273,16 @@ function appendMessageElement(message) {
     if (travelData && travelData.hasTravel && travelData.places && travelData.places.length > 0) {
       setTimeout(() => {
         window.travelMode.renderComponents(bubble, travelData);
+      }, 300);
+    }
+  }
+
+  // Renderizar componentes de salud
+  if (message.role === 'assistant' && message.content && window.healthMode?.hasContent && window.healthMode.hasContent(message.content)) {
+    const healthData = window.healthMode.parseCommands(message.content);
+    if (healthData) {
+      setTimeout(() => {
+        window.healthMode.renderComponents(bubble, healthData);
       }, 300);
     }
   }
@@ -2527,6 +2506,15 @@ function setActiveConversation(id) {
 }
 
 function createConversation() {
+  // Cerrar el panel de proyectos si está abierto
+  const projectsPanel = document.getElementById('projects-panel');
+  if (projectsPanel && projectsPanel.style.display === 'flex') {
+    projectsPanelVisible = false;
+    projectsPanel.style.display = 'none';
+    const btn = document.getElementById('projects-panel-btn');
+    if (btn) btn.classList.remove('active');
+  }
+
   const id = generateId('conv');
   const conversation = {
     id,
@@ -2871,7 +2859,56 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
 
   // Agregar el texto de la respuesta
   if (text) {
-    content += parseMarkdown(text);
+    // Limpiar comandos de viaje del texto visible (se procesan por separado al finalizar)
+    let visibleText = text;
+    if (visibleText.includes('[TRAVEL_MAP]') || visibleText.includes('[PLACE:')) {
+      // Eliminar bloques TRAVEL_MAP completos con todo su contenido
+      visibleText = visibleText.replace(/\[TRAVEL_MAP\][\s\S]*?\[\/TRAVEL_MAP\]/g, '');
+      // Si el bloque aún no se cerró (streaming en curso), ocultar desde [TRAVEL_MAP] en adelante
+      visibleText = visibleText.replace(/\[TRAVEL_MAP\][\s\S]*/g, '');
+      // Eliminar PLACE tags sueltos
+      visibleText = visibleText.replace(/\[PLACE:[^\]]*\]?/g, '');
+      // Eliminar GMAPS_ROUTE
+      visibleText = visibleText.replace(/\[GMAPS_ROUTE\]/g, '');
+      // Limpiar saltos de línea excesivos
+      visibleText = visibleText.replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    // Limpiar comandos de salud del texto visible (se procesan por separado al finalizar)
+    if (/\[(?:HEALTH_(?:RECIPE|ROUTINE|PLAN|WELLNESS|SUGGESTIONS)\]|RECIPE_|ROUTINE_|PLAN_|WELLNESS_|SUGGESTION:)\w*/.test(visibleText)) {
+      // Eliminar bloques completos cerrados
+      visibleText = visibleText.replace(/\[HEALTH_SUGGESTIONS\][\s\S]*?\[\/HEALTH_SUGGESTIONS\]/g, '');
+      visibleText = visibleText.replace(/\[HEALTH_RECIPE\][\s\S]*?\[\/HEALTH_RECIPE\]/g, '');
+      visibleText = visibleText.replace(/\[HEALTH_ROUTINE\][\s\S]*?\[\/HEALTH_ROUTINE\]/g, '');
+      visibleText = visibleText.replace(/\[HEALTH_PLAN\][\s\S]*?\[\/HEALTH_PLAN\]/g, '');
+      visibleText = visibleText.replace(/\[HEALTH_WELLNESS\][\s\S]*?\[\/HEALTH_WELLNESS\]/g, '');
+      // Si el bloque aún no se cerró (streaming en curso), ocultar desde el tag de apertura en adelante
+      visibleText = visibleText.replace(/\[HEALTH_SUGGESTIONS\][\s\S]*/g, '');
+      visibleText = visibleText.replace(/\[HEALTH_RECIPE\][\s\S]*/g, '');
+      visibleText = visibleText.replace(/\[HEALTH_ROUTINE\][\s\S]*/g, '');
+      visibleText = visibleText.replace(/\[HEALTH_PLAN\][\s\S]*/g, '');
+      visibleText = visibleText.replace(/\[HEALTH_WELLNESS\][\s\S]*/g, '');
+      // Eliminar tags envolventes sueltos
+      visibleText = visibleText.replace(/\[\/?HEALTH_[A-Z]+\]/g, '');
+      // Eliminar tags de sugerencia
+      visibleText = visibleText.replace(/\[SUGGESTION:[^\]]*\]/g, '');
+      // Eliminar tags individuales con contenido dentro de brackets: [TAG:contenido]
+      visibleText = visibleText.replace(/\[RECIPE_[A-Z_]+:[^\]]*\]/g, '');
+      visibleText = visibleText.replace(/\[ROUTINE_[A-Z_]+:[^\]]*\]/g, '');
+      visibleText = visibleText.replace(/\[PLAN_[A-Z_]+:[^\]]*\]/g, '');
+      visibleText = visibleText.replace(/\[WELLNESS_[A-Z_]+:[^\]]*\]/g, '');
+      // Eliminar tags formato B: [RECIPE_STEP:N]texto
+      visibleText = visibleText.replace(/\[RECIPE_STEP:\d+\][^\[\n]*/g, '');
+      visibleText = visibleText.replace(/\[WELLNESS_STEP:\d+\][^\[\n]*/g, '');
+      // Eliminar RECIPE_TIP sin brackets
+      visibleText = visibleText.replace(/^\s*RECIPE_TIP:.*$/gm, '');
+      // Limpiar líneas vacías de listas
+      visibleText = visibleText.replace(/^\s*[-*◦]\s*$/gm, '');
+      // Limpiar saltos de línea excesivos
+      visibleText = visibleText.replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    content += parseMarkdown(visibleText);
   }
 
   // Usar requestAnimationFrame para actualizar el DOM de forma más eficiente
@@ -2914,8 +2951,44 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
 
       copyContainer.appendChild(regenerateButton);
       copyContainer.appendChild(copyButton);
+      
+      // Añadir indicador de modelo si existe
+      const conversation = state.conversations[state.activeId];
+      if (conversation) {
+        const assistantMessage = conversation.messages[conversation.messages.length - 1];
+        if (assistantMessage && assistantMessage.role === 'assistant' && assistantMessage.model) {
+          const modelIndicator = document.createElement('span');
+          modelIndicator.className = 'message-model-indicator';
+          modelIndicator.id = 'streaming-model-indicator'; // ID para actualizarlo en tiempo real
+          
+          // Mostrar modelo y tokens/segundo si está disponible
+          let displayText = assistantMessage.model;
+          if (assistantMessage.tokensPerSecond && assistantMessage.tokensPerSecond > 0) {
+            displayText += ` • ${assistantMessage.tokensPerSecond} t/s`;
+          }
+          
+          modelIndicator.textContent = displayText;
+          modelIndicator.title = `Respondido por ${assistantMessage.model}${assistantMessage.tokensPerSecond ? ` (${assistantMessage.tokensPerSecond} tokens/segundo)` : ''}`;
+          copyContainer.appendChild(modelIndicator);
+        }
+      }
+      
       copyContainer.appendChild(timeElement);
       bubble.appendChild(copyContainer);
+    } else {
+      // Si ya existe el contenedor, actualizar el indicador de modelo en tiempo real
+      const modelIndicator = copyContainer.querySelector('#streaming-model-indicator');
+      if (modelIndicator) {
+        const conversation = state.conversations[state.activeId];
+        if (conversation) {
+          const assistantMessage = conversation.messages[conversation.messages.length - 1];
+          if (assistantMessage && assistantMessage.tokensPerSecond && assistantMessage.tokensPerSecond > 0) {
+            const displayText = `${assistantMessage.model} • ${assistantMessage.tokensPerSecond} t/s`;
+            modelIndicator.textContent = displayText;
+            modelIndicator.title = `Respondido por ${assistantMessage.model} (${assistantMessage.tokensPerSecond} tokens/segundo)`;
+          }
+        }
+      }
     }
 
     // Actualizar el evento de regenerar
@@ -3171,6 +3244,8 @@ async function streamAssistantResponse(conversation, payloadMessages) {
   const assistantMessage = createMessage('assistant', '');
   assistantMessage.thinking = '';
   assistantMessage.thinkingDuration = 0;
+  assistantMessage.model = state.currentModel; // Guardar el modelo usado
+  assistantMessage.tokensPerSecond = 0; // Inicializar tokens por segundo
   conversation.messages.push(assistantMessage);
   touchConversation(conversation.id);
   const { bubble } = appendMessageElement(assistantMessage);
@@ -3271,6 +3346,7 @@ async function streamAssistantResponse(conversation, payloadMessages) {
   let isThinkingStreaming = false;
   wasCancelled = false; // Resetear el flag de cancelación
   let canvasProcessed = false;
+  let streamedTokens = 0; // Contador de tokens en tiempo real
 
   // Sistema de batching para actualizaciones suaves
   let pendingUpdate = false;
@@ -3412,6 +3488,12 @@ async function streamAssistantResponse(conversation, payloadMessages) {
               }
 
               assistantMessage.content += contentChunk;
+              
+              // Actualizar contador de tokens en tiempo real
+              streamedTokens = Math.ceil(assistantMessage.content.length / 3.5);
+              const currentTime = (Date.now() - startTime) / 1000;
+              const currentTokensPerSecond = currentTime > 0 ? Math.round(streamedTokens / currentTime) : 0;
+              assistantMessage.tokensPerSecond = currentTokensPerSecond;
 
               // Detectar si estamos recibiendo JSON de canvas para no mostrarlo
               if (!canvasProcessed && assistantMessage.content.includes('"type"') && assistantMessage.content.includes('"canvas"')) {
@@ -3451,6 +3533,11 @@ async function streamAssistantResponse(conversation, payloadMessages) {
           }
 
           if (parsed.done) {
+            // Calcular tokens por segundo
+            const responseTime = (Date.now() - startTime) / 1000;
+            const estimatedTokens = Math.ceil(assistantMessage.content.length / 3.5);
+            assistantMessage.tokensPerSecond = responseTime > 0 ? Math.round(estimatedTokens / responseTime) : 0;
+            
             // Actualización final inmediata cuando termina (con scroll)
             const thinkingData = assistantMessage.thinking ? {
               thinking: assistantMessage.thinking,
@@ -3465,7 +3552,6 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             updateStopButtonToSend();
 
             // Registrar estadísticas de uso
-            const responseTime = (Date.now() - startTime) / 1000;
             trackModelUsage(state.currentModel);
             trackDailyMessage();
             trackResponseTime(responseTime);
@@ -3519,11 +3605,28 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                   copyButton.title = 'Copiar mensaje';
                   copyButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 
+                  newCopyContainer.appendChild(copyButton);
+                  
+                  // Añadir indicador de modelo si existe
+                  if (assistantMessage.model) {
+                    const modelIndicator = document.createElement('span');
+                    modelIndicator.className = 'message-model-indicator';
+                    
+                    // Mostrar modelo y tokens/segundo si está disponible
+                    let displayText = assistantMessage.model;
+                    if (assistantMessage.tokensPerSecond && assistantMessage.tokensPerSecond > 0) {
+                      displayText += ` • ${assistantMessage.tokensPerSecond} t/s`;
+                    }
+                    
+                    modelIndicator.textContent = displayText;
+                    modelIndicator.title = `Respondido por ${assistantMessage.model}${assistantMessage.tokensPerSecond ? ` (${assistantMessage.tokensPerSecond} tokens/segundo)` : ''}`;
+                    newCopyContainer.appendChild(modelIndicator);
+                  }
+                  
                   const timeElement = document.createElement('span');
                   timeElement.className = 'message-time';
                   timeElement.textContent = formatTime(assistantMessage.timestamp || Date.now());
 
-                  newCopyContainer.appendChild(copyButton);
                   newCopyContainer.appendChild(timeElement);
                   bubble.appendChild(newCopyContainer);
                 }
@@ -3614,11 +3717,28 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             copyButton.title = 'Copiar mensaje';
             copyButton.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 
+            newCopyContainer.appendChild(copyButton);
+            
+            // Añadir indicador de modelo si existe
+            if (assistantMessage.model) {
+              const modelIndicator = document.createElement('span');
+              modelIndicator.className = 'message-model-indicator';
+              
+              // Mostrar modelo y tokens/segundo si está disponible
+              let displayText = assistantMessage.model;
+              if (assistantMessage.tokensPerSecond && assistantMessage.tokensPerSecond > 0) {
+                displayText += ` • ${assistantMessage.tokensPerSecond} t/s`;
+              }
+              
+              modelIndicator.textContent = displayText;
+              modelIndicator.title = `Respondido por ${assistantMessage.model}${assistantMessage.tokensPerSecond ? ` (${assistantMessage.tokensPerSecond} tokens/segundo)` : ''}`;
+              newCopyContainer.appendChild(modelIndicator);
+            }
+            
             const timeElement = document.createElement('span');
             timeElement.className = 'message-time';
             timeElement.textContent = formatTime(assistantMessage.timestamp || Date.now());
 
-            newCopyContainer.appendChild(copyButton);
             newCopyContainer.appendChild(timeElement);
             bubble.appendChild(newCopyContainer);
           }
@@ -3738,10 +3858,6 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             assistantMessage.travelPlaces = travelData.places;
             assistantMessage.cleanContent = travelData.text; // Guardar contenido limpio
 
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:3698', message: 'Guardando cleanContent en assistantMessage', data: { travelDataText: travelData.text, travelDataTextLength: travelData.text?.length, placesCount: travelData.places?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });;
-            // #endregion
-
             // Buscar el contenedor del mensaje
             const chatList = document.getElementById('chat-list');
             const lastMessage = chatList?.lastElementChild;
@@ -3752,18 +3868,26 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             if (messageBubble) {
               // Actualizar el texto del mensaje sin los comandos
               const cleanContent = travelData.text;
-
-              // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/9cc8281c-e83b-4ee4-b773-1122b3b5e896', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'app.js:3709', message: 'Actualizando messageBubble con cleanContent', data: { cleanContent: cleanContent, cleanContentLength: cleanContent?.length, messageBubbleExists: !!messageBubble }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });;
-              // #endregion
               console.log('🗺️ Contenido limpio:', cleanContent.substring(0, 100) + '...');
 
-              // Limpiar directamente el innerHTML del bubble eliminando comandos RAW
+              // Limpiar directamente el innerHTML del bubble eliminando TODOS los comandos de viaje
+              // Primero eliminar bloques TRAVEL_MAP completos (incluyendo todo su contenido)
               let bubbleHtml = messageBubble.innerHTML;
-              bubbleHtml = bubbleHtml
-                .replace(/\[TRAVEL_MAP\]/g, '')
-                .replace(/\[\/TRAVEL_MAP\]/g, '')
-                .replace(/\[PLACE:[^\]]+\]/g, '');
+              // Eliminar bloques TRAVEL_MAP completos con todo su contenido
+              bubbleHtml = bubbleHtml.replace(/\[TRAVEL_MAP\][\s\S]*?\[\/TRAVEL_MAP\]/g, '');
+              // Eliminar PLACE tags sueltos que pudieran quedar
+              bubbleHtml = bubbleHtml.replace(/\[PLACE:[^\]]+\]/g, '');
+              // Eliminar GMAPS_ROUTE tags sueltos
+              bubbleHtml = bubbleHtml.replace(/\[GMAPS_ROUTE\]/g, '');
+              // Limpiar <br> excesivos que queden
+              bubbleHtml = bubbleHtml.replace(/(<br\s*\/?>[\s\n]*){3,}/gi, '<br><br>');
+              bubbleHtml = bubbleHtml.trim();
+
+              // Si el cleanContent está vacío (todo era TRAVEL_MAP), vaciar el bubble
+              if (!cleanContent || cleanContent.trim() === '') {
+                bubbleHtml = '';
+              }
+
               messageBubble.innerHTML = bubbleHtml;
 
               // Renderizar componentes de viaje
@@ -3776,6 +3900,56 @@ async function streamAssistantResponse(conversation, payloadMessages) {
           }
         }
       }, 700);
+    }
+
+    // Procesar comandos de salud (HEALTH_RECIPE, HEALTH_ROUTINE, etc.)
+    const hasHealthCommands = window.healthMode?.hasContent && window.healthMode.hasContent(assistantMessage.content || '');
+    if (hasHealthCommands && !wasCancelled) {
+      console.log('🏥 Fin de stream - Procesando comandos de salud detectados');
+      setTimeout(() => {
+        const healthData = window.healthMode.parseCommands(assistantMessage.content);
+        if (healthData) {
+          const chatList = document.getElementById('chat-list');
+          const lastMessage = chatList?.lastElementChild;
+          const messageBubble = lastMessage?.querySelector('.message-bubble');
+
+          if (messageBubble) {
+            // Re-renderizar desde el contenido original limpio (sin tags de salud)
+            const cleanedContent = window.healthMode.cleanTags(assistantMessage.content);
+            
+            // Preservar bloques de pensamiento si existen
+            const thinkingBlock = messageBubble.querySelector('.thinking-block');
+            const copyContainer = messageBubble.querySelector('.copy-message-container');
+            
+            // Limpiar el bubble y re-renderizar
+            const parsedClean = parseMarkdown(cleanedContent);
+            
+            // Reconstruir: pensamiento + contenido limpio
+            let newHTML = '';
+            if (thinkingBlock) {
+              newHTML += thinkingBlock.outerHTML;
+            }
+            newHTML += parsedClean;
+            if (copyContainer) {
+              newHTML += copyContainer.outerHTML;
+            }
+            messageBubble.innerHTML = newHTML;
+
+            // Re-attach event listeners para copiar/regenerar
+            const newCopyBtn = messageBubble.querySelector('.copy-message-btn');
+            if (newCopyBtn) {
+              newCopyBtn.addEventListener('click', () => {
+                const textToCopy = assistantMessage.content || '';
+                navigator.clipboard.writeText(textToCopy).catch(() => {});
+              });
+            }
+
+            // Renderizar componentes visuales de salud
+            window.healthMode.renderComponents(messageBubble, healthData);
+            persistState();
+          }
+        }
+      }, 800);
     }
   }
 }
@@ -4088,7 +4262,7 @@ async function regenerateResponse(messageId) {
     memoryContext = buildMemoryContext() || '';
   }
 
-  if (isFirstMessage || shouldIncludeProjectContext || window._studyModeActive || window._webSearchModeActive || window._travelModeActive) {
+  if (isFirstMessage || shouldIncludeProjectContext || window._studyModeActive || window._webSearchModeActive || window._travelModeActive || window._healthModeActive) {
     let systemContent = '';
 
     if (projectContext) {
@@ -4217,6 +4391,14 @@ Ejemplo:
         if (finalContent) finalContent += '\n\n';
         finalContent += travelInstructions;
         console.log('🗺️ Modo Viajes activado - Instrucciones de mapa añadidas');
+      }
+
+      // Instrucciones para Modo Salud
+      if (window._healthModeActive) {
+        const healthInstructions = window.healthMode?.getSystemPrompt ? window.healthMode.getSystemPrompt() : '🏥 MODO SALUD ACTIVADO. Responde como un coach de bienestar integral.';
+        if (finalContent) finalContent += '\n\n';
+        finalContent += healthInstructions;
+        console.log('🏥 Modo Salud activado - Instrucciones de salud añadidas');
       }
 
       if (finalContent.trim()) {
@@ -4411,7 +4593,7 @@ let handleSubmit = async function handleSubmitOriginal(event) {
   }
 
   // Si es el primer mensaje O hay un proyecto activo O un modo especial está activo, construir el mensaje del sistema
-  if (isFirstMessage || shouldIncludeProjectContext || window._studyModeActive || window._webSearchModeActive || window._travelModeActive) {
+  if (isFirstMessage || shouldIncludeProjectContext || window._studyModeActive || window._webSearchModeActive || window._travelModeActive || window._healthModeActive) {
     let systemContent = '';
 
     // PRIMERO: Agregar contexto del proyecto (máxima prioridad) - SIEMPRE si hay proyecto
@@ -4601,6 +4783,14 @@ No menciones estos comandos al usuario, simplemente úsalos. El sistema los conv
         if (finalContent) finalContent += '\n\n';
         finalContent += travelInstructions;
         console.log('🗺️ Modo Viajes activado - Instrucciones de mapa añadidas');
+      }
+
+      // Instrucciones para Modo Salud
+      if (window._healthModeActive) {
+        const healthInstructions = window.healthMode?.getSystemPrompt ? window.healthMode.getSystemPrompt() : '🏥 MODO SALUD ACTIVADO. Responde como un coach de bienestar integral.';
+        if (finalContent) finalContent += '\n\n';
+        finalContent += healthInstructions;
+        console.log('🏥 Modo Salud activado - Instrucciones de salud añadidas');
       }
 
       if (finalContent.trim()) {
@@ -6106,7 +6296,7 @@ function getStyleInstructions(style) {
 // Sistema de Modos de Chat Visibles
 // ========================================
 const VISIBLE_CHAT_MODES_KEY = 'ollama-web-visible-chat-modes';
-const DEFAULT_VISIBLE_MODES = ['normal', 'canvas', 'web', 'deep', 'study', 'travel'];
+const DEFAULT_VISIBLE_MODES = ['normal', 'canvas', 'web', 'deep', 'study', 'travel', 'health'];
 
 function getVisibleChatModes() {
   if (!hasLocalStorage) return DEFAULT_VISIBLE_MODES;
@@ -6146,10 +6336,12 @@ function updateChatModeTogglesVisibility() {
     let visibleCount = 0;
     let firstVisibleMode = null;
     const visibleModesList = [];
+    const currentMode = toggle.getAttribute('data-active-mode') || state.chatMode || 'normal';
 
     options.forEach(option => {
       const mode = option.dataset.mode;
-      const isVisible = visibleModes.includes(mode);
+      // Si es el modo activo actual, SIEMPRE mostrarlo aunque no esté en la lista de visibles
+      const isVisible = visibleModes.includes(mode) || mode === currentMode;
       option.style.display = isVisible ? '' : 'none';
       if (isVisible) {
         visibleCount++;
@@ -6160,12 +6352,6 @@ function updateChatModeTogglesVisibility() {
 
     // Si solo hay un modo visible, ocultar todo el toggle
     toggle.style.display = visibleCount > 1 ? '' : 'none';
-
-    // Si el modo activo actual no está visible, cambiar al primer modo visible
-    const currentMode = toggle.getAttribute('data-active-mode');
-    if (!visibleModes.includes(currentMode) && firstVisibleMode) {
-      setChatMode(firstVisibleMode);
-    }
 
     // Actualizar la posición del slider basada en modos visibles
     updateSliderPosition(toggle, visibleModesList);
@@ -8542,8 +8728,8 @@ function updateProjectBadge() {
     // Marcar el botón de proyectos como activo (naranja en modo minimizado)
     if (projectsBtn) {
       projectsBtn.classList.add('has-active-project');
-      projectsBtn.setAttribute('data-active-project', project.name);
-      projectsBtn.setAttribute('title', `Proyecto activo: ${project.name}`);
+      projectsBtn.setAttribute('data-active-project', 'Proyecto');
+      projectsBtn.setAttribute('title', 'Proyecto');
     }
 
     // Actualizar indicadores compactos de contexto
@@ -9233,20 +9419,34 @@ function handleTravelMode(mode) {
 // Sincronizar todos los toggles de modo de chat
 function syncChatModeToggles(mode) {
   const toggles = document.querySelectorAll('.chat-mode-toggle');
+  const visibleModes = getVisibleChatModes();
+  
   toggles.forEach(toggle => {
+    toggle.setAttribute('data-active-mode', mode);
     const options = toggle.querySelectorAll('.chat-mode-option');
-    const slider = toggle.querySelector('.chat-mode-slider');
+    
+    // Construir lista de modos visibles en orden y actualizar visibilidad
+    const visibleModesList = [];
+    options.forEach(option => {
+      const optMode = option.dataset.mode;
+      // Si es el modo activo actual, SIEMPRE mostrarlo aunque no esté en la lista de visibles
+      const isVisible = visibleModes.includes(optMode) || optMode === mode;
+      option.style.display = isVisible ? '' : 'none';
+      if (isVisible) {
+        visibleModesList.push(optMode);
+      }
+    });
 
     options.forEach((option, index) => {
       if (option.dataset.mode === mode) {
         option.classList.add('active');
-        if (slider) {
-          slider.style.left = `${index * 32}px`;
-        }
       } else {
         option.classList.remove('active');
       }
     });
+    
+    // Actualizar posición del slider con modos visibles
+    updateSliderPosition(toggle, visibleModesList);
   });
 }
 
@@ -10810,21 +11010,36 @@ function setChatMode(mode) {
   travelModeActive = mode === 'travel';
   window._travelModeActive = travelModeActive;
 
+  // Modo salud
+  window._healthModeActive = mode === 'health';
+  if (window.healthMode) window.healthMode.setActive(mode === 'health');
+
+  // Asegurar que el modo activo esté en la lista de modos visibles
+  const visibleModes = getVisibleChatModes();
+  if (!visibleModes.includes(mode)) {
+    visibleModes.push(mode);
+    saveVisibleChatModes(visibleModes);
+  }
+
   // Actualizar todos los toggles
   const toggles = document.querySelectorAll('.chat-mode-toggle');
-  const visibleModes = getVisibleChatModes();
 
   toggles.forEach(toggle => {
     toggle.setAttribute('data-active-mode', mode);
     toggle.querySelectorAll('.chat-mode-option').forEach(opt => {
       opt.classList.toggle('active', opt.dataset.mode === mode);
+      // Asegurar que el modo activo siempre sea visible
+      if (opt.dataset.mode === mode) {
+        opt.style.display = '';
+      }
     });
 
-    // Calcular posición del slider basado en modos visibles
+    // Calcular posición del slider basado en modos visibles (incluyendo el activo)
     const visibleModesList = [];
     toggle.querySelectorAll('.chat-mode-option').forEach(opt => {
-      if (visibleModes.includes(opt.dataset.mode)) {
-        visibleModesList.push(opt.dataset.mode);
+      const optMode = opt.dataset.mode;
+      if (visibleModes.includes(optMode) || optMode === mode) {
+        visibleModesList.push(optMode);
       }
     });
     updateSliderPosition(toggle, visibleModesList);
@@ -10838,7 +11053,8 @@ function setChatMode(mode) {
     'web': '🌐 Búsqueda Web',
     'canvas': '📝 Canvas',
     'music': '🎵 Música',
-    'travel': '🗺️ Modo Viajes'
+    'travel': '🗺️ Modo Viajes',
+    'health': '🏥 Modo Salud'
   };
   console.log(`Modo de chat: ${modeNames[mode]}`);
 
@@ -11772,6 +11988,7 @@ async function executeDeepResearch(userQuery, conversation) {
   // Crear mensaje del asistente con el contenedor de progreso
   const assistantMessage = createMessage('assistant', '');
   assistantMessage.isDeepResearchInProgress = true; // Marcar como Deep Research activo
+  assistantMessage.model = state.currentModel; // Guardar el modelo usado
   conversation.messages.push(assistantMessage);
 
   // Guardar el ID del mensaje para poder restaurar el UI
@@ -12002,11 +12219,28 @@ async function executeDeepResearch(userQuery, conversation) {
         await copyToClipboard(finalReport, copyButton);
       });
 
+      copyContainer.appendChild(copyButton);
+      
+      // Añadir indicador de modelo si existe
+      if (assistantMessage.model) {
+        const modelIndicator = document.createElement('span');
+        modelIndicator.className = 'message-model-indicator';
+        
+        // Mostrar modelo y tokens/segundo si está disponible
+        let displayText = assistantMessage.model;
+        if (assistantMessage.tokensPerSecond && assistantMessage.tokensPerSecond > 0) {
+          displayText += ` • ${assistantMessage.tokensPerSecond} t/s`;
+        }
+        
+        modelIndicator.textContent = displayText;
+        modelIndicator.title = `Respondido por ${assistantMessage.model}${assistantMessage.tokensPerSecond ? ` (${assistantMessage.tokensPerSecond} tokens/segundo)` : ''}`;
+        copyContainer.appendChild(modelIndicator);
+      }
+      
       const timeElement = document.createElement('span');
       timeElement.className = 'message-time';
       timeElement.textContent = formatTime(Date.now());
 
-      copyContainer.appendChild(copyButton);
       copyContainer.appendChild(timeElement);
       bubble.appendChild(copyContainer);
 
@@ -13254,6 +13488,7 @@ async function executeWebResearchWithPDF(userQuery, conversation) {
   // Crear mensaje del asistente con progreso
   const assistantMessage = createMessage('assistant', '');
   assistantMessage.isDeepResearchInProgress = true;
+  assistantMessage.model = state.currentModel; // Guardar el modelo usado
   conversation.messages.push(assistantMessage);
 
   deepResearchMessageId = assistantMessage.id;
@@ -13430,11 +13665,28 @@ async function executeWebResearchWithPDF(userQuery, conversation) {
         await copyToClipboard(finalReport, copyButton);
       });
 
+      copyContainer.appendChild(copyButton);
+      
+      // Añadir indicador de modelo si existe
+      if (assistantMessage.model) {
+        const modelIndicator = document.createElement('span');
+        modelIndicator.className = 'message-model-indicator';
+        
+        // Mostrar modelo y tokens/segundo si está disponible
+        let displayText = assistantMessage.model;
+        if (assistantMessage.tokensPerSecond && assistantMessage.tokensPerSecond > 0) {
+          displayText += ` • ${assistantMessage.tokensPerSecond} t/s`;
+        }
+        
+        modelIndicator.textContent = displayText;
+        modelIndicator.title = `Respondido por ${assistantMessage.model}${assistantMessage.tokensPerSecond ? ` (${assistantMessage.tokensPerSecond} tokens/segundo)` : ''}`;
+        copyContainer.appendChild(modelIndicator);
+      }
+      
       const timeElement = document.createElement('span');
       timeElement.className = 'message-time';
       timeElement.textContent = formatTime(Date.now());
 
-      copyContainer.appendChild(copyButton);
       copyContainer.appendChild(timeElement);
       bubble.appendChild(copyContainer);
 
@@ -13571,6 +13823,7 @@ async function handleSubmitWithDeepResearch(event) {
 
     // Crear mensaje del asistente con la UI de búsqueda
     const assistantMessage = createMessage('assistant', '');
+    assistantMessage.model = state.currentModel; // Guardar el modelo usado
     conversation.messages.push(assistantMessage);
     const { bubble } = appendMessageElement(assistantMessage);
 
@@ -13668,6 +13921,13 @@ async function handleSubmitWithDeepResearch(event) {
     window._studyModeActive = true;
   } else {
     window._studyModeActive = false;
+  }
+
+  // Si el modo salud está activo, activar flag
+  if (state.chatMode === 'health') {
+    window._healthModeActive = true;
+  } else {
+    window._healthModeActive = false;
   }
 
   // Si no, usar el flujo normal
@@ -13775,6 +14035,8 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
 
   console.log('🌐 Enviando solicitud al modelo:', state.currentModel);
 
+  const startTime = Date.now(); // Capturar tiempo de inicio
+
   const response = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -13789,7 +14051,7 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
 
   const reader = response.body.getReader();
   currentStreamReader = reader;
-  updateSendButtonToStop();
+  updateSendButtonToSend();
 
   let fullContent = '';
   const decoder = new TextDecoder();
@@ -13861,6 +14123,11 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
 
   // Actualizar el mensaje en la conversación
   assistantMessage.content = fullContent;
+
+  // Calcular tokens por segundo
+  const responseTime = (Date.now() - startTime) / 1000;
+  const estimatedTokens = Math.ceil(fullContent.length / 3.5);
+  assistantMessage.tokensPerSecond = responseTime > 0 ? Math.round(estimatedTokens / responseTime) : 0;
 
   // Guardar datos de búsqueda web en el mensaje para persistencia
   if (searchResults && searchResults.organic) {
@@ -13959,6 +14226,22 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
 
     copyContainer.appendChild(sourcesBtn);
     copyContainer.appendChild(sourcesPopup);
+  }
+
+  // Añadir indicador de modelo si existe
+  if (assistantMessage && assistantMessage.model) {
+    const modelIndicator = document.createElement('span');
+    modelIndicator.className = 'message-model-indicator';
+    
+    // Mostrar modelo y tokens/segundo si está disponible
+    let displayText = assistantMessage.model;
+    if (assistantMessage.tokensPerSecond && assistantMessage.tokensPerSecond > 0) {
+      displayText += ` • ${assistantMessage.tokensPerSecond} t/s`;
+    }
+    
+    modelIndicator.textContent = displayText;
+    modelIndicator.title = `Respondido por ${assistantMessage.model}${assistantMessage.tokensPerSecond ? ` (${assistantMessage.tokensPerSecond} tokens/segundo)` : ''}`;
+    copyContainer.appendChild(modelIndicator);
   }
 
   const timeSpan = document.createElement('span');
@@ -16335,6 +16618,15 @@ function toggleNewsView(view) {
   const screenOverlayToggleEmpty = document.getElementById('screen-overlay-toggle-empty');
   const incognitoToggleEmpty = document.getElementById('incognito-toggle-empty');
 
+  // Cerrar el panel de proyectos si está abierto
+  const projectsPanel = document.getElementById('projects-panel');
+  if (projectsPanel && projectsPanel.style.display === 'flex') {
+    projectsPanelVisible = false;
+    projectsPanel.style.display = 'none';
+    const projectsBtn = document.getElementById('projects-panel-btn');
+    if (projectsBtn) projectsBtn.classList.remove('active');
+  }
+
   if (view === 'news') {
     // Hide chat views
     if (emptyState) emptyState.style.display = 'none';
@@ -17297,6 +17589,14 @@ function initTodoPanel() {
         // Close calendar if open
         const calendarPanel = document.getElementById('calendar-panel');
         if (calendarPanel) calendarPanel.style.display = 'none';
+        // Close projects panel if open
+        const projectsPanel = document.getElementById('projects-panel');
+        if (projectsPanel && projectsPanel.style.display === 'flex') {
+          projectsPanelVisible = false;
+          projectsPanel.style.display = 'none';
+          const projectsBtn = document.getElementById('projects-panel-btn');
+          if (projectsBtn) projectsBtn.classList.remove('active');
+        }
       }
     });
   }
@@ -18490,6 +18790,14 @@ function initCalendarPanel() {
         // Close todo if open
         const todoPanel = document.getElementById('todo-panel');
         if (todoPanel) todoPanel.style.display = 'none';
+        // Close projects panel if open
+        const projectsPanel = document.getElementById('projects-panel');
+        if (projectsPanel && projectsPanel.style.display === 'flex') {
+          projectsPanelVisible = false;
+          projectsPanel.style.display = 'none';
+          const projectsBtn = document.getElementById('projects-panel-btn');
+          if (projectsBtn) projectsBtn.classList.remove('active');
+        }
       }
     });
   }

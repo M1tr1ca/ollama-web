@@ -432,6 +432,17 @@
                                         <span class="chip-text">Música</span>
                                     </span>
                                 </label>
+                                <label class="chat-mode-chip" data-mode="health">
+                                    <input type="checkbox" id="mode-health-visible" data-mode="health" checked>
+                                    <span class="chip-content">
+                                        <span class="chip-icon"><svg width="16" height="16" viewBox="0 0 24 24"
+                                                fill="none" stroke="currentColor" stroke-width="2"
+                                                stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                            </svg></span>
+                                        <span class="chip-text">Salud</span>
+                                    </span>
+                                </label>
                             </div>
                         </div>
 
@@ -1214,6 +1225,15 @@
                                                     stroke-linejoin="round" />
                                             </svg>
                                         </button>
+                                        <button type="button" class="chat-mode-option" data-mode="health"
+                                            title="Modo Salud - Coach de bienestar">
+                                            <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none"
+                                                xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                    stroke-linejoin="round" />
+                                            </svg>
+                                        </button>
                                         <div class="chat-mode-slider"></div>
                                     </div>
                                 </div>
@@ -1598,6 +1618,36 @@
                                                         stroke-linejoin="round" />
                                                 </svg>
                                             </button>
+                                            <button type="button" class="chat-mode-option" data-mode="music"
+                                                title="Modo Música - Partituras">
+                                                <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none"
+                                                    xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="2"
+                                                        stroke-linecap="round" stroke-linejoin="round" />
+                                                    <circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="2" />
+                                                    <circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="2" />
+                                                </svg>
+                                            </button>
+                                            <button type="button" class="chat-mode-option" data-mode="travel"
+                                                title="Modo Viajes - Planifica tu viaje">
+                                                <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none"
+                                                    xmlns="http://www.w3.org/2000/svg">
+                                                    <path
+                                                        d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"
+                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                        stroke-linejoin="round" />
+                                                </svg>
+                                            </button>
+                                            <button type="button" class="chat-mode-option" data-mode="health"
+                                                title="Modo Salud - Recetas, rutinas y bienestar">
+                                                <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none"
+                                                    xmlns="http://www.w3.org/2000/svg">
+                                                    <path
+                                                        d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                        stroke-linejoin="round" />
+                                                </svg>
+                                            </button>
                                             <div class="chat-mode-slider"></div>
                                         </div>
                                     </div>
@@ -1842,6 +1892,25 @@
                                                     stroke-linecap="round" stroke-linejoin="round" />
                                                 <circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="2" />
                                                 <circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="2" />
+                                            </svg>
+                                        </button>
+                                        <button type="button" class="chat-mode-option" data-mode="travel"
+                                            title="Modo Viajes - Planifica tu viaje">
+                                            <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none"
+                                                xmlns="http://www.w3.org/2000/svg">
+                                                <path
+                                                    d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"
+                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                    stroke-linejoin="round" />
+                                            </svg>
+                                        </button>
+                                        <button type="button" class="chat-mode-option" data-mode="health"
+                                            title="Modo Salud - Coach de bienestar">
+                                            <svg class="chat-mode-icon" viewBox="0 0 24 24" fill="none"
+                                                xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                    stroke-linejoin="round" />
                                             </svg>
                                         </button>
                                         <div class="chat-mode-slider"></div>
@@ -2736,6 +2805,9 @@ C D E F | G A B c |"></textarea>
         <!-- Leaflet.js (FREE - no API key needed) -->
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+        <!-- Módulo de salud -->
+        <script src="/js/salud.js"></script>
 
         <!-- Módulo de viajes -->
         <script src="/js/viajes.js"></script>
