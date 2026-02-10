@@ -83,14 +83,14 @@
                         <path d="M10 6h8v4h-8V6Z"></path>
                     </svg>
                 </button>
-                <button id="todo-panel-btn" class="quick-action-btn" title="Lista de tareas">
+                <button id="todo-panel-btn" class="quick-action-btn" title="Lista de tareas" data-i18n-target="title" data-i18n="sidebar.todoList">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M9 11l3 3L22 4"></path>
                         <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
                     </svg>
                 </button>
-                <button id="calendar-panel-btn" class="quick-action-btn" title="Calendario">
+                <button id="calendar-panel-btn" class="quick-action-btn" title="Calendario" data-i18n-target="title" data-i18n="sidebar.calendar">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -100,7 +100,7 @@
                         <circle cx="12" cy="16" r="2"></circle>
                     </svg>
                 </button>
-                <button id="projects-panel-btn" class="quick-action-btn" title="Proyectos">
+                <button id="projects-panel-btn" class="quick-action-btn" title="Proyectos" data-i18n-target="title" data-i18n="sidebar.projects">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -113,7 +113,7 @@
             <section class="projects-section" aria-label="Proyectos">
                 <header class="projects-header">
                     <h2 data-i18n="sidebar.projects">Proyectos</h2>
-                    <button id="new-project-btn" class="new-project-btn" title="Nuevo proyecto">＋</button>
+                    <button id="new-project-btn" class="new-project-btn" title="Nuevo proyecto" data-i18n-target="title" data-i18n="sidebar.newProject">＋</button>
                 </header>
                 <ul id="projects-list" class="projects-list"></ul>
             </section>
@@ -122,7 +122,7 @@
                 <header class="conversation-header">
                     <h2 data-i18n="sidebar.recent">Recientes</h2>
                     <button id="delete-all-conversations-btn" class="delete-all-btn icon-button small"
-                        title="Borrar todas las conversaciones">🗑</button>
+                        title="Borrar todas las conversaciones" data-i18n-target="title" data-i18n="sidebar.deleteAll">🗑</button>
                 </header>
                 <ul id="conversation-list" class="conversation-list"></ul>
             </section>
@@ -195,7 +195,7 @@
                                     d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4">
                                 </path>
                             </svg></span>
-                        <span>API Keys</span>
+                        <span data-i18n="sidebar.apiKeys">API Keys</span>
                     </button>
                     <button class="user-menu-item" id="language-btn-menu">
                         <span class="menu-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -221,7 +221,7 @@
                         <button class="language-option" data-lang="ro"><span class="lang-code">RO</span> Română</button>
                     </div>
                     <div class="settings-divider"></div>
-                    <div class="settings-themes-label">Temas:</div>
+                    <div class="settings-themes-label" data-i18n="sidebar.themes">Temas:</div>
                     <div class="settings-themes-grid">
                         <button class="theme-option-compact" data-theme="orange" title="Naranja">
                             <span class="theme-color-compact"
@@ -258,15 +258,15 @@
                         <input type="color" id="custom-color-picker" style="display: none;" />
                     </div>
                     <div class="settings-divider"></div>
-                    <div class="settings-themes-label">Fuente:</div>
+                    <div class="settings-themes-label" data-i18n="sidebar.font">Fuente:</div>
                     <div class="font-selector">
                         <button class="font-option" data-font="normal" title="Fuente normal">
                             <span class="font-preview font-normal">Aa</span>
-                            <span class="font-name">Normal</span>
+                            <span class="font-name" data-i18n="sidebar.fontNormal">Normal</span>
                         </button>
                         <button class="font-option" data-font="dyslexic" title="OpenDyslexic - Facilita la lectura">
                             <span class="font-preview font-dyslexic">Aa</span>
-                            <span class="font-name">Dislexia</span>
+                            <span class="font-name" data-i18n="sidebar.fontDyslexic">Dislexia</span>
                         </button>
                     </div>
                 </div>
@@ -280,12 +280,12 @@
                         <button class="modal-close" id="close-name-modal">×</button>
                     </div>
                     <div class="modal-body">
-                        <label for="new-name-input">Nuevo nombre:</label>
-                        <input type="text" id="new-name-input" class="modal-input" placeholder="Ingresa tu nombre" />
+                        <label for="new-name-input" data-i18n="modal.changeName.label">Nuevo nombre:</label>
+                        <input type="text" id="new-name-input" class="modal-input" placeholder="Ingresa tu nombre" data-i18n-target="placeholder" data-i18n="modal.changeName.placeholder" />
                     </div>
                     <div class="modal-footer">
-                        <button class="modal-button secondary" id="cancel-name-change">Cancelar</button>
-                        <button class="modal-button primary" id="save-name-change">Guardar</button>
+                        <button class="modal-button secondary" id="cancel-name-change" data-i18n="modal.cancel">Cancelar</button>
+                        <button class="modal-button primary" id="save-name-change" data-i18n="modal.save">Guardar</button>
                     </div>
                 </div>
             </div>
@@ -299,15 +299,15 @@
                     </div>
                     <div class="modal-body">
                         <div class="personalization-section">
-                            <label for="ai-personal-info-input" class="section-label">
+                            <label for="ai-personal-info-input" class="section-label" data-i18n="modal.aiPersonalization.personalInfo">
                                 Información personal
                             </label>
                             <textarea id="ai-personal-info-input" class="modal-textarea-compact" rows="3"
-                                placeholder="Ej: Estudio ingeniería informática, trabajo como desarrollador..."></textarea>
+                                placeholder="Ej: Estudio ingeniería informática, trabajo como desarrollador..." data-i18n-target="placeholder" data-i18n="modal.aiPersonalization.personalInfoPlaceholder"></textarea>
                         </div>
 
                         <div class="personalization-section">
-                            <label class="section-label">
+                            <label class="section-label" data-i18n="modal.aiPersonalization.responseStyle">
                                 Estilo de respuesta
                             </label>
                             <div class="style-selector-grid">
@@ -339,9 +339,9 @@
                         </div>
 
                         <div class="personalization-section">
-                            <label class="section-label">
+                            <label class="section-label" data-i18n="modal.aiPersonalization.chatModesVisible">
                                 Modos de chat visibles
-                                <span class="section-hint">Elige qué modos mostrar en la barra de entrada</span>
+                                <span class="section-hint" data-i18n="modal.aiPersonalization.chatModesHint">Elige qué modos mostrar en la barra de entrada</span>
                             </label>
                             <div class="chat-modes-chips" id="chat-modes-selector">
                                 <label class="chat-mode-chip" data-mode="normal">
@@ -448,7 +448,7 @@
 
                         <!-- Nueva sección para la mascota -->
                         <div class="personalization-section">
-                            <label class="section-label">
+                            <label class="section-label" data-i18n="modal.aiPersonalization.virtualPet">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                     style="vertical-align: middle; margin-right: 4px;">
@@ -473,15 +473,15 @@
                                                 <path d="M16 14v.5" />
                                                 <path d="M11.25 16.25h1.5L12 17l-.75-.75Z" />
                                             </svg></span>
-                                        <span class="chip-text">Mostrar Gatito</span>
+                                        <span class="chip-text" data-i18n="modal.aiPersonalization.showCat">Mostrar Gatito</span>
                                     </span>
                                 </label>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button class="modal-button secondary" id="cancel-ai-personalization">Cancelar</button>
-                        <button class="modal-button primary" id="save-ai-personalization">Guardar</button>
+                        <button class="modal-button secondary" id="cancel-ai-personalization" data-i18n="modal.cancel">Cancelar</button>
+                        <button class="modal-button primary" id="save-ai-personalization" data-i18n="modal.save">Guardar</button>
                     </div>
                 </div>
             </div>
@@ -497,8 +497,8 @@
                         <div class="personalization-section">
                             <div class="switch-container">
                                 <label class="switch-label">
-                                    <span>Cambio automático diario</span>
-                                    <span class="switch-description">El fondo cambiará automáticamente cada día a las
+                                    <span data-i18n="modal.background.autoChange">Cambio automático diario</span>
+                                    <span class="switch-description" data-i18n="modal.background.autoChangeDesc">El fondo cambiará automáticamente cada día a las
                                         00:00</span>
                                 </label>
                                 <label class="switch">
@@ -509,7 +509,7 @@
                         </div>
 
                         <div class="personalization-section" id="manual-background-section" style="display: none;">
-                            <label class="section-label">
+                            <label class="section-label" data-i18n="modal.background.selectManually">
                                 Seleccionar fondo manualmente
                             </label>
                             <div class="background-gallery" id="background-gallery">
@@ -534,8 +534,8 @@
                     <div class="modal-body">
                         <!-- Pestañas del dashboard -->
                         <div class="dashboard-tabs">
-                            <button class="dashboard-tab active" data-tab="stats">Estadísticas</button>
-                            <button class="dashboard-tab" data-tab="models">Modelos</button>
+                            <button class="dashboard-tab active" data-tab="stats" data-i18n="modal.dashboard.stats">Estadísticas</button>
+                            <button class="dashboard-tab" data-tab="models" data-i18n="modal.dashboard.models">Modelos</button>
                         </div>
 
                         <!-- Contenido: Estadísticas -->
@@ -546,58 +546,58 @@
                                     <div class="summary-icon">💬</div>
                                     <div class="summary-info">
                                         <span class="summary-value" id="stat-total-messages">0</span>
-                                        <span class="summary-label">Mensajes totales</span>
+                                        <span class="summary-label" data-i18n="modal.dashboard.messagesTotal">Mensajes totales</span>
                                     </div>
                                 </div>
                                 <div class="summary-card">
                                     <div class="summary-icon">📝</div>
                                     <div class="summary-info">
                                         <span class="summary-value" id="stat-total-conversations">0</span>
-                                        <span class="summary-label">Conversaciones</span>
+                                        <span class="summary-label" data-i18n="modal.dashboard.conversations">Conversaciones</span>
                                     </div>
                                 </div>
                                 <div class="summary-card">
                                     <div class="summary-icon">🔤</div>
                                     <div class="summary-info">
                                         <span class="summary-value" id="stat-total-tokens">~0</span>
-                                        <span class="summary-label">Tokens estimados</span>
+                                        <span class="summary-label" data-i18n="modal.dashboard.tokensEstimated">Tokens estimados</span>
                                     </div>
                                 </div>
                                 <div class="summary-card">
                                     <div class="summary-icon">⏱️</div>
                                     <div class="summary-info">
                                         <span class="summary-value" id="stat-avg-response-time">0s</span>
-                                        <span class="summary-label">Tiempo promedio respuesta</span>
+                                        <span class="summary-label" data-i18n="modal.dashboard.avgTime">Tiempo promedio respuesta</span>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Detalles estadísticos -->
                             <div class="dashboard-section">
-                                <h4 class="dashboard-section-title">📈 Uso detallado</h4>
+                                <h4 class="dashboard-section-title" data-i18n="modal.dashboard.detailedStats">📈 Uso detallado</h4>
                                 <div class="stats-grid">
                                     <div class="stat-item">
-                                        <span class="stat-label">Mensajes enviados (usuario)</span>
+                                        <span class="stat-label" data-i18n="modal.dashboard.sentMessages">Mensajes enviados (usuario)</span>
                                         <span class="stat-value" id="stat-user-messages">0</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">Respuestas recibidas (IA)</span>
+                                        <span class="stat-label" data-i18n="modal.dashboard.receivedMessages">Respuestas recibidas (IA)</span>
                                         <span class="stat-value" id="stat-assistant-messages">0</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">Caracteres enviados</span>
+                                        <span class="stat-label" data-i18n="modal.dashboard.sentChars">Caracteres enviados</span>
                                         <span class="stat-value" id="stat-chars-sent">0</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">Caracteres recibidos</span>
+                                        <span class="stat-label" data-i18n="modal.dashboard.receivedChars">Caracteres recibidos</span>
                                         <span class="stat-value" id="stat-chars-received">0</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">Archivos adjuntados</span>
+                                        <span class="stat-label" data-i18n="modal.dashboard.attachedFiles">Archivos adjuntados</span>
                                         <span class="stat-value" id="stat-files-attached">0</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">Proyectos creados</span>
+                                        <span class="stat-label" data-i18n="modal.dashboard.createdProjects">Proyectos creados</span>
                                         <span class="stat-value" id="stat-projects-count">0</span>
                                     </div>
                                 </div>
@@ -605,13 +605,13 @@
 
                             <!-- Actividad por día -->
                             <div class="dashboard-section">
-                                <h4 class="dashboard-section-title">📅 Actividad reciente (últimos 7 días)</h4>
+                                <h4 class="dashboard-section-title" data-i18n="modal.dashboard.recentActivityTitle">📅 Actividad reciente (últimos 7 días)</h4>
                                 <div class="activity-chart" id="activity-chart"></div>
                             </div>
 
                             <!-- Modelos más usados -->
                             <div class="dashboard-section">
-                                <h4 class="dashboard-section-title">🏆 Modelos más usados</h4>
+                                <h4 class="dashboard-section-title" data-i18n="modal.dashboard.topModelsTitle">🏆 Modelos más usados</h4>
                                 <div class="models-ranking" id="models-ranking"></div>
                             </div>
                         </div>
@@ -621,7 +621,7 @@
                             <div class="models-list" id="models-info-list">
                                 <div class="models-loading">
                                     <div class="loading-spinner"></div>
-                                    <span>Cargando información de modelos...</span>
+                                    <span data-i18n="modal.dashboard.loadingModelsText">Cargando información de modelos...</span>
                                 </div>
                             </div>
                         </div>
@@ -643,8 +643,8 @@
                         <div class="personalization-section">
                             <div class="switch-container">
                                 <label class="switch-label">
-                                    <span>Memoria activa</span>
-                                    <span class="switch-description">La IA recordará información importante entre
+                                    <span data-i18n="modal.memory.active">Memoria activa</span>
+                                    <span class="switch-description" data-i18n="modal.memory.activeDesc">La IA recordará información importante entre
                                         conversaciones</span>
                                 </label>
                                 <label class="switch">
@@ -655,34 +655,34 @@
                         </div>
 
                         <div class="personalization-section">
-                            <label class="section-label">Añadir nuevo recuerdo</label>
+                            <label class="section-label" data-i18n="modal.memory.add">Añadir nuevo recuerdo</label>
                             <div class="memory-input-container">
                                 <input type="text" id="new-memory-input" class="modal-input"
-                                    placeholder="Ej: Estudio ingeniería informática..." />
-                                <button class="memory-add-btn" id="add-memory-btn" title="Añadir recuerdo">+</button>
+                                    placeholder="Ej: Estudio ingeniería informática..." data-i18n-target="placeholder" data-i18n="modal.memory.addPlaceholder" />
+                                <button class="memory-add-btn" id="add-memory-btn" title="Añadir recuerdo" data-i18n-target="title" data-i18n="modal.memory.addMemory">+</button>
                             </div>
                         </div>
 
                         <div class="personalization-section">
                             <div class="memory-header">
-                                <label class="section-label">Recuerdos guardados</label>
+                                <label class="section-label" data-i18n="modal.memory.saved">Recuerdos guardados</label>
                                 <button class="memory-clear-all-btn" id="clear-all-memories-btn" title="Borrar todos">
-                                    <span>🗑️</span> Borrar todos
+                                    <span>🗑️</span> <span data-i18n="modal.memory.clearAll">Borrar todos</span>
                                 </button>
                             </div>
                             <div id="memories-list" class="memories-list">
                                 <!-- Los recuerdos se cargarán dinámicamente -->
                                 <div class="memory-empty-state">
                                     <span class="memory-empty-icon">💭</span>
-                                    <p>No hay recuerdos guardados</p>
-                                    <p class="memory-empty-hint">Añade información que quieras que la IA recuerde sobre
+                                    <p data-i18n="modal.memory.empty">No hay recuerdos guardados</p>
+                                    <p class="memory-empty-hint" data-i18n="modal.memory.emptyHint">Añade información que quieras que la IA recuerde sobre
                                         ti</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button class="modal-button secondary" id="close-memory-modal-btn">Cerrar</button>
+                        <button class="modal-button secondary" id="close-memory-modal-btn" data-i18n="modal.close">Cerrar</button>
                     </div>
                 </div>
             </div>
@@ -742,20 +742,20 @@
             <div id="api-keys-modal" class="modal-overlay" style="display: none;">
                 <div class="modal-content modal-content-compact">
                     <div class="modal-header">
-                        <h3>🔑 API Keys</h3>
+                        <h3 data-i18n="modal.apiKeys.title">🔑 API Keys</h3>
                         <button class="modal-close" id="close-api-keys-modal">×</button>
                     </div>
                     <div class="modal-body">
                         <div class="personalization-section">
-                            <label class="section-label">
+                            <label class="section-label" data-i18n="modal.apiKeys.serperLabel">
                                 Serper API Key
-                                <span class="section-hint">Para búsquedas en la web. <a href="https://serper.dev"
-                                        target="_blank" rel="noopener">Obtener API Key</a></span>
+                                <span class="section-hint"><span data-i18n="modal.apiKeys.serperHint">Para búsquedas en la web.</span> <a href="https://serper.dev"
+                                        target="_blank" rel="noopener" data-i18n="modal.apiKeys.serperLink">Obtener API Key</a></span>
                             </label>
                             <div class="api-key-input-container">
                                 <input type="password" id="serper-api-key-input" class="modal-input api-key-input"
-                                    placeholder="Introduce tu Serper API Key" />
-                                <button class="api-key-toggle-btn" id="toggle-serper-key" title="Mostrar/ocultar">
+                                    placeholder="Introduce tu Serper API Key" data-i18n-target="placeholder" data-i18n="modal.apiKeys.serperPlaceholder" />
+                                <button class="api-key-toggle-btn" id="toggle-serper-key" title="Mostrar/ocultar" data-i18n-target="title" data-i18n="modal.apiKeys.toggleVisibility">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                         width="18" height="18">
                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -766,15 +766,15 @@
                         </div>
 
                         <div class="personalization-section">
-                            <label class="section-label">
+                            <label class="section-label" data-i18n="modal.apiKeys.gnewsLabel">
                                 GNews API Key
-                                <span class="section-hint">Para el panel de noticias. <a href="https://gnews.io"
-                                        target="_blank" rel="noopener">Obtener API Key</a></span>
+                                <span class="section-hint"><span data-i18n="modal.apiKeys.gnewsHint">Para el panel de noticias.</span> <a href="https://gnews.io"
+                                        target="_blank" rel="noopener" data-i18n="modal.apiKeys.serperLink">Obtener API Key</a></span>
                             </label>
                             <div class="api-key-input-container">
                                 <input type="password" id="gnews-api-key-input" class="modal-input api-key-input"
-                                    placeholder="Introduce tu GNews API Key" />
-                                <button class="api-key-toggle-btn" id="toggle-gnews-key" title="Mostrar/ocultar">
+                                    placeholder="Introduce tu GNews API Key" data-i18n-target="placeholder" data-i18n="modal.apiKeys.gnewsPlaceholder" />
+                                <button class="api-key-toggle-btn" id="toggle-gnews-key" title="Mostrar/ocultar" data-i18n-target="title" data-i18n="modal.apiKeys.toggleVisibility">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                         width="18" height="18">
                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -785,16 +785,16 @@
                         </div>
 
                         <div class="personalization-section">
-                            <label class="section-label">
+                            <label class="section-label" data-i18n="modal.apiKeys.mapboxLabel">
                                 Mapbox API Key
-                                <span class="section-hint">Para el modo viajes y mapas. <a
-                                        href="https://account.mapbox.com" target="_blank" rel="noopener">Obtener API
+                                <span class="section-hint"><span data-i18n="modal.apiKeys.mapboxHint">Para el modo viajes y mapas.</span> <a
+                                        href="https://account.mapbox.com" target="_blank" rel="noopener" data-i18n="modal.apiKeys.serperLink">Obtener API
                                         Key</a></span>
                             </label>
                             <div class="api-key-input-container">
                                 <input type="password" id="mapbox-api-key-input" class="modal-input api-key-input"
-                                    placeholder="Introduce tu Mapbox API Key" />
-                                <button class="api-key-toggle-btn" id="toggle-mapbox-key" title="Mostrar/ocultar">
+                                    placeholder="Introduce tu Mapbox API Key" data-i18n-target="placeholder" data-i18n="modal.apiKeys.mapboxPlaceholder" />
+                                <button class="api-key-toggle-btn" id="toggle-mapbox-key" title="Mostrar/ocultar" data-i18n-target="title" data-i18n="modal.apiKeys.toggleVisibility">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                         width="18" height="18">
                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -805,14 +805,14 @@
                         </div>
 
                         <div class="api-keys-info">
-                            <p><strong>Nota:</strong> Las API keys se guardan de forma segura en el almacenamiento local
+                            <p><strong data-i18n="modal.apiKeys.note">Nota:</strong> <span data-i18n="modal.apiKeys.noteText">Las API keys se guardan de forma segura en el almacenamiento local
                                 de tu
-                                navegador.</p>
+                                navegador.</span></p>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button class="modal-button secondary" id="cancel-api-keys">Cancelar</button>
-                        <button class="modal-button primary" id="save-api-keys">Guardar</button>
+                        <button class="modal-button secondary" id="cancel-api-keys" data-i18n="modal.cancel">Cancelar</button>
+                        <button class="modal-button primary" id="save-api-keys" data-i18n="modal.save">Guardar</button>
                     </div>
                 </div>
             </div>
