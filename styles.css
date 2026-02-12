@@ -12417,6 +12417,12 @@ body.research-report-visible .research-report-panel {
   border-radius: 6px;
   transition: all 0.15s ease;
   animation: todoFadeIn 0.25s ease;
+  cursor: move;
+}
+
+.todo-item.drag-over {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px dashed var(--theme-primary);
 }
 
 @keyframes todoFadeIn {
@@ -12482,6 +12488,20 @@ body.research-report-visible .research-report-panel {
   color: rgba(255, 255, 255, 0.75);
   line-height: 1.5;
   padding-top: 1px;
+  cursor: text;
+  outline: none;
+  border-radius: 4px;
+  padding: 2px 4px;
+  transition: background 0.15s ease;
+}
+
+.todo-text:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.todo-text:focus {
+  background: rgba(255, 255, 255, 0.05);
+  outline: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .todo-delete {

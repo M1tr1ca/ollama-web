@@ -17482,9 +17482,9 @@ function renderTodoList() {
 
       grouped[date].forEach(todo => {
         html += `
-          <div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}">
+          <div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}" draggable="true">
             <button class="todo-checkbox ${todo.completed ? 'checked' : ''}"></button>
-            <span class="todo-text">${escapeHtml(todo.text)}</span>
+            <span class="todo-text" contenteditable="true" data-original-text="${escapeHtml(todo.text)}">${escapeHtml(todo.text)}</span>
             <button class="todo-delete">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -17542,11 +17542,34 @@ function addTodo(text) {
   renderTodoList();
 }
 
+// Update todo text
+function updateTodo(id, newText) {
+  const todo = todoState.todos.find(t => t.id === id);
+  if (todo && newText.trim()) {
+    todo.text = newText.trim();
+    saveTodos();
+    renderTodoList();
+  }
+}
+
 // Toggle todo completion
 function toggleTodo(id) {
   const todo = todoState.todos.find(t => t.id === id);
   if (todo) {
     todo.completed = !todo.completed;
+    saveTodos();
+    renderTodoList();
+  }
+}
+
+// Move todo (reorder)
+function moveTodo(fromId, toId) {
+  const fromIndex = todoState.todos.findIndex(t => t.id === fromId);
+  const toIndex = todoState.todos.findIndex(t => t.id === toId);
+  
+  if (fromIndex !== -1 && toIndex !== -1) {
+    const [movedTodo] = todoState.todos.splice(fromIndex, 1);
+    todoState.todos.splice(toIndex, 0, movedTodo);
     saveTodos();
     renderTodoList();
   }
@@ -17626,6 +17649,7 @@ function initTodoPanel() {
   }
 
   if (todoList) {
+    // Click events
     todoList.addEventListener('click', (e) => {
       const todoItem = e.target.closest('.todo-item');
       if (!todoItem) return;
@@ -17635,10 +17659,90 @@ function initTodoPanel() {
       // Si hace clic en eliminar, eliminar
       if (e.target.closest('.todo-delete')) {
         deleteTodo(id);
-      } else {
-        // Cualquier otro clic en el item lo marca/desmarca
+        return;
+      }
+      
+      // Solo marcar como completado si hace clic en el checkbox
+      if (e.target.closest('.todo-checkbox')) {
         toggleTodo(id);
       }
+    });
+
+    // Edit text events
+    todoList.addEventListener('blur', (e) => {
+      if (e.target.classList.contains('todo-text')) {
+        const todoItem = e.target.closest('.todo-item');
+        const id = todoItem.dataset.id;
+        const newText = e.target.textContent.trim();
+        const originalText = e.target.dataset.originalText;
+        
+        if (newText && newText !== originalText) {
+          updateTodo(id, newText);
+        } else if (!newText) {
+          e.target.textContent = originalText;
+        }
+      }
+    }, true);
+
+    todoList.addEventListener('keydown', (e) => {
+      if (e.target.classList.contains('todo-text')) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.target.blur();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          e.target.textContent = e.target.dataset.originalText;
+          e.target.blur();
+        }
+      }
+    });
+
+    // Drag and drop events
+    let draggedElement = null;
+
+    todoList.addEventListener('dragstart', (e) => {
+      const todoItem = e.target.closest('.todo-item');
+      if (todoItem) {
+        draggedElement = todoItem;
+        todoItem.style.opacity = '0.4';
+      }
+    });
+
+    todoList.addEventListener('dragend', (e) => {
+      const todoItem = e.target.closest('.todo-item');
+      if (todoItem) {
+        todoItem.style.opacity = '1';
+      }
+    });
+
+    todoList.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const todoItem = e.target.closest('.todo-item');
+      if (todoItem && draggedElement && todoItem !== draggedElement) {
+        todoItem.classList.add('drag-over');
+      }
+    });
+
+    todoList.addEventListener('dragleave', (e) => {
+      const todoItem = e.target.closest('.todo-item');
+      if (todoItem) {
+        todoItem.classList.remove('drag-over');
+      }
+    });
+
+    todoList.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const todoItem = e.target.closest('.todo-item');
+      if (todoItem && draggedElement && todoItem !== draggedElement) {
+        const fromId = draggedElement.dataset.id;
+        const toId = todoItem.dataset.id;
+        moveTodo(fromId, toId);
+      }
+      
+      // Remove all drag-over classes
+      document.querySelectorAll('.todo-item.drag-over').forEach(item => {
+        item.classList.remove('drag-over');
+      });
     });
   }
 
