@@ -6654,6 +6654,261 @@ button.research-active-btn svg {
   white-space: nowrap;
 }
 
+/* =====================================================
+   WEB SPLIT-VIEW (Pantalla dividida para modo web)
+   ===================================================== */
+
+.web-split-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.web-split-chat {
+  flex: 1;
+  min-width: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+}
+
+.web-split-chat .chat-list {
+  height: auto;
+}
+
+.web-split-resize-handle {
+  width: 8px;
+  background: transparent;
+  cursor: col-resize;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.web-split-resize-handle:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.resize-handle-line {
+  width: 2px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+  transition: all 0.2s ease;
+}
+
+.web-split-resize-handle:hover .resize-handle-line {
+  background: var(--theme-primary);
+  box-shadow: 0 0 8px var(--theme-primary-alpha-30);
+}
+
+.web-split-resize-handle:active .resize-handle-line {
+  background: var(--theme-primary);
+  box-shadow: 0 0 12px var(--theme-primary-alpha-50);
+}
+
+.web-split-preview {
+  width: 50%;
+  min-width: 300px;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.web-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 12px;
+}
+
+.web-preview-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.web-preview-title svg {
+  flex-shrink: 0;
+  color: var(--theme-primary);
+}
+
+#web-preview-url-display {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.web-preview-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.web-preview-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.web-preview-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.web-preview-btn:active {
+  transform: scale(0.95);
+}
+
+.web-preview-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.web-preview-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #fff;
+}
+
+.web-preview-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(26, 26, 46, 0.95);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  z-index: 10;
+}
+
+.web-preview-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--theme-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Citation badges en el texto */
+.citation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  margin: 0 2px;
+  background: var(--theme-primary-alpha-20);
+  border: 1px solid var(--theme-primary-alpha-30);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--theme-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  vertical-align: middle;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.citation-badge:hover {
+  background: var(--theme-primary-alpha-30);
+  border-color: var(--theme-primary);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px var(--theme-primary-alpha-30);
+}
+
+.citation-badge:active {
+  transform: translateY(0);
+}
+
+/* =====================================================
+   WEB SEARCH TYPE TOGGLE (Web vs Papers)
+   ===================================================== */
+
+.web-search-type-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin-left: 8px;
+}
+
+.web-search-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.web-search-type-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.web-search-type-btn:hover {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.web-search-type-btn.active {
+  background: var(--theme-primary-alpha-20);
+  color: var(--theme-primary);
+  border: 1px solid var(--theme-primary-alpha-30);
+}
+
+.web-search-type-btn.active svg {
+  color: var(--theme-primary);
+}
+
 /* Typing indicator - antiguo (mantener para compatibilidad) */
 .typing-indicator {
   display: flex;

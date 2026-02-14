@@ -1236,6 +1236,25 @@
                                         </button>
                                         <div class="chat-mode-slider"></div>
                                     </div>
+
+                                    <!-- Toggle para tipo de búsqueda web (solo visible en modo web) -->
+                                    <div id="web-search-type-toggle" class="web-search-type-toggle" style="display: none;">
+                                        <button type="button" class="web-search-type-btn active" data-type="general">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                            </svg>
+                                            <span>Web</span>
+                                        </button>
+                                        <button type="button" class="web-search-type-btn" data-type="academic">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                                                <path d="M12 6v8M9 11l3 3 3-3" />
+                                            </svg>
+                                            <span>Papers</span>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="input-controls-right">
                                     <button type="button" class="input-icon-button attach-btn-minimal"
@@ -1795,6 +1814,61 @@
                     </div>
                 </header>
                 <main class="chat-area" aria-live="polite">
+                    <!-- Container de split-view para modo web -->
+                    <div id="web-split-container" class="web-split-container" style="display: none;">
+                        <div class="web-split-chat">
+                            <ul id="chat-list-web" class="chat-list"></ul>
+                        </div>
+                        <div class="web-split-resize-handle" id="web-resize-handle">
+                            <div class="resize-handle-line"></div>
+                        </div>
+                        <div class="web-split-preview" id="web-preview-panel">
+                            <div class="web-preview-header">
+                                <div class="web-preview-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                                    </svg>
+                                    <span id="web-preview-url-display">Fuente</span>
+                                </div>
+                                <div class="web-preview-actions">
+                                    <button class="web-preview-btn" id="web-preview-reader-mode" title="Modo lectura">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                                        </svg>
+                                    </button>
+                                    <button class="web-preview-btn" id="web-preview-open-external" title="Abrir en nueva pestaña">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                            <polyline points="15 3 21 3 21 9"/>
+                                            <line x1="10" y1="14" x2="21" y2="3"/>
+                                        </svg>
+                                    </button>
+                                    <button class="web-preview-btn" id="web-preview-close" title="Cerrar vista previa">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <line x1="18" y1="6" x2="6" y2="18"/>
+                                            <line x1="6" y1="6" x2="18" y2="18"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="web-preview-content">
+                                <div class="web-preview-loading" id="web-preview-loading">
+                                    <div class="web-preview-spinner"></div>
+                                    <span>Cargando...</span>
+                                </div>
+                                <iframe 
+                                    id="web-preview-iframe" 
+                                    class="web-preview-iframe"
+                                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                                    referrerpolicy="no-referrer">
+                                </iframe>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Chat normal -->
                     <ul id="chat-list" class="chat-list"></ul>
                     <div id="canvas-feed" class="canvas-feed" style="display: none;">
                         <div class="canvas-feed-list" id="canvas-feed-list"></div>
@@ -1915,6 +1989,7 @@
                                         </button>
                                         <div class="chat-mode-slider"></div>
                                     </div>
+                                    
                                 </div>
                                 <div class="input-controls-right">
                                     <button type="button" class="input-icon-button attach-btn-minimal"

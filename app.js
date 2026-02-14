@@ -1681,6 +1681,13 @@ function parseMarkdown(text) {
     return `SOURCE_REF_PLACEHOLDER_${sourceBlocks.length - 1}`;
   });
 
+  // Proteger citas de búsqueda web [1], [2], etc.
+  const webCitations = [];
+  protectedText = protectedText.replace(/\[(\d+)\]/g, (match, number) => {
+    webCitations.push(number);
+    return `WEB_CITATION_PLACEHOLDER_${webCitations.length - 1}`;
+  });
+
   // Parsear markdown
   let html = marked.parse(protectedText);
 
@@ -1706,6 +1713,19 @@ function parseMarkdown(text) {
               <span class="source-badge-icon">📄</span>
               <span class="source-badge-name">${displayName}</span>
             </span>`;
+  });
+
+  // Restaurar citas de búsqueda web como badges clicables
+  html = html.replace(/WEB_CITATION_PLACEHOLDER_(\d+)/g, (match, index) => {
+    const citationNumber = webCitations[index];
+    if (!citationNumber) return match;
+
+    const sourcesMap = window._webSourcesMap || [];
+    const source = sourcesMap.find(s => String(s.id) === String(citationNumber));
+    const encodedUrl = encodeURIComponent(source?.url || '');
+    const encodedTitle = encodeURIComponent(source?.title || '');
+
+    return `<button class="citation-badge" data-source-id="${citationNumber}" data-source-url="${encodedUrl}" data-source-title="${encodedTitle}" onclick="window.openWebCitation(this.dataset.sourceId, decodeURIComponent(this.dataset.sourceUrl || ''), decodeURIComponent(this.dataset.sourceTitle || ''))" title="Ver fuente ${citationNumber}">[${citationNumber}]</button>`;
   });
 
   // Agregar clase markdown-table a todas las tablas para que se apliquen los estilos CSS
@@ -8380,6 +8400,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initScreenOverlay();
   initSourceBadgeHandler(); // PDF source references click handler
   initPdfDatabase(); // Initialize IndexedDB for PDF storage
+  
+  // Ocultar toggle de búsqueda web por defecto (se muestra solo en modo web)
+  const searchTypeToggle = document.querySelector('.web-search-type-toggle');
+  if (searchTypeToggle) {
+    searchTypeToggle.style.display = 'none';
+  }
+  
   try {
     initTranslationSystem();
   } catch (error) {
@@ -10942,11 +10969,116 @@ async function searchWeb(query) {
   }
 }
 
+// Función para buscar papers académicos en OpenAlex
+async function searchAcademicPapers(query) {
+  try {
+    console.log('🔬 Buscando papers académicos:', query);
+    
+    const response = await fetch("https://api.openalex.org/works", {
+      method: "GET",
+      headers: {
+        "User-Agent": "mailto:ollama-web@localhost.com"
+      },
+      params: new URLSearchParams({
+        search: query,
+        filter: "open_access.is_oa:true", // Solo open access
+        per_page: 5,
+        sort: "cited_by_count:desc" // Ordenar por citas
+      })
+    });
+
+    // Construir URL manualmente porque fetch no soporta params directamente
+    const url = new URL("https://api.openalex.org/works");
+    url.searchParams.append("search", query);
+    url.searchParams.append("filter", "open_access.is_oa:true");
+    url.searchParams.append("per_page", "5");
+    url.searchParams.append("sort", "cited_by_count:desc");
+
+    const responseActual = await fetch(url.toString(), {
+      headers: {
+        "User-Agent": "mailto:ollama-web@localhost.com"
+      }
+    });
+
+    if (!responseActual.ok) {
+      throw new Error(`Error en búsqueda académica: ${responseActual.status}`);
+    }
+
+    const data = await responseActual.json();
+    
+    // Transformar a formato compatible con el resto del sistema
+    const formattedData = {
+      academic: true,
+      results: data.results?.map(paper => ({
+        title: paper.title || 'Sin título',
+        link: paper.primary_location?.landing_page_url || paper.doi || `https://openalex.org/${paper.id}`,
+        snippet: paper.abstract_inverted_index ? 
+          reconstructAbstract(paper.abstract_inverted_index).substring(0, 300) + '...' :
+          (paper.display_name || 'Abstract no disponible'),
+        authors: paper.authorships?.slice(0, 3).map(a => a.author?.display_name).filter(Boolean).join(', '),
+        year: paper.publication_year,
+        citations: paper.cited_by_count,
+        venue: paper.primary_location?.source?.display_name,
+        doi: paper.doi
+      })) || []
+    };
+
+    return formattedData;
+  } catch (error) {
+    console.error('Error buscando papers académicos:', error);
+    return null;
+  }
+}
+
+// Función auxiliar para reconstruir abstract desde inverted index
+function reconstructAbstract(invertedIndex) {
+  if (!invertedIndex) return '';
+  
+  const words = [];
+  for (const [word, positions] of Object.entries(invertedIndex)) {
+    positions.forEach(pos => {
+      words[pos] = word;
+    });
+  }
+  
+  return words.filter(Boolean).join(' ').substring(0, 500);
+}
+
 // Formatear resultados de búsqueda para el contexto del modelo
 function formatSearchResults(searchData) {
   if (!searchData) return '';
 
-  let context = '📊 **Resultados de búsqueda web:**\n\n';
+  // Crear mapa de fuentes para citación
+  window._webSourcesMap = [];
+
+  // Si son resultados académicos
+  if (searchData.academic && searchData.results) {
+    let context = '📚 **PAPERS ACADÉMICOS ENCONTRADOS:**\n\n';
+    
+    searchData.results.forEach((paper, i) => {
+      const sourceId = i + 1;
+      window._webSourcesMap.push({
+        id: sourceId,
+        url: paper.link,
+        title: paper.title,
+        snippet: paper.snippet
+      });
+      
+      context += `[${sourceId}] **${paper.title}**\n`;
+      if (paper.authors) context += `    Autores: ${paper.authors}\n`;
+      if (paper.year) context += `    Año: ${paper.year}\n`;
+      if (paper.venue) context += `    Publicado en: ${paper.venue}\n`;
+      if (paper.citations) context += `    Citado ${paper.citations} veces\n`;
+      context += `    Abstract: ${paper.snippet}\n`;
+      if (paper.doi) context += `    DOI: ${paper.doi}\n`;
+      context += `\n`;
+    });
+    
+    return context;
+  }
+
+  // Si son resultados web normales
+  let context = '🌐 **FUENTES DE INFORMACIÓN WEB:**\n\n';
 
   // Answer box si existe
   if (searchData.answerBox) {
@@ -10960,7 +11092,7 @@ function formatSearchResults(searchData) {
   // Knowledge graph si existe
   if (searchData.knowledgeGraph) {
     const kg = searchData.knowledgeGraph;
-    context += `📚 **Información:**\n`;
+    context += `📚 **Información de Knowledge Graph:**\n`;
     if (kg.title) context += `**${kg.title}**`;
     if (kg.type) context += ` (${kg.type})`;
     context += '\n';
@@ -10968,13 +11100,21 @@ function formatSearchResults(searchData) {
     context += '\n';
   }
 
-  // Resultados orgánicos
+  // Resultados orgánicos - FORMATO MEJORADO CON IDs
   if (searchData.organic && searchData.organic.length > 0) {
-    context += `🔍 **Resultados principales:**\n\n`;
+    context += `📋 **FUENTES DISPONIBLES (Usa [1], [2], etc. para citar):**\n\n`;
     searchData.organic.slice(0, 5).forEach((result, i) => {
-      context += `${i + 1}. **${result.title}**\n`;
-      context += `   ${result.snippet}\n`;
-      context += `   🔗 ${result.link}\n\n`;
+      const sourceId = i + 1;
+      window._webSourcesMap.push({
+        id: sourceId,
+        url: result.link,
+        title: result.title,
+        snippet: result.snippet
+      });
+      
+      context += `[${sourceId}] **${result.title}**\n`;
+      context += `    Fuente: ${new URL(result.link).hostname}\n`;
+      context += `    Contenido: ${result.snippet}\n\n`;
     });
   }
 
@@ -11013,6 +11153,16 @@ function setChatMode(mode) {
   // Modo salud
   window._healthModeActive = mode === 'health';
   if (window.healthMode) window.healthMode.setActive(mode === 'health');
+
+  // Mostrar/ocultar toggle de tipo de búsqueda según modo web
+  const searchTypeToggle = document.querySelector('.web-search-type-toggle');
+  if (searchTypeToggle) {
+    const newDisplay = mode === 'web' ? 'flex' : 'none';
+    searchTypeToggle.style.display = newDisplay;
+    console.log(`🔍 Toggle de búsqueda: ${newDisplay} (modo: ${mode})`);
+  } else {
+    console.warn('⚠️ No se encontró el elemento .web-search-type-toggle');
+  }
 
   // Asegurar que el modo activo esté en la lista de modos visibles
   const visibleModes = getVisibleChatModes();
@@ -13838,8 +13988,17 @@ async function handleSubmitWithDeepResearch(event) {
     console.log('🌐 Buscando en la web:', prompt);
 
     try {
-      // Realizar la búsqueda
-      const searchResults = await searchWeb(prompt);
+      // Determinar tipo de búsqueda (web general o papers académicos)
+      const searchType = window._webSearchType || 'general';
+      let searchResults;
+      
+      if (searchType === 'academic') {
+        console.log('🔬 Modo búsqueda académica activado');
+        searchResults = await searchAcademicPapers(prompt);
+      } else {
+        console.log('🌐 Modo búsqueda web general activado');
+        searchResults = await searchWeb(prompt);
+      }
 
       if (searchResults) {
         // Actualizar la UI con los resultados
@@ -13938,20 +14097,75 @@ async function handleSubmitWithDeepResearch(event) {
 function buildWebSearchPayload(conversation, prompt, webContext) {
   const payloadMessages = [];
 
-  // Mensaje de sistema con contexto web
-  const systemMessage = `🌐 MODO BÚSQUEDA WEB ACTIVADO
+  // Detectar si es búsqueda académica
+  const isAcademic = webContext.includes('📚 **PAPERS ACADÉMICOS');
+  
+  // Mensaje de sistema con contexto web - INSTRUCCIONES ADAPTADAS
+  let systemMessage;
+  
+  if (isAcademic) {
+    systemMessage = `🔬 MODO BÚSQUEDA ACADÉMICA - PAPERS CIENTÍFICOS
 
-He realizado una búsqueda en internet sobre la consulta del usuario. Aquí están los resultados que encontré:
+He realizado una búsqueda en bases de datos académicas (OpenAlex) sobre la consulta del usuario. A continuación están los papers encontrados:
 
 ${webContext}
 
-INSTRUCCIONES:
-1. Usa esta información de internet para responder la pregunta del usuario de manera completa y precisa.
-2. Sintetiza la información de múltiples fuentes cuando sea relevante.
-3. Si citas información específica, menciona de qué fuente proviene.
-4. Si la información parece desactualizada o contradictoria, indícalo.
-5. Complementa con tu conocimiento cuando sea apropiado.
-6. Responde en español de forma clara y útil.`;
+⚠️ INSTRUCCIONES PARA CONTENIDO ACADÉMICO:
+
+1. **CITACIÓN ACADÉMICA OBLIGATORIA**: Cada afirmación científica DEBE incluir una cita [id] inmediatamente después.
+   ✅ Correcto: "Los transformers revolucionaron el NLP [1]. BERT utiliza atención bidireccional [2]."
+   ❌ Incorrecto: "Los transformers revolucionaron el NLP. BERT utiliza atención bidireccional."
+
+2. **FORMATO ESTRICTO**: Usa SOLO el formato [número] (ej: [1], [2], [3]).
+   - Las citas van DENTRO del texto, no al final.
+   - Si múltiples papers respaldan un dato, usa [1][2].
+
+3. **RIGOR CIENTÍFICO**: 
+   - Menciona autores cuando sea relevante: "Según Smith et al. [1]..."
+   - Indica el año de publicación cuando contextualice: "En 2020, se demostró que... [2]"
+   - Señala el número de citas para destacar impacto: "Este estudio altamente citado [3] demuestra..."
+
+4. **SOLO USA LOS PAPERS PROPORCIONADOS**: 
+   - NO inventes citas o referencias a papers no listados.
+   - Si no hay suficiente información, indica: "Los papers encontrados no cubren este aspecto específico."
+
+5. **SÍNTESIS ACADÉMICA**: 
+   - Compara hallazgos entre diferentes papers cuando sea apropiado.
+   - Señala consensos: "Múltiples estudios coinciden en que... [1][2][3]"
+   - Indica divergencias: "Mientras [1] sugiere X, [2] propone Y"
+
+6. **RESPUESTA EN ESPAÑOL**: Académica, rigurosa y clara.
+
+🎯 RECORDATORIO: Cada afirmación científica = una cita [id]. Rigor académico absoluto.`;
+  } else {
+    systemMessage = `🌐 MODO BÚSQUEDA WEB CON CITACIÓN ACADÉMICA
+
+He realizado una búsqueda en internet sobre la consulta del usuario. A continuación están las fuentes encontradas:
+
+${webContext}
+
+⚠️ INSTRUCCIONES CRÍTICAS DE CITACIÓN:
+
+1. **CITACIÓN OBLIGATORIA**: Cada afirmación factual DEBE incluir una cita [id] inmediatamente después de la oración.
+   ✅ Correcto: "El grafeno es un superconductor [1]. Fue descubierto en 2004 [2]."
+   ❌ Incorrecto: "El grafeno es un superconductor. Fue descubierto en 2004."
+
+2. **FORMATO ESTRICTO**: Usa SOLO el formato [número] (ej: [1], [2], [3]).
+   - NO uses [Fuente 1], [ref1], ni otros formatos.
+   - Las citas van DENTRO del párrafo, no al final.
+
+3. **MÚLTIPLES FUENTES**: Si varias fuentes respaldan un hecho, usa [1][2].
+
+4. **SOLO USA LAS FUENTES PROPORCIONADAS**: 
+   - NO inventes citas ([6], [7] si solo hay 5 fuentes).
+   - Si no hay información en las fuentes, responde: "No encontré información sobre esto en las fuentes disponibles."
+
+5. **SIN CONOCIMIENTO EXTERNO**: Basa tu respuesta ÚNICAMENTE en el contexto web proporcionado.
+
+6. **RESPUESTA EN ESPAÑOL**: Clara, concisa y profesional.
+
+🎯 RECORDATORIO: Cada dato = una cita [id]. Sin excepciones.`;
+  }
 
   payloadMessages.push({
     role: 'system',
@@ -14051,7 +14265,7 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
 
   const reader = response.body.getReader();
   currentStreamReader = reader;
-  updateSendButtonToSend();
+  updateSendButtonToStop();
 
   let fullContent = '';
   const decoder = new TextDecoder();
@@ -19155,4 +19369,243 @@ function resetTravelCommands() {
   processedTravelCommands.clear();
 }
 
-console.log('✅ TODO and Calendar modules loaded');
+// =====================================================
+//  WEB SPLIT-VIEW & CITATION FUNCTIONS
+// =====================================================
+
+// Estado del panel web
+window._webPreviewState = {
+  isOpen: false,
+  currentUrl: null,
+  currentSourceId: null,
+  readerMode: false
+};
+
+// Función para abrir una citación web
+window.openWebCitation = function(sourceId, directUrl = '', directTitle = '') {
+  console.log(`🔗 Abriendo citación [${sourceId}]`);
+  
+  // Obtener la fuente del mapa global (última búsqueda)
+  const sourcesMap = window._webSourcesMap || [];
+  const numericId = parseInt(sourceId, 10);
+  const source = sourcesMap.find(s => s.id === numericId);
+
+  // Fallback robusto: usar URL/título incrustados en el badge del mensaje
+  const fallbackUrl = (directUrl || '').trim();
+  const fallbackTitle = (directTitle || '').trim();
+  const finalUrl = source?.url || fallbackUrl;
+  const finalTitle = source?.title || fallbackTitle || `Fuente ${sourceId}`;
+  
+  if (!finalUrl) {
+    console.warn(`⚠️ Fuente [${sourceId}] no encontrada`);
+    return;
+  }
+  
+  openWebPreview(finalUrl, finalTitle, sourceId);
+};
+
+// Función para abrir el panel de vista previa
+function openWebPreview(url, title, sourceId) {
+  const splitContainer = document.getElementById('web-split-container');
+  const chatList = document.getElementById('chat-list');
+  const chatListWeb = document.getElementById('chat-list-web');
+  const previewPanel = document.getElementById('web-preview-panel');
+  const iframe = document.getElementById('web-preview-iframe');
+  const urlDisplay = document.getElementById('web-preview-url-display');
+  const loading = document.getElementById('web-preview-loading');
+  
+  if (!splitContainer || !previewPanel) return;
+  
+  // Activar split-view
+  if (chatList && chatListWeb) {
+    // Copiar contenido del chat al contenedor split
+    chatListWeb.innerHTML = chatList.innerHTML;
+    chatList.style.display = 'none';
+    splitContainer.style.display = 'flex';
+  }
+  
+  // Actualizar estado
+  window._webPreviewState.isOpen = true;
+  window._webPreviewState.currentUrl = url;
+  window._webPreviewState.currentSourceId = sourceId;
+  window._webPreviewState.readerMode = false;
+  
+  // Mostrar loading
+  if (loading) loading.style.display = 'flex';
+  if (iframe) iframe.style.display = 'none';
+  
+  // Actualizar título
+  if (urlDisplay) {
+    const domain = new URL(url).hostname.replace('www.', '');
+    urlDisplay.textContent = title || domain;
+  }
+  
+  // Cargar URL a través del proxy
+  const proxyUrl = `http://localhost:3001/proxy?url=${encodeURIComponent(url)}`;
+  
+  if (iframe) {
+    iframe.src = proxyUrl;
+    
+    iframe.onload = () => {
+      if (loading) loading.style.display = 'none';
+      if (iframe) iframe.style.display = 'block';
+    };
+    
+    iframe.onerror = () => {
+      if (loading) loading.innerHTML = `
+        <div style="color: #ef4444; text-align: center;">
+          <p>⚠️ No se pudo cargar la página</p>
+          <button onclick="window.openWebPreviewInTab('${url}')" style="margin-top: 12px; padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; cursor: pointer;">
+            Abrir en nueva pestaña →
+          </button>
+        </div>
+      `;
+    };
+  }
+  
+  console.log(`📄 Vista previa abierta: ${url}`);
+}
+
+// Función para cerrar el panel de vista previa
+window.closeWebPreview = function() {
+  const splitContainer = document.getElementById('web-split-container');
+  const chatList = document.getElementById('chat-list');
+  
+  if (splitContainer) splitContainer.style.display = 'none';
+  if (chatList) chatList.style.display = '';
+  
+  window._webPreviewState.isOpen = false;
+  window._webPreviewState.currentUrl = null;
+  window._webPreviewState.currentSourceId = null;
+  
+  console.log('❌ Vista previa cerrada');
+};
+
+// Función para modo lectura
+window.toggleWebPreviewReaderMode = function() {
+  const currentUrl = window._webPreviewState.currentUrl;
+  if (!currentUrl) return;
+  
+  const iframe = document.getElementById('web-preview-iframe');
+  const loading = document.getElementById('web-preview-loading');
+  
+  window._webPreviewState.readerMode = !window._webPreviewState.readerMode;
+  
+  if (loading) loading.style.display = 'flex';
+  if (iframe) iframe.style.display = 'none';
+  
+  const url = window._webPreviewState.readerMode
+    ? `http://localhost:3001/readability?url=${encodeURIComponent(currentUrl)}`
+    : `http://localhost:3001/proxy?url=${encodeURIComponent(currentUrl)}`;
+  
+  if (iframe) {
+    iframe.src = url;
+    iframe.onload = () => {
+      if (loading) loading.style.display = 'none';
+      if (iframe) iframe.style.display = 'block';
+    };
+  }
+  
+  console.log(`📖 Modo lectura: ${window._webPreviewState.readerMode ? 'ON' : 'OFF'}`);
+};
+
+// Función para abrir en pestaña externa
+window.openWebPreviewInTab = function() {
+  const currentUrl = window._webPreviewState.currentUrl;
+  if (currentUrl) {
+    window.open(currentUrl, '_blank');
+  }
+};
+
+// Configurar event listeners del panel web
+function initWebPreviewPanel() {
+  const closeBtn = document.getElementById('web-preview-close');
+  const readerBtn = document.getElementById('web-preview-reader-mode');
+  const externalBtn = document.getElementById('web-preview-open-external');
+  const resizeHandle = document.getElementById('web-resize-handle');
+  
+  if (closeBtn) {
+    closeBtn.addEventListener('click', window.closeWebPreview);
+  }
+  
+  if (readerBtn) {
+    readerBtn.addEventListener('click', window.toggleWebPreviewReaderMode);
+  }
+  
+  if (externalBtn) {
+    externalBtn.addEventListener('click', window.openWebPreviewInTab);
+  }
+  
+  // Configurar toggle de tipo de búsqueda
+  const toggleButtons = document.querySelectorAll('.web-search-type-btn');
+  toggleButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Remover active de todos
+      toggleButtons.forEach(b => b.classList.remove('active'));
+      // Añadir active al clickeado
+      btn.classList.add('active');
+      // Guardar tipo de búsqueda
+      window._webSearchType = btn.dataset.type;
+      console.log(`🔍 Tipo de búsqueda cambiado a: ${window._webSearchType}`);
+    });
+  });
+  
+  // Inicializar tipo de búsqueda por defecto
+  if (!window._webSearchType) {
+    window._webSearchType = 'general';
+  }
+  
+  // Resize handle para ajustar ancho del panel
+  if (resizeHandle) {
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    
+    resizeHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      startX = e.clientX;
+      const previewPanel = document.getElementById('web-preview-panel');
+      if (previewPanel) {
+        startWidth = previewPanel.offsetWidth;
+      }
+      document.body.style.cursor = 'col-resize';
+      e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      
+      const previewPanel = document.getElementById('web-preview-panel');
+      if (!previewPanel) return;
+      
+      const diff = startX - e.clientX;
+      const newWidth = startWidth + diff;
+      
+      // Limitar ancho entre 300px y 70% del viewport
+      const minWidth = 300;
+      const maxWidth = window.innerWidth * 0.7;
+      
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        previewPanel.style.width = `${newWidth}px`;
+      }
+    });
+    
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        document.body.style.cursor = '';
+      }
+    });
+  }
+  
+  console.log('✅ Panel de vista previa web inicializado');
+}
+
+// Inicializar al cargar la página
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initWebPreviewPanel);
+} else {
+  initWebPreviewPanel();
+}
+
+console.log('✅ Web preview, TODO and Calendar modules loaded');
