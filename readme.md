@@ -49,8 +49,10 @@ An autonomous research agent that:
 - Delivers structured reports with sources
 
 <p align="center">
-  <img src="assets/Demo/image3DeepResearch.png" alt="Deep Research" width="45%" />
-  <img src="assets/Demo/image3DeepResearchResult.png" alt="Research Result" width="45%" />
+  <img src="assets/Demo/image3DeepResearch.png" alt="Deep Research" width="100%" />
+</p>
+<p align="center">
+  <img src="assets/Demo/image3DeepResearchResult.png" alt="Research Result" width="100%" />
 </p>
 
 ### Projects & Organization
@@ -59,7 +61,7 @@ An autonomous research agent that:
 - Keep work organized by topic or goal
 
 <p align="center">
-  <img src="assets/Demo/image2Projects.png" alt="Projects Organization" width="70%" />
+  <img src="assets/Demo/image2Projects.png" alt="Projects Organization" width="100%" />
 </p>
 
 ### Canvas Mode
@@ -105,8 +107,10 @@ Your personal coach for nutrition, exercise, and mental wellbeing.
 > **Disclaimer:** Kaisio is not a medical device. It does not diagnose or prescribe. Always consult a healthcare professional for medical advice.
 
 <p align="center">
-  <img src="assets/Demo/imageSalud.png" alt="Health Mode" width="45%" />
-  <img src="assets/Demo/imageSalud2.png" alt="Health Recipes" width="45%" />
+  <img src="assets/Demo/imageSalud.png" alt="Health Mode" width="100%" />
+</p>
+<p align="center">
+  <img src="assets/Demo/imageSalud2.png" alt="Health Recipes" width="100%" />
 </p>
 
 ---
@@ -123,7 +127,7 @@ Plan trips with interactive maps rendered directly in chat.
 - Multi-day itineraries with waypoints
 
 <p align="center">
-  <img src="assets/Demo/imageMaps.png" alt="Travel Mode with Maps" width="70%" />
+  <img src="assets/Demo/imageMaps.png" alt="Travel Mode with Maps" width="100%" />
 </p>
 
 ---
@@ -139,7 +143,7 @@ Compose and edit musical scores through natural conversation.
 - Export scores as PDF or MusicXML
 
 <p align="center">
-  <img src="assets/Demo/imageMusic.png" alt="Music Composition Mode" width="70%" />
+  <img src="assets/Demo/imageMusic.png" alt="Music Composition Mode" width="100%" />
 </p>
 
 ---
@@ -265,15 +269,10 @@ In brief: You can use, modify, and distribute this software freely, but any modi
 ---
 
 <p align="center">
-  <strong>Built with local-first principles</strong><br/>
-  Your data stays yours. Forever.
+  <b>Local-First Principles.</b>  <b>Your Data Stays Yours. Forever.</b>
 </p>
 
 <p align="center">
-  Made with love for the Ollama community<br/>
-  From Spain with ❤️
-</p>
-
-<p align="center">
-  <a href="https://github.com/M1tr1ca">M1tr1ca</a>
+  Made with ❤️ for the Ollama community<br/>
+  From Spain by <a href="https://github.com/M1tr1ca"><b>M1tr1ca</b></a>
 </p>
