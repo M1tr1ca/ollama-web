@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:11434';
+﻿const API_BASE = 'http://localhost:11434';
 const STORAGE_KEY = 'ollama-web-state-v1';
 const DEFAULT_TITLE = 'Nueva conversación';
 const BACKGROUND_STORAGE_KEY = 'ollama-web-background-date';
@@ -9,9 +9,14 @@ const PDF_DB_NAME = 'ollama-web-pdf-store';
 const PDF_DB_VERSION = 1;
 const SCORE_CANVAS_STORAGE_KEY = 'ollama-web-score-canvas-v1';
 const SCORE_CANVAS_DEFAULT_TITLE = 'Nueva partitura';
+const WEB_CONTENT_DB_NAME = 'ollama-web-content-cache';
+const WEB_CONTENT_DB_VERSION = 1;
+const WEB_CONTENT_CACHE_DAYS = 7; // Expiración de caché en días
 
 // IndexedDB for storing large PDF binaries
 let pdfDatabase = null;
+// IndexedDB for caching extracted web content
+let webContentDatabase = null;
 
 async function initPdfDatabase() {
   return new Promise((resolve, reject) => {
@@ -36,6 +41,14 @@ async function initPdfDatabase() {
     };
   });
 }
+
+// Inicializar ambas bases de datos al inicio
+(async function initDatabases() {
+  await initPdfDatabase();
+  await initWebContentDatabase();
+  // Limpiar contenido expirado periódicamente
+  setInterval(clearExpiredWebContent, 24 * 60 * 60 * 1000); // Cada 24 horas
+})();
 
 async function savePdfToIndexedDB(fileId, pdfBinary) {
   if (!pdfDatabase) await initPdfDatabase();
@@ -83,6 +96,119 @@ async function deletePdfFromIndexedDB(fileId) {
     store.delete(fileId);
   } catch (e) {
     console.warn('Error deleting PDF from IndexedDB:', e);
+  }
+}
+
+// ========================================
+// INDEXEDDB PARA CONTENIDO WEB EXTRAÍDO
+// ========================================
+
+async function initWebContentDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(WEB_CONTENT_DB_NAME, WEB_CONTENT_DB_VERSION);
+
+    request.onerror = () => {
+      console.warn('IndexedDB not available for web content cache');
+      resolve(null);
+    };
+
+    request.onsuccess = (event) => {
+      webContentDatabase = event.target.result;
+      console.log('📦 Web Content IndexedDB initialized');
+      resolve(webContentDatabase);
+    };
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('webContent')) {
+        const store = db.createObjectStore('webContent', { keyPath: 'url' });
+        store.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+    };
+  });
+}
+
+async function saveWebContentToCache(url, content) {
+  if (!webContentDatabase) await initWebContentDatabase();
+  if (!webContentDatabase) return false;
+
+  return new Promise((resolve) => {
+    try {
+      const transaction = webContentDatabase.transaction(['webContent'], 'readwrite');
+      const store = transaction.objectStore('webContent');
+      store.put({ 
+        url: url, 
+        content: content, 
+        timestamp: Date.now() 
+      });
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = () => resolve(false);
+    } catch (e) {
+      console.warn('Error saving web content to cache:', e);
+      resolve(false);
+    }
+  });
+}
+
+async function getWebContentFromCache(url) {
+  if (!webContentDatabase) await initWebContentDatabase();
+  if (!webContentDatabase) return null;
+
+  return new Promise((resolve) => {
+    try {
+      const transaction = webContentDatabase.transaction(['webContent'], 'readonly');
+      const store = transaction.objectStore('webContent');
+      const request = store.get(url);
+      
+      request.onsuccess = () => {
+        const result = request.result;
+        if (!result) {
+          resolve(null);
+          return;
+        }
+        
+        // Verificar expiración (7 días)
+        const ageInDays = (Date.now() - result.timestamp) / (1000 * 60 * 60 * 24);
+        if (ageInDays > WEB_CONTENT_CACHE_DAYS) {
+          // Contenido expirado, eliminarlo
+          const deleteTransaction = webContentDatabase.transaction(['webContent'], 'readwrite');
+          deleteTransaction.objectStore('webContent').delete(url);
+          resolve(null);
+        } else {
+          resolve(result.content);
+        }
+      };
+      
+      request.onerror = () => resolve(null);
+    } catch (e) {
+      console.warn('Error getting web content from cache:', e);
+      resolve(null);
+    }
+  });
+}
+
+async function clearExpiredWebContent() {
+  if (!webContentDatabase) await initWebContentDatabase();
+  if (!webContentDatabase) return;
+
+  try {
+    const transaction = webContentDatabase.transaction(['webContent'], 'readwrite');
+    const store = transaction.objectStore('webContent');
+    const index = store.index('timestamp');
+    const expirationTime = Date.now() - (WEB_CONTENT_CACHE_DAYS * 24 * 60 * 60 * 1000);
+    
+    const request = index.openCursor();
+    request.onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (cursor) {
+        if (cursor.value.timestamp < expirationTime) {
+          store.delete(cursor.value.url);
+        }
+        cursor.continue();
+      }
+    };
+  } catch (e) {
+    console.warn('Error clearing expired web content:', e);
   }
 }
 
@@ -137,8 +263,12 @@ let musicMode = false;
 let pendingScoreEdit = null; // For AI edit approval flow
 
 // Control de scroll para burbujas (fuera del streaming principal)
-const SCROLL_UPDATE_INTERVAL = 16; // ~60fps
+const SCROLL_UPDATE_INTERVAL = 80; // ~12fps - suficiente para el auto-scroll sin lag
 let lastScrollUpdateTime = 0;
+
+// Control: detectar si el usuario está scrolleando manualmente hacia arriba
+let userIsScrollingUp = false;
+let userScrollTimeout = null;
 
 //Archivos adjuntos por conversación
 const attachedFiles = {};
@@ -450,10 +580,31 @@ function autoResizeTextarea(textarea) {
   textarea.style.height = `${textarea.scrollHeight}px`;
 }
 
-function scrollChatToBottom() {
-  requestAnimationFrame(() => {
-    chatList?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  });
+function scrollChatToBottom(force = false) {
+  const chatArea = document.querySelector('.chat-area');
+  if (!chatArea) return;
+  // No forzar scroll si el usuario está scrolleando manualmente hacia arriba
+  if (userIsScrollingUp && !force) return;
+  // Usar scrollTop directo: más eficiente que scrollIntoView smooth durante streaming
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+// Inicializar detección de scroll manual (se llama una vez al cargar la app)
+function initScrollDetection() {
+  const chatArea = document.querySelector('.chat-area');
+  if (!chatArea) return;
+  chatArea.addEventListener('scroll', () => {
+    const distanceFromBottom = chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight;
+    // Si el usuario está a más de 120px del fondo, asumimos que scrolleó hacia arriba manualmente
+    userIsScrollingUp = distanceFromBottom > 120;
+    // Resetear el flag después de 2 segundos de inactividad
+    clearTimeout(userScrollTimeout);
+    if (userIsScrollingUp) {
+      userScrollTimeout = setTimeout(() => {
+        userIsScrollingUp = false;
+      }, 2000);
+    }
+  }, { passive: true });
 }
 
 function touchConversation(id) {
@@ -2933,13 +3084,27 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
 
   // Usar requestAnimationFrame para actualizar el DOM de forma más eficiente
   requestAnimationFrame(() => {
-    bubble.innerHTML = content;
+    // Optimización: separar el área de contenido del área de controles.
+    // Así no se recrean los botones en cada chunk del streaming.
+    let contentArea = bubble.querySelector('.bubble-content-area');
+    let copyContainer = bubble.querySelector('.copy-message-container');
+
+    if (!contentArea) {
+      // Primera vez: crear la estructura separada
+      bubble.innerHTML = '';
+      contentArea = document.createElement('div');
+      contentArea.className = 'bubble-content-area';
+      bubble.appendChild(contentArea);
+    }
+
+    // Actualizar solo el área de contenido (no los controles)
+    contentArea.innerHTML = content;
 
     // Renderizar matemáticas con KaTeX solo si hay contenido
     if (content && typeof renderMathInElement !== 'undefined') {
       // Usar setTimeout para no bloquear el frame principal
       setTimeout(() => {
-        renderMathInElement(bubble, {
+        renderMathInElement(contentArea, {
           delimiters: [
             { left: '$$', right: '$$', display: true },
             { left: '$', right: '$', display: false }
@@ -2950,7 +3115,6 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
     }
 
     // Asegurar que el botón de copiar existe dentro del bubble
-    let copyContainer = bubble.querySelector('.copy-message-container');
     if (!copyContainer) {
       copyContainer = document.createElement('div');
       copyContainer.className = 'copy-message-container';
@@ -3060,7 +3224,7 @@ function updateAssistantBubble(bubble, text, thinkingData = null, skipScroll = f
     }
 
     // Scroll automático del thinking-content hacia el final cuando está cargando
-    const thinkingContent = bubble.querySelector('.thinking-content-streaming');
+    const thinkingContent = (contentArea || bubble).querySelector('.thinking-content-streaming');
     if (thinkingContent) {
       thinkingContent.scrollTop = thinkingContent.scrollHeight;
     }
@@ -3372,8 +3536,8 @@ async function streamAssistantResponse(conversation, payloadMessages) {
   let pendingUpdate = false;
   let updateScheduled = false;
   let lastUpdateTime = 0;
-  const UPDATE_INTERVAL = 16; // ~60fps (16ms)
-  const BATCH_SIZE = 50; // Número de caracteres antes de forzar actualización
+  const UPDATE_INTERVAL = 80; // ~12fps durante streaming - reduce re-renders del DOM sin perder fluidez
+  const BATCH_SIZE = 150; // Acumular más caracteres antes de actualizar
 
   // Función para programar actualización del DOM
   const scheduleUpdate = () => {
@@ -3431,12 +3595,9 @@ async function streamAssistantResponse(conversation, payloadMessages) {
             const duration = ((Date.now() - startTime) / 1000).toFixed(0);
             assistantMessage.thinkingDuration = duration;
 
-            // Actualizar inmediatamente para thinking (con scroll)
-            updateAssistantBubble(bubble, assistantMessage.content, {
-              thinking: assistantMessage.thinking,
-              duration: duration,
-              isLoading: true
-            }, false);
+            // Usar scheduleUpdate también para thinking, evita llamadas en cada chunk
+            pendingUpdate = true;
+            scheduleUpdate();
             thinkingComplete = true;
             // No persistir en cada chunk de thinking, solo al final
           }
@@ -3485,12 +3646,9 @@ async function streamAssistantResponse(conversation, payloadMessages) {
                 pendingUpdate = true;
                 scheduleUpdate();
               } else {
-                // Si solo había thinking, actualizar la vista inmediatamente
-                const thinkingData = assistantMessage.thinking ? {
-                  thinking: assistantMessage.thinking,
-                  duration: assistantMessage.thinkingDuration
-                } : null;
-                updateAssistantBubble(bubble, assistantMessage.content, thinkingData, false);
+                // Si solo había thinking, programar actualización con throttle
+                pendingUpdate = true;
+                scheduleUpdate();
               }
             } else {
               // Si es el primer chunk y no hay pensamiento explícito, registrar el tiempo de primera respuesta
@@ -10935,6 +11093,56 @@ function addFinalSources(container, searchData) {
 }
 
 // Función para buscar en la web con Serper API
+// ========================================
+// EXTRACCIÓN DE CONTENIDO CON JINA READER
+// ========================================
+
+async function extractContentWithJina(url) {
+  try {
+    console.log('📄 Extrayendo contenido con Jina Reader:', url);
+    
+    // Verificar caché primero
+    const cached = await getWebContentFromCache(url);
+    if (cached) {
+      console.log('✅ Contenido recuperado de caché:', url);
+      return cached;
+    }
+    
+    // Extraer con Jina Reader
+    const jinaUrl = `https://r.jina.ai/${url}`;
+    const response = await fetch(jinaUrl, {
+      headers: {
+        'Accept': 'application/json',
+        'X-Return-Format': 'markdown'
+      },
+      signal: AbortSignal.timeout(15000) // 15 segundos timeout
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Jina Reader error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const content = data.data?.content || data.content || '';
+    
+    if (content && content.length > 100) {
+      // Guardar en caché
+      await saveWebContentToCache(url, content);
+      console.log(`✅ Contenido extraído y cacheado (${content.length} chars):`, url);
+      return content;
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn(`⚠️ Error extrayendo contenido de ${url}:`, error.message);
+    return null;
+  }
+}
+
+// ========================================
+// BÚSQUEDA WEB CON SERPER
+// ========================================
+
 async function searchWeb(query) {
   try {
     const apiKey = getSerperApiKey();
@@ -10953,7 +11161,7 @@ async function searchWeb(query) {
         q: query,
         gl: "es",
         hl: "es",
-        num: 5
+        num: 8 // Aumentar a 8 para tener más fuentes
       })
     });
 
@@ -10969,83 +11177,160 @@ async function searchWeb(query) {
   }
 }
 
-// Función para buscar papers académicos en OpenAlex
+// ========================================
+// BÚSQUEDA ACADÉMICA CON SEMANTIC SCHOLAR
+// ========================================
+
 async function searchAcademicPapers(query) {
   try {
-    console.log('🔬 Buscando papers académicos:', query);
+    console.log('🔬 Buscando papers académicos en Semantic Scholar:', query);
     
-    const response = await fetch("https://api.openalex.org/works", {
-      method: "GET",
+    // Usar proxy local para evitar CORS
+    const url = `http://localhost:3001/api/scholar?q=${encodeURIComponent(query)}`;
+    
+    const response = await fetch(url, {
       headers: {
-        "User-Agent": "mailto:ollama-web@localhost.com"
-      },
-      params: new URLSearchParams({
-        search: query,
-        filter: "open_access.is_oa:true", // Solo open access
-        per_page: 5,
-        sort: "cited_by_count:desc" // Ordenar por citas
-      })
-    });
-
-    // Construir URL manualmente porque fetch no soporta params directamente
-    const url = new URL("https://api.openalex.org/works");
-    url.searchParams.append("search", query);
-    url.searchParams.append("filter", "open_access.is_oa:true");
-    url.searchParams.append("per_page", "5");
-    url.searchParams.append("sort", "cited_by_count:desc");
-
-    const responseActual = await fetch(url.toString(), {
-      headers: {
-        "User-Agent": "mailto:ollama-web@localhost.com"
+        'Accept': 'application/json'
       }
     });
 
-    if (!responseActual.ok) {
-      throw new Error(`Error en búsqueda académica: ${responseActual.status}`);
+    if (!response.ok) {
+      console.warn('⚠️ Semantic Scholar no disponible, intentando con Serper Scholar...');
+      return await searchWithSerperScholar(query);
     }
 
-    const data = await responseActual.json();
+    const data = await response.json();
     
-    // Transformar a formato compatible con el resto del sistema
+    // Si el proxy devuelve error de fallback o no hay datos
+    if (data.fallback || !data.data || data.data.length === 0) {
+      console.log('📚 No hay resultados en Semantic Scholar, usando Serper Scholar...');
+      return await searchWithSerperScholar(query);
+    }
+    
+    // Transformar a formato compatible
     const formattedData = {
       academic: true,
-      results: data.results?.map(paper => ({
-        title: paper.title || 'Sin título',
-        link: paper.primary_location?.landing_page_url || paper.doi || `https://openalex.org/${paper.id}`,
-        snippet: paper.abstract_inverted_index ? 
-          reconstructAbstract(paper.abstract_inverted_index).substring(0, 300) + '...' :
-          (paper.display_name || 'Abstract no disponible'),
-        authors: paper.authorships?.slice(0, 3).map(a => a.author?.display_name).filter(Boolean).join(', '),
-        year: paper.publication_year,
-        citations: paper.cited_by_count,
-        venue: paper.primary_location?.source?.display_name,
-        doi: paper.doi
-      })) || []
+      results: data.data.map(paper => {
+        const authors = paper.authors?.slice(0, 3).map(a => a.name).filter(Boolean).join(', ') || 'Autor desconocido';
+        const abstract = paper.abstract || paper.tldr?.text || 'Abstract no disponible';
+        const pdfUrl = paper.openAccessPdf?.url || null;
+        const doi = paper.externalIds?.DOI || null;
+        
+        return {
+          title: paper.title || 'Sin título',
+          link: paper.url || (doi ? `https://doi.org/${doi}` : `https://www.semanticscholar.org/paper/${paper.paperId}`),
+          snippet: abstract.substring(0, 400) + (abstract.length > 400 ? '...' : ''),
+          abstract: abstract,
+          tldr: paper.tldr?.text || null,
+          authors: authors,
+          year: paper.year || paper.publicationDate?.split('-')[0] || null,
+          citations: paper.citationCount || 0,
+          venue: paper.venue || 'Venue desconocido',
+          doi: doi,
+          pdfUrl: pdfUrl,
+          paperId: paper.paperId
+        };
+      })
     };
 
+    console.log(`✅ Encontrados ${formattedData.results.length} papers en Semantic Scholar`);
     return formattedData;
+    
   } catch (error) {
-    console.error('Error buscando papers académicos:', error);
+    console.error('Error buscando en Semantic Scholar:', error);
+    // Fallback a Serper Scholar
+    return await searchWithSerperScholar(query);
+  }
+}
+
+// Fallback: Búsqueda académica con Serper Google Scholar
+async function searchWithSerperScholar(query) {
+  try {
+    const apiKey = getSerperApiKey();
+    if (!apiKey) return null;
+
+    console.log('🔬 Buscando en Google Scholar vía Serper:', query);
+    
+    const response = await fetch("https://google.serper.dev/scholar", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        q: query,
+        num: 8
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error en Serper Scholar: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    const formattedData = {
+      academic: true,
+      results: (data.organic || []).map(paper => ({
+        title: paper.title || 'Sin título',
+        link: paper.link || '#',
+        snippet: paper.snippet || 'Abstract no disponible',
+        abstract: paper.snippet || '',
+        authors: paper.publication || 'Autores desconocidos',
+        year: extractYearFromPublication(paper.publication),
+        citations: extractCitationCount(paper.inline_links),
+        venue: extractVenue(paper.publication),
+        doi: null,
+        pdfUrl: extractPdfLink(paper.inline_links)
+      }))
+    };
+
+    console.log(`✅ Encontrados ${formattedData.results.length} papers en Serper Scholar`);
+    return formattedData;
+    
+  } catch (error) {
+    console.error('Error buscando en Serper Scholar:', error);
     return null;
   }
 }
 
-// Función auxiliar para reconstruir abstract desde inverted index
-function reconstructAbstract(invertedIndex) {
-  if (!invertedIndex) return '';
-  
-  const words = [];
-  for (const [word, positions] of Object.entries(invertedIndex)) {
-    positions.forEach(pos => {
-      words[pos] = word;
-    });
-  }
-  
-  return words.filter(Boolean).join(' ').substring(0, 500);
+// Funciones auxiliares para parsear datos de Serper Scholar
+function extractYearFromPublication(publication) {
+  if (!publication) return null;
+  const match = publication.match(/\b(19|20)\d{2}\b/);
+  return match ? parseInt(match[0]) : null;
 }
 
-// Formatear resultados de búsqueda para el contexto del modelo
-function formatSearchResults(searchData) {
+function extractCitationCount(inlineLinks) {
+  if (!inlineLinks) return 0;
+  const citedBy = inlineLinks.find(link => link.title && link.title.includes('Cited by'));
+  if (citedBy && citedBy.title) {
+    const match = citedBy.title.match(/\d+/);
+    return match ? parseInt(match[0]) : 0;
+  }
+  return 0;
+}
+
+function extractVenue(publication) {
+  if (!publication) return 'Venue desconocido';
+  // Intentar extraer el nombre de la revista/conferencia
+  const parts = publication.split('-');
+  return parts[0]?.trim() || 'Venue desconocido';
+}
+
+function extractPdfLink(inlineLinks) {
+  if (!inlineLinks) return null;
+  const pdfLink = inlineLinks.find(link => 
+    link.link && (link.link.includes('.pdf') || link.title?.toLowerCase().includes('pdf'))
+  );
+  return pdfLink?.link || null;
+}
+
+// ========================================
+// FORMATEAR RESULTADOS CON CONTENIDO EXTRAÍDO
+// ========================================
+
+async function formatSearchResults(searchData, extractContent = true) {
   if (!searchData) return '';
 
   // Crear mapa de fuentes para citación
@@ -11054,35 +11339,52 @@ function formatSearchResults(searchData) {
   // Si son resultados académicos
   if (searchData.academic && searchData.results) {
     let context = '📚 **PAPERS ACADÉMICOS ENCONTRADOS:**\n\n';
+    context += 'Tienes acceso a papers científicos revisados por pares. DEBES citar usando [1], [2], etc.\n\n';
     
-    searchData.results.forEach((paper, i) => {
+    for (let i = 0; i < searchData.results.length; i++) {
+      const paper = searchData.results[i];
       const sourceId = i + 1;
+      
       window._webSourcesMap.push({
         id: sourceId,
         url: paper.link,
         title: paper.title,
-        snippet: paper.snippet
+        snippet: paper.snippet,
+        type: 'academic',
+        authors: paper.authors,
+        year: paper.year,
+        citations: paper.citations,
+        venue: paper.venue,
+        doi: paper.doi,
+        pdfUrl: paper.pdfUrl
       });
       
-      context += `[${sourceId}] **${paper.title}**\n`;
-      if (paper.authors) context += `    Autores: ${paper.authors}\n`;
-      if (paper.year) context += `    Año: ${paper.year}\n`;
-      if (paper.venue) context += `    Publicado en: ${paper.venue}\n`;
-      if (paper.citations) context += `    Citado ${paper.citations} veces\n`;
-      context += `    Abstract: ${paper.snippet}\n`;
-      if (paper.doi) context += `    DOI: ${paper.doi}\n`;
+      context += `[${sourceId}] ${paper.title}\n`;
+      if (paper.authors) context += `   Autores: ${paper.authors}\n`;
+      if (paper.year) context += `   Año: ${paper.year}\n`;
+      if (paper.venue) context += `   Publicado en: ${paper.venue}\n`;
+      if (paper.citations !== undefined) context += `   Citas: ${paper.citations}\n`;
+      if (paper.doi) context += `   DOI: ${paper.doi}\n`;
+      if (paper.pdfUrl) context += `   PDF: ${paper.pdfUrl}\n`;
+      
+      // Usar abstract completo o TLDR
+      const abstractText = paper.abstract || paper.snippet;
+      context += `   Abstract: ${abstractText}\n`;
+      if (paper.tldr) context += `   TL;DR: ${paper.tldr}\n`;
+      
       context += `\n`;
-    });
+    }
     
     return context;
   }
 
-  // Si son resultados web normales
+  // Si son resultados web normales - EXTRACCIÓN CON JINA
   let context = '🌐 **FUENTES DE INFORMACIÓN WEB:**\n\n';
+  context += 'Analiza el contenido de las siguientes fuentes web. DEBES incluir citaciones [1], [2], etc. en tu respuesta.\n\n';
 
   // Answer box si existe
   if (searchData.answerBox) {
-    context += `📌 **Respuesta destacada:**\n`;
+    context += `📌 **Respuesta Destacada de Google:**\n`;
     if (searchData.answerBox.title) context += `**${searchData.answerBox.title}**\n`;
     if (searchData.answerBox.answer) context += `${searchData.answerBox.answer}\n`;
     if (searchData.answerBox.snippet) context += `${searchData.answerBox.snippet}\n`;
@@ -11092,43 +11394,173 @@ function formatSearchResults(searchData) {
   // Knowledge graph si existe
   if (searchData.knowledgeGraph) {
     const kg = searchData.knowledgeGraph;
-    context += `📚 **Información de Knowledge Graph:**\n`;
+    context += `📚 **Knowledge Graph:**\n`;
     if (kg.title) context += `**${kg.title}**`;
     if (kg.type) context += ` (${kg.type})`;
     context += '\n';
     if (kg.description) context += `${kg.description}\n`;
+    if (kg.attributes) {
+      Object.entries(kg.attributes).slice(0, 5).forEach(([key, value]) => {
+        context += `  ${key}: ${value}\n`;
+      });
+    }
     context += '\n';
   }
 
-  // Resultados orgánicos - FORMATO MEJORADO CON IDs
+  // Resultados orgánicos - EXTRACCIÓN COMPLETA
   if (searchData.organic && searchData.organic.length > 0) {
-    context += `📋 **FUENTES DISPONIBLES (Usa [1], [2], etc. para citar):**\n\n`;
-    searchData.organic.slice(0, 5).forEach((result, i) => {
+    context += `📄 **CONTENIDO COMPLETO DE FUENTES (cita con [1], [2], etc.):**\n\n`;
+    
+    // Extraer contenido de las top 5 URLs en paralelo
+    const topResults = searchData.organic.slice(0, 5);
+    const extractionPromises = extractContent ? 
+      topResults.map(result => extractContentWithJina(result.link)) : 
+      topResults.map(() => Promise.resolve(null));
+    
+    const extractedContents = await Promise.all(extractionPromises);
+    
+    for (let i = 0; i < topResults.length; i++) {
+      const result = topResults[i];
       const sourceId = i + 1;
+      const extractedContent = extractedContents[i];
+      
+      let domain = '';
+      try {
+        domain = new URL(result.link).hostname.replace('www.', '');
+      } catch (e) {
+        domain = 'web';
+      }
+      
       window._webSourcesMap.push({
         id: sourceId,
         url: result.link,
         title: result.title,
-        snippet: result.snippet
+        snippet: result.snippet,
+        domain: domain,
+        type: 'web',
+        fullContent: extractedContent
       });
       
-      context += `[${sourceId}] **${result.title}**\n`;
-      context += `    Fuente: ${new URL(result.link).hostname}\n`;
-      context += `    Contenido: ${result.snippet}\n\n`;
-    });
+      context += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      context += `[${sourceId}] ${result.title}\n`;
+      context += `🔗 Fuente: ${domain}\n`;
+      context += `📅 URL: ${result.link}\n\n`;
+      
+      if (extractedContent && extractedContent.length > 200) {
+        // Usar contenido extraído (primeros 2500 caracteres)
+        const cleanContent = extractedContent
+          .substring(0, 2500)
+          .replace(/\n{3,}/g, '\n\n') // Eliminar saltos excesivos
+          .trim();
+        context += `📝 **Contenido completo extraído:**\n${cleanContent}`;
+        if (extractedContent.length > 2500) {
+          context += '\n\n[...contenido truncado...]';
+        }
+        context += `\n\n`;
+      } else {
+        // Fallback a snippet si la extracción falló
+        context += `📋 **Snippet:**\n${result.snippet || 'No disponible'}\n\n`;
+      }
+    }
+    
+    // Fuentes adicionales sin extracción completa
+    const remainingResults = searchData.organic.slice(5, 8);
+    if (remainingResults.length > 0) {
+      context += `\n📚 **FUENTES ADICIONALES:**\n\n`;
+      remainingResults.forEach((result, idx) => {
+        const sourceId = 6 + idx;
+        let domain = '';
+        try {
+          domain = new URL(result.link).hostname.replace('www.', '');
+        } catch (e) {
+          domain = 'web';
+        }
+        
+        window._webSourcesMap.push({
+          id: sourceId,
+          url: result.link,
+          title: result.title,
+          snippet: result.snippet,
+          domain: domain,
+          type: 'web'
+        });
+        
+        context += `[${sourceId}] ${result.title} (${domain})\n`;
+        context += `   ${result.snippet || ''}\n\n`;
+      });
+    }
   }
 
   // People also ask
   if (searchData.peopleAlsoAsk && searchData.peopleAlsoAsk.length > 0) {
-    context += `❓ **Preguntas relacionadas:**\n`;
+    context += `\n❓ **Preguntas Relacionadas:**\n`;
     searchData.peopleAlsoAsk.slice(0, 3).forEach(q => {
-      context += `- ${q.question}\n`;
+      context += `• ${q.question}\n`;
       if (q.snippet) context += `  ${q.snippet}\n`;
     });
     context += '\n';
   }
 
   return context;
+}
+
+// ========================================
+// REESCRITURA DE CONSULTAS MULTI-TURNO
+// ========================================
+
+async function rewriteQueryWithContext(query, conversation) {
+  // Si no hay mensajes previos, retornar query original
+  if (!conversation || !conversation.messages || conversation.messages.length < 3) {
+    return query;
+  }
+  
+  // Obtener los últimos 4 mensajes (2 intercambios)
+  const recentMessages = conversation.messages.slice(-4);
+  const hasUserMessages = recentMessages.some(m => m.role === 'user');
+  
+  if (!hasUserMessages) return query;
+  
+  // Construir contexto de conversación
+  let conversationContext = 'Conversación previa:\n';
+  recentMessages.forEach(msg => {
+    const role = msg.role === 'user' ? 'Usuario' : 'Asistente';
+    const content = msg.content.substring(0, 200);
+    conversationContext += `${role}: ${content}\n`;
+  });
+  
+  try {
+    const rewritePrompt = `Dada esta conversación previa, reformula la nueva pregunta del usuario para que sea autocontenida y clara, incluyendo el contexto necesario.
+
+${conversationContext}
+Nueva pregunta: ${query}
+
+Reformula la pregunta en una sola línea clara y específica que incluya el contexto. NO expliques, solo devuelve la pregunta reformulada:`;
+    
+    const response = await fetch(`${API_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: state.currentModel,
+        stream: false,
+        messages: [{ role: 'user', content: rewritePrompt }],
+        options: { temperature: 0.3, num_ctx: 2048 }
+      }),
+      signal: AbortSignal.timeout(8000)
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const rewritten = data.message?.content?.trim();
+      if (rewritten && rewritten.length < 200 && rewritten.length > 10) {
+        console.log(`🔄 Query reescrita: "${query}" → "${rewritten}"`);
+        return rewritten;
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ No se pudo reescribir query:', e.message);
+  }
+  
+  return query;
 }
 
 // Función para cambiar el modo de chat
@@ -13985,30 +14417,37 @@ async function handleSubmitWithDeepResearch(event) {
     const chatArea = document.querySelector('.chat-area');
     if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
 
-    console.log('🌐 Buscando en la web:', prompt);
+    console.log('🌐 Iniciando búsqueda web:', prompt);
 
     try {
+      // Reescribir consulta si es necesario (multi-turno)
+      let searchQuery = prompt;
+      if (conversation.messages.length > 2) {
+        searchQuery = await rewriteQueryWithContext(prompt, conversation);
+      }
+      
       // Determinar tipo de búsqueda (web general o papers académicos)
       const searchType = window._webSearchType || 'general';
       let searchResults;
       
       if (searchType === 'academic') {
         console.log('🔬 Modo búsqueda académica activado');
-        searchResults = await searchAcademicPapers(prompt);
+        searchResults = await searchAcademicPapers(searchQuery);
       } else {
         console.log('🌐 Modo búsqueda web general activado');
-        searchResults = await searchWeb(prompt);
+        searchResults = await searchWeb(searchQuery);
       }
 
       if (searchResults) {
         // Actualizar la UI con los resultados
         updateWebSearchUI(webSearchUI, searchResults, prompt);
 
-        const formattedResults = formatSearchResults(searchResults);
+        // Formatear resultados con extracción de contenido (async)
+        const formattedResults = await formatSearchResults(searchResults, true);
         window._webSearchContext = formattedResults;
         window._webSearchQuery = prompt;
         window._webSearchResults = searchResults;
-        console.log('🌐 Resultados encontrados:', searchResults);
+        console.log('✅ Resultados formateados con contenido extraído');
 
         // Pequeña pausa para que se vea la animación
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -14035,7 +14474,8 @@ async function handleSubmitWithDeepResearch(event) {
 
         try {
           // Pasar los resultados de búsqueda para el botón de fuentes
-          await streamAssistantResponseInContainer(conversation, payloadMessages, responseContainer, assistantMessage, searchResults);
+          // Temperatura 0 para máxima factualidad en búsqueda web
+          await streamAssistantResponseInContainer(conversation, payloadMessages, responseContainer, assistantMessage, searchResults, 0);
         } catch (error) {
           console.error('Error generando respuesta:', error);
           responseContainer.innerHTML = `<p style="color: #ef4444;">⚠️ Error al generar respuesta: ${error.message}</p>`;
@@ -14229,21 +14669,46 @@ function createWebThinkingBlock(thinking, isLoading = true) {
   `;
 }
 
+// Función helper: detectar si un modelo tiene capacidades de razonamiento
+function isReasoningModel(modelName) {
+  if (!modelName) return false;
+  
+  const lowerName = modelName.toLowerCase();
+  const reasoningModels = [
+    'deepseek',
+    'qwen',
+    'qwq',
+    'o1',
+    'r1'
+  ];
+  
+  return reasoningModels.some(pattern => lowerName.includes(pattern));
+}
+
 // Stream respuesta en un contenedor específico
-async function streamAssistantResponseInContainer(conversation, payloadMessages, container, assistantMessage, searchResults = null) {
+async function streamAssistantResponseInContainer(conversation, payloadMessages, container, assistantMessage, searchResults = null, customTemperature = null) {
   if (!state.currentModel) {
     throw new Error('Selecciona un modelo antes de enviar un mensaje.');
   }
 
-  // Mostrar bloque de razonamiento inicial
-  container.innerHTML = createWebThinkingBlock('', true);
+  // Detectar si el modelo tiene capacidad de razonamiento (declarar una sola vez)
+  const hasReasoningCapability = isReasoningModel(state.currentModel);
+  
+  // Mostrar bloque de razonamiento solo si el modelo lo soporta
+  if (hasReasoningCapability) {
+    container.innerHTML = createWebThinkingBlock('', true);
+  } else {
+    // Comenzar directamente sin animación de "Analizando fuentes..."
+    container.innerHTML = '<div class="web-search-answer"></div>';
+  }
 
   const body = {
     model: state.currentModel,
     stream: true,
     messages: payloadMessages,
     options: {
-      num_ctx: 8192
+      num_ctx: 8192,
+      ...(customTemperature !== null ? { temperature: customTemperature } : {})
     }
   };
 
@@ -14269,6 +14734,27 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
 
   let fullContent = '';
   const decoder = new TextDecoder();
+  // Throttle para el rendering en modo web: parsear markdown máximo cada 80ms
+  let webLastRenderTime = 0;
+  const WEB_RENDER_INTERVAL = 80;
+  let webRenderScheduled = false;
+
+  const scheduleWebRender = (renderFn) => {
+    if (webRenderScheduled) return;
+    const now = Date.now();
+    const elapsed = now - webLastRenderTime;
+    if (elapsed >= WEB_RENDER_INTERVAL) {
+      webLastRenderTime = now;
+      renderFn();
+    } else {
+      webRenderScheduled = true;
+      setTimeout(() => {
+        webRenderScheduled = false;
+        webLastRenderTime = Date.now();
+        renderFn();
+      }, WEB_RENDER_INTERVAL - elapsed);
+    }
+  };
 
   try {
     while (true) {
@@ -14288,21 +14774,32 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
           if (json.message?.content) {
             fullContent += json.message.content;
 
-            // Actualizar el bloque de razonamiento en vivo
-            const thinkingTextEl = container.querySelector('.web-thinking-block-text');
-            if (thinkingTextEl) {
-              thinkingTextEl.innerHTML = escapeHtml(fullContent) + '<span class="web-thinking-cursor">▊</span>';
-
-              // Auto-scroll dentro del bloque de pensamiento
-              const contentEl = container.querySelector('.web-thinking-block-content');
-              if (contentEl) {
-                contentEl.scrollTop = contentEl.scrollHeight;
-              }
+            if (hasReasoningCapability) {
+              // Para modelos con razonamiento: actualizar bloque de pensamiento (texto plano, sin parse costoso)
+              scheduleWebRender(() => {
+                const thinkingTextEl = container.querySelector('.web-thinking-block-text');
+                if (thinkingTextEl) {
+                  thinkingTextEl.innerHTML = escapeHtml(fullContent) + '<span class="web-thinking-cursor">▊</span>';
+                  // Auto-scroll dentro del bloque de pensamiento
+                  const contentEl = container.querySelector('.web-thinking-block-content');
+                  if (contentEl) contentEl.scrollTop = contentEl.scrollHeight;
+                }
+              });
+            } else {
+              // Para modelos sin razonamiento: mostrar respuesta directamente con throttle
+              scheduleWebRender(() => {
+                const answerEl = container.querySelector('.web-search-answer');
+                if (answerEl) {
+                  answerEl.innerHTML = parseMarkdown(fullContent) + '<span class="web-thinking-cursor">▊</span>';
+                }
+              });
             }
 
-            // Scroll del chat
-            const chatArea = document.querySelector('.chat-area');
-            if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+            // Scroll del chat respetando scroll manual del usuario
+            if (!userIsScrollingUp) {
+              const chatArea = document.querySelector('.chat-area');
+              if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+            }
           }
         } catch (e) {
           // Ignorar errores de parsing JSON
@@ -14319,7 +14816,13 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
 
   // Cuando termina: mostrar bloque colapsado + respuesta formateada
   if (fullContent) {
-    let html = createWebThinkingBlock(fullContent, false);
+    let html = '';
+    
+    // Solo mostrar bloque de razonamiento si el modelo lo soporta
+    if (hasReasoningCapability) {
+      html += createWebThinkingBlock(fullContent, false);
+    }
+    
     html += '<div class="web-response-content">' + parseMarkdown(fullContent) + '</div>';
     container.innerHTML = html;
 
@@ -19373,12 +19876,34 @@ function resetTravelCommands() {
 //  WEB SPLIT-VIEW & CITATION FUNCTIONS
 // =====================================================
 
+// Listener para mensajes del iframe (navegación interna)
+window.addEventListener('message', function(event) {
+  // Solo procesar mensajes de navegación del iframe
+  if (event.data && event.data.type === 'NAVIGATE_IFRAME') {
+    const { url, title } = event.data;
+    
+    if (url && window._webPreviewState.isOpen) {
+      console.log('📄 Navegando en iframe a:', url);
+      
+      // Agregar al historial
+      window._webPreviewState.navigationHistory.push(url);
+      window._webPreviewState.historyIndex = window._webPreviewState.navigationHistory.length - 1;
+      updateNavigationButtons();
+      
+      // Cargar en el iframe actual
+      loadUrlInPreview(url);
+    }
+  }
+});
+
 // Estado del panel web
 window._webPreviewState = {
   isOpen: false,
   currentUrl: null,
   currentSourceId: null,
-  readerMode: false
+  readerMode: false,
+  navigationHistory: [],
+  historyIndex: -1
 };
 
 // Función para abrir una citación web
@@ -19416,12 +19941,20 @@ function openWebPreview(url, title, sourceId) {
   
   if (!splitContainer || !previewPanel) return;
   
+  // Guardar la posición de scroll actual ANTES de modificar el DOM
+  const scrollPosition = chatList ? chatList.scrollTop : 0;
+  
   // Activar split-view
   if (chatList && chatListWeb) {
     // Copiar contenido del chat al contenedor split
     chatListWeb.innerHTML = chatList.innerHTML;
     chatList.style.display = 'none';
     splitContainer.style.display = 'flex';
+    
+    // Restaurar la posición de scroll en el nuevo contenedor
+    setTimeout(() => {
+      if (chatListWeb) chatListWeb.scrollTop = scrollPosition;
+    }, 0);
   }
   
   // Actualizar estado
@@ -19440,11 +19973,41 @@ function openWebPreview(url, title, sourceId) {
     urlDisplay.textContent = title || domain;
   }
   
-  // Cargar URL a través del proxy
-  const proxyUrl = `http://localhost:3001/proxy?url=${encodeURIComponent(url)}`;
+  // Detectar YouTube y convertir a embed directo
+  let finalUrl = url;
+  if (url.includes('youtube.com/watch?v=') || url.includes('youtu.be/')) {
+    const videoId = url.includes('youtube.com/watch?v=') 
+      ? new URL(url).searchParams.get('v')
+      : url.split('youtu.be/')[1]?.split('?')[0];
+    
+    if (videoId) {
+      // Parámetros mejorados para embed de YouTube
+      const embedParams = new URLSearchParams({
+        autoplay: '0',
+        rel: '0',
+        modestbranding: '1',
+        enablejsapi: '1',
+        origin: window.location.origin,
+        widget_referrer: window.location.href
+      });
+      
+      finalUrl = `https://www.youtube.com/embed/${videoId}?${embedParams.toString()}`;
+      console.log(`🎥 YouTube detectado, usando embed: ${videoId}`);
+    }
+  }
+  
+  // Agregar a historial de navegación
+  window._webPreviewState.navigationHistory.push(finalUrl);
+  window._webPreviewState.historyIndex = window._webPreviewState.navigationHistory.length - 1;
+  updateNavigationButtons();
+  
+  // Cargar URL (YouTube directo, otros a través del proxy)
+  const iframeUrl = finalUrl.startsWith('https://www.youtube.com/embed/')
+    ? finalUrl
+    : `http://localhost:3001/proxy?url=${encodeURIComponent(finalUrl)}`;
   
   if (iframe) {
-    iframe.src = proxyUrl;
+    iframe.src = iframeUrl;
     
     iframe.onload = () => {
       if (loading) loading.style.display = 'none';
@@ -19516,6 +20079,82 @@ window.openWebPreviewInTab = function() {
     window.open(currentUrl, '_blank');
   }
 };
+
+// Función para navegar hacia atrás en el historial
+window.navigateWebPreviewBack = function() {
+  if (window._webPreviewState.historyIndex > 0) {
+    window._webPreviewState.historyIndex--;
+    const url = window._webPreviewState.navigationHistory[window._webPreviewState.historyIndex];
+    loadUrlInPreview(url);
+    updateNavigationButtons();
+  }
+};
+
+// Función para navegar hacia adelante en el historial
+window.navigateWebPreviewForward = function() {
+  if (window._webPreviewState.historyIndex < window._webPreviewState.navigationHistory.length - 1) {
+    window._webPreviewState.historyIndex++;
+    const url = window._webPreviewState.navigationHistory[window._webPreviewState.historyIndex];
+    loadUrlInPreview(url);
+    updateNavigationButtons();
+  }
+};
+
+// Función auxiliar para cargar URL en el iframe
+function loadUrlInPreview(url) {
+  const iframe = document.getElementById('web-preview-iframe');
+  const loading = document.getElementById('web-preview-loading');
+  const urlDisplay = document.getElementById('web-preview-url-display');
+  
+  if (!iframe) return;
+  
+  // Mostrar loading
+  if (loading) loading.style.display = 'flex';
+  if (iframe) iframe.style.display = 'none';
+  
+  // Actualizar título
+  if (urlDisplay) {
+    try {
+      const domain = new URL(url).hostname.replace('www.', '');
+      urlDisplay.textContent = domain;
+    } catch (e) {
+      urlDisplay.textContent = 'Navegando...';
+    }
+  }
+  
+  // Actualizar estado actual
+  window._webPreviewState.currentUrl = url;
+  
+  // Cargar URL (YouTube directo, otros a través del proxy)
+  const iframeUrl = url.startsWith('https://www.youtube.com/embed/')
+    ? url
+    : `http://localhost:3001/proxy?url=${encodeURIComponent(url)}`;
+  
+  iframe.src = iframeUrl;
+  
+  iframe.onload = () => {
+    if (loading) loading.style.display = 'none';
+    if (iframe) iframe.style.display = 'block';
+  };
+}
+
+// Función para actualizar estado de botones de navegación
+function updateNavigationButtons() {
+  const backBtn = document.getElementById('web-preview-back');
+  const forwardBtn = document.getElementById('web-preview-forward');
+  
+  if (backBtn) {
+    backBtn.disabled = window._webPreviewState.historyIndex <= 0;
+    backBtn.style.opacity = backBtn.disabled ? '0.4' : '1';
+    backBtn.style.cursor = backBtn.disabled ? 'not-allowed' : 'pointer';
+  }
+  
+  if (forwardBtn) {
+    forwardBtn.disabled = window._webPreviewState.historyIndex >= window._webPreviewState.navigationHistory.length - 1;
+    forwardBtn.style.opacity = forwardBtn.disabled ? '0.4' : '1';
+    forwardBtn.style.cursor = forwardBtn.disabled ? 'not-allowed' : 'pointer';
+  }
+}
 
 // Configurar event listeners del panel web
 function initWebPreviewPanel() {
@@ -19603,9 +20242,13 @@ function initWebPreviewPanel() {
 
 // Inicializar al cargar la página
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initWebPreviewPanel);
+  document.addEventListener('DOMContentLoaded', () => {
+    initWebPreviewPanel();
+    initScrollDetection();
+  });
 } else {
   initWebPreviewPanel();
+  initScrollDetection();
 }
 
 console.log('✅ Web preview, TODO and Calendar modules loaded');
