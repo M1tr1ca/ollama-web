@@ -2724,9 +2724,6 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   background: transparent;
-  /* Forzar compositing propio para el scroll - reduce repaint */
-  will-change: scroll-position;
-  -webkit-overflow-scrolling: touch;
 }
 
 .chat-area::-webkit-scrollbar {
@@ -2747,20 +2744,12 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   gap: 24px;
   max-width: 900px;
   margin: 0 auto;
-  /* Optimización de scroll: content-visibility permite al navegador saltarse el renderizado de mensajes fuera de pantalla */
-  content-visibility: auto;
-  contain-intrinsic-size: 1000px;
 }
 
 .message {
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  /* Aislar el layout de cada mensaje: los cambios en uno no reflow a los demás */
-  contain: layout style paint;
-  /* Optimización adicional para mensajes individuales */
-  content-visibility: auto;
-  contain-intrinsic-size: 150px;
 }
 
 .message-avatar {
@@ -2801,12 +2790,6 @@ body.dyslexic-font-enabled .message.assistant .message-bubble pre code {
   max-width: 100%;
   overflow-wrap: break-word;
   box-sizing: border-box;
-}
-
-/* Área de contenido del bubble (separada de los controles para optimizar re-renders) */
-.bubble-content-area {
-  /* Aislar los cambios de contenido durante el streaming */
-  contain: layout style;
 }
 
 .message-bubble h1,
@@ -6744,34 +6727,10 @@ button.research-active-btn svg {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   gap: 12px;
-  backdrop-filter: blur(20px);
-}
-
-.web-preview-nav-controls {
-  display: flex;
-  gap: 2px;
-  align-items: center;
-  padding-right: 8px;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.web-preview-nav-btn {
-  width: 28px !important;
-  height: 28px !important;
-}
-
-.web-preview-nav-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.web-preview-nav-btn:disabled:hover {
-  background: transparent !important;
-  transform: none !important;
 }
 
 .web-preview-title {
@@ -6781,21 +6740,19 @@ button.research-active-btn svg {
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .web-preview-title svg {
   flex-shrink: 0;
   color: var(--theme-primary);
-  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
 }
 
 #web-preview-url-display {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+  font-weight: 500;
 }
 
 .web-preview-actions {
@@ -6806,28 +6763,24 @@ button.research-active-btn svg {
 .web-preview-btn {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: 6px;
+  border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  transition: all 0.2s ease;
 }
 
 .web-preview-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .web-preview-btn:active {
-  transform: scale(0.95) translateY(0);
+  transform: scale(0.95);
 }
 
 .web-preview-content {
