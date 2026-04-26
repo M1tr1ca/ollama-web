@@ -1,4 +1,5 @@
-const API_BASE = 'http://localhost:11434';
+const OLLAMA_URL_KEY = 'ollama-web-api-url';
+let API_BASE = localStorage.getItem(OLLAMA_URL_KEY) || 'http://localhost:11434';
 const STORAGE_KEY = 'ollama-web-state-v1';
 const DEFAULT_TITLE = 'Nueva conversación';
 const BACKGROUND_STORAGE_KEY = 'ollama-web-background-date';
@@ -147,6 +148,11 @@ let currentStreamReader = null;
 let wasCancelled = false;
 let incognitoMode = false;
 let stateBeforeIncognito = null; // Guardar el estado antes de entrar en modo incógnito
+function debugTravelModeLog(hypothesisId, location, message, data = {}, runId = 'run-1') {
+  // #region agent log
+  fetch('http://127.0.0.1:7698/ingest/6d43e7c4-b55e-475d-a28f-263a1d520ed5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'349350'},body:JSON.stringify({sessionId:'349350',runId,hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+}
 
 const hasLocalStorage = (() => {
   try {
@@ -2271,6 +2277,10 @@ function appendMessageElement(message) {
 
     // Renderizar el mapa si hay data
     if (travelData && travelData.hasTravel && travelData.places && travelData.places.length > 0) {
+      debugTravelModeLog('H2', 'app.js:appendMessageElement:travel-render', 'appendMessageElement renderiza travelData', {
+        placesCount: travelData.places.length,
+        activeChatMode: state.chatMode || null
+      });
       setTimeout(() => {
         window.travelMode.renderComponents(bubble, travelData);
       }, 300);
@@ -3849,6 +3859,12 @@ async function streamAssistantResponse(conversation, payloadMessages) {
       assistantMessage.content?.includes('[GMAPS_ROUTE]');
     if (hasTravelCommands && !wasCancelled) {
       console.log('🗺️ Fin de stream - Procesando comandos de viaje detectados');
+      debugTravelModeLog('H5', 'app.js:stream:travel-detected', 'Comandos de viaje detectados al final del stream', {
+        hasTravelMapTag: assistantMessage.content?.includes('[TRAVEL_MAP]') || false,
+        hasPlaceTag: assistantMessage.content?.includes('[PLACE:') || false,
+        activeChatMode: state.chatMode || null,
+        wasCancelled
+      });
       setTimeout(() => {
         if (window.travelMode?.parseCommands && window.travelMode?.renderComponents) {
           const travelData = window.travelMode.parseCommands(assistantMessage.content);
@@ -4341,7 +4357,7 @@ INSTRUCCIONES:
       instructions = 'Ten en cuenta esta información sobre el usuario al responder sus preguntas.';
     }
 
-    if (systemContent || styleInstructions || instructions || studyModeInstructions || webSearchInstructions) {
+    if (systemContent || styleInstructions || instructions || studyModeInstructions || webSearchInstructions || window._travelModeActive || window._healthModeActive) {
       let finalContent = systemContent;
 
       // Añadir contexto de búsqueda web primero (máxima prioridad)
@@ -4681,7 +4697,7 @@ INSTRUCCIONES:
     }
 
     // Combinar todas las instrucciones
-    if (systemContent || styleInstructions || instructions || studyModeInstructions || webSearchInstructions) {
+    if (systemContent || styleInstructions || instructions || studyModeInstructions || webSearchInstructions || window._travelModeActive || window._healthModeActive) {
       let finalContent = systemContent;
 
       // Añadir instrucciones del modo estudio primero (alta prioridad)
@@ -4783,6 +4799,11 @@ No menciones estos comandos al usuario, simplemente úsalos. El sistema los conv
         if (finalContent) finalContent += '\n\n';
         finalContent += travelInstructions;
         console.log('🗺️ Modo Viajes activado - Instrucciones de mapa añadidas');
+        debugTravelModeLog('H7', 'app.js:handleSubmit:travel-instructions-appended', 'Instrucciones de viajes añadidas al system prompt', {
+          travelModeActive: !!travelModeActive,
+          hasTravelMapToken: travelInstructions.includes('[TRAVEL_MAP]'),
+          travelInstructionLength: travelInstructions.length
+        });
       }
 
       // Instrucciones para Modo Salud
@@ -4797,6 +4818,11 @@ No menciones estos comandos al usuario, simplemente úsalos. El sistema los conv
         payloadMessages.push({
           role: 'system',
           content: finalContent.trim()
+        });
+        debugTravelModeLog('H7', 'app.js:handleSubmit:system-message-pushed', 'Mensaje de sistema añadido a payload', {
+          finalContentLength: finalContent.length,
+          hasTravelMapToken: finalContent.includes('[TRAVEL_MAP]'),
+          payloadMessagesCountAfterSystem: payloadMessages.length
         });
 
         // Log de depuración del mensaje del sistema
@@ -4866,6 +4892,12 @@ No menciones estos comandos al usuario, simplemente úsalos. El sistema los conv
     }
 
     payloadMessages.push(payloadMessage);
+  });
+  debugTravelModeLog('H8', 'app.js:handleSubmit:before-stream', 'Payload final antes de stream', {
+    totalMessages: payloadMessages.length,
+    systemMessages: payloadMessages.filter(m => m.role === 'system').length,
+    hasAnyTravelMapInstruction: payloadMessages.some(m => m.role === 'system' && typeof m.content === 'string' && m.content.includes('[TRAVEL_MAP]')),
+    activeChatMode: state.chatMode || null
   });
 
   if (wantsCanvas) {
@@ -5455,8 +5487,43 @@ function hideAttachmentsDropdown() {
   }
 }
 
+function isCompactViewport() {
+  return window.matchMedia('(max-width: 1080px)').matches;
+}
+
+function closeCompactSidebar() {
+  if (!sidebar || !layout) return;
+  sidebar.classList.remove('mobile-open');
+  layout.classList.remove('sidebar-mobile-open');
+}
+
+function syncSidebarWithViewport() {
+  if (!sidebar || !layout || !toggleSidebarButton) return;
+
+  // En viewport compacto el sidebar se oculta por CSS.
+  // Limpiamos estado minimizado para evitar inconsistencias al volver a desktop.
+  if (isCompactViewport()) {
+    sidebar.classList.remove('minimized');
+    layout.classList.remove('sidebar-minimized');
+    toggleSidebarButton.title = 'Abrir barra lateral';
+    return;
+  }
+
+  closeCompactSidebar();
+  const isMinimized = sidebar.classList.contains('minimized');
+  layout.classList.toggle('sidebar-minimized', isMinimized);
+  toggleSidebarButton.title = isMinimized ? 'Expandir barra lateral' : 'Minimizar barra lateral';
+}
+
 function toggleSidebar() {
   if (!sidebar || !layout || !toggleSidebarButton) return;
+  if (sidebar.classList.contains('hidden')) return;
+  if (isCompactViewport()) {
+    const isOpen = sidebar.classList.toggle('mobile-open');
+    layout.classList.toggle('sidebar-mobile-open', isOpen);
+    toggleSidebarButton.title = isOpen ? 'Cerrar barra lateral' : 'Abrir barra lateral';
+    return;
+  }
 
   const isMinimized = sidebar.classList.toggle('minimized');
   layout.classList.toggle('sidebar-minimized', isMinimized);
@@ -5487,6 +5554,8 @@ function loadSidebarState() {
   } catch (error) {
     console.warn('No se pudo restaurar el estado del sidebar', error);
   }
+
+  syncSidebarWithViewport();
 }
 
 function toggleIncognitoMode() {
@@ -5630,9 +5699,12 @@ function init() {
   // Atajos de teclado
   document.addEventListener('keydown', (e) => {
     // Control+B para abrir/cerrar la barra lateral
-    if (e.ctrlKey && e.key === 'b') {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
       e.preventDefault();
       toggleSidebar();
+    }
+    if (e.key === 'Escape' && isCompactViewport()) {
+      closeCompactSidebar();
     }
     // Control+M para nueva conversación
     if (e.ctrlKey && e.key === 'm') {
@@ -5648,6 +5720,14 @@ function init() {
 
   // Configurar manejo de archivos
   setupFileHandlers();
+
+  window.addEventListener('resize', syncSidebarWithViewport);
+  document.addEventListener('click', (e) => {
+    if (!isCompactViewport()) return;
+    if (!sidebar?.classList.contains('mobile-open')) return;
+    if (sidebar.contains(e.target) || toggleSidebarButton?.contains(e.target)) return;
+    closeCompactSidebar();
+  });
 
   // Configurar badge de archivos
   const attachmentsBadge = document.getElementById('attachments-badge');
@@ -6928,11 +7008,68 @@ function initUserMenu() {
   const languageBtnMenu = document.getElementById('language-btn-menu');
   const languageSubmenu = document.getElementById('language-submenu');
   if (languageBtnMenu && languageSubmenu) {
+    const closeLanguageSubmenu = () => {
+      languageSubmenu.style.display = 'none';
+      languageBtnMenu.classList.remove('active');
+    };
+
+    const positionLanguageSubmenu = () => {
+      const buttonRect = languageBtnMenu.getBoundingClientRect();
+      const menuWidth = 240;
+      const sidePadding = 12;
+
+      let left = buttonRect.left;
+      left = Math.min(left, window.innerWidth - menuWidth - sidePadding);
+      left = Math.max(sidePadding, left);
+
+      const viewportMaxHeight = Math.max(180, window.innerHeight - (sidePadding * 2));
+      languageSubmenu.style.maxHeight = `${Math.min(320, viewportMaxHeight)}px`;
+      languageSubmenu.style.left = `${left}px`;
+
+      // Forzar medición real para evitar que se salga de la pantalla
+      const measuredHeight = languageSubmenu.offsetHeight || 280;
+      const preferredTop = buttonRect.top;
+      const bottomLimit = window.innerHeight - sidePadding;
+      const top = (preferredTop + measuredHeight > bottomLimit)
+        ? Math.max(sidePadding, buttonRect.bottom - measuredHeight)
+        : preferredTop;
+      languageSubmenu.style.top = `${top}px`;
+    };
+
     languageBtnMenu.addEventListener('click', (e) => {
       e.stopPropagation();
       const isOpen = languageSubmenu.style.display !== 'none';
-      languageSubmenu.style.display = isOpen ? 'none' : 'block';
+      if (isOpen) {
+        closeLanguageSubmenu();
+      } else {
+        languageSubmenu.style.display = 'block';
+        languageBtnMenu.classList.add('active');
+        positionLanguageSubmenu();
+      }
     });
+
+    languageSubmenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!languageSubmenu.contains(e.target) && !languageBtnMenu.contains(e.target)) {
+        closeLanguageSubmenu();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (languageSubmenu.style.display !== 'none') {
+        positionLanguageSubmenu();
+      }
+    });
+
+    // Cerrar en scroll para evitar desalineación con el botón ancla
+    window.addEventListener('scroll', () => {
+      if (languageSubmenu.style.display !== 'none') {
+        closeLanguageSubmenu();
+      }
+    }, true);
   }
 
   // Abrir modal de cambio de nombre desde el submenú
@@ -7466,6 +7603,7 @@ function initUserMenu() {
   const serperApiKeyInput = document.getElementById('serper-api-key-input');
   const gnewsApiKeyInput = document.getElementById('gnews-api-key-input');
   const mapboxApiKeyInput = document.getElementById('mapbox-api-key-input');
+  const ollamaUrlInput = document.getElementById('ollama-url-input');
   const toggleSerperKey = document.getElementById('toggle-serper-key');
   const toggleGnewsKey = document.getElementById('toggle-gnews-key');
   const toggleMapboxKey = document.getElementById('toggle-mapbox-key');
@@ -7474,6 +7612,9 @@ function initUserMenu() {
   const loadApiKeys = () => {
     if (serperApiKeyInput) {
       serperApiKeyInput.value = localStorage.getItem('serper-api-key') || '';
+    }
+    if (ollamaUrlInput) {
+      ollamaUrlInput.value = localStorage.getItem(OLLAMA_URL_KEY) || 'http://localhost:11434';
     }
     if (gnewsApiKeyInput) {
       gnewsApiKeyInput.value = localStorage.getItem('gnews-api-key') || '';
@@ -7554,6 +7695,7 @@ function initUserMenu() {
       const serperKey = serperApiKeyInput?.value.trim() || '';
       const gnewsKey = gnewsApiKeyInput?.value.trim() || '';
       const mapboxKey = mapboxApiKeyInput?.value.trim() || '';
+      const ollamaUrl = ollamaUrlInput?.value.trim() || 'http://localhost:11434';
 
       // Guardar o eliminar las keys según si están vacías
       if (serperKey) {
@@ -7578,8 +7720,14 @@ function initUserMenu() {
         localStorage.removeItem('mapbox-api-key');
       }
 
+      // Guardar URL de Ollama y actualizar API_BASE en tiempo real
+      localStorage.setItem(OLLAMA_URL_KEY, ollamaUrl);
+      API_BASE = ollamaUrl;
+
       closeApiKeysModalFunc();
       console.log('🔑 API Keys guardadas correctamente');
+      // Recargar modelos con la nueva URL
+      loadModels();
     });
   }
 }
@@ -11009,6 +11157,11 @@ function setChatMode(mode) {
   // Modo viajes
   travelModeActive = mode === 'travel';
   window._travelModeActive = travelModeActive;
+  debugTravelModeLog('H6', 'app.js:setChatMode', 'Cambio de modo de chat', {
+    mode,
+    travelModeActive,
+    windowTravelModeActive: !!window._travelModeActive
+  });
 
   // Modo salud
   window._healthModeActive = mode === 'health';
@@ -14051,7 +14204,7 @@ async function streamAssistantResponseInContainer(conversation, payloadMessages,
 
   const reader = response.body.getReader();
   currentStreamReader = reader;
-  updateSendButtonToSend();
+  updateSendButtonToStop();
 
   let fullContent = '';
   const decoder = new TextDecoder();

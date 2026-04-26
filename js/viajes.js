@@ -10,6 +10,12 @@ const travelState = {
   currentConversationId: null
 };
 
+function debugTravelLog(hypothesisId, location, message, data = {}, runId = 'run-1') {
+  // #region agent log
+  fetch('http://127.0.0.1:7698/ingest/6d43e7c4-b55e-475d-a28f-263a1d520ed5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'349350'},body:JSON.stringify({sessionId:'349350',runId,hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+}
+
 // ========================================
 // OSRM ROUTING - Rutas reales por calles
 // ========================================
@@ -59,6 +65,11 @@ function formatRouteDistance(meters) {
 
 function createInlineChatMap(containerId, places = [], options = {}) {
   const container = document.getElementById(containerId);
+  debugTravelLog('H3', 'js/viajes.js:createInlineChatMap:container-check', 'Intento crear mapa inline', {
+    containerId,
+    hasContainer: !!container,
+    placesCount: Array.isArray(places) ? places.length : -1
+  });
   if (!container) {
     console.error('Container not found:', containerId);
     return null;
@@ -231,6 +242,12 @@ function createInlineChatMap(containerId, places = [], options = {}) {
     }
 
     travelState.inlineMaps[containerId] = map;
+    debugTravelLog('H4', 'js/viajes.js:createInlineChatMap:success', 'Mapa Leaflet creado', {
+      containerId,
+      clientWidth: container.clientWidth,
+      clientHeight: container.clientHeight,
+      placesCount: places.length
+    });
 
     // Forzar el redimensionado del mapa
     setTimeout(() => {
@@ -542,6 +559,10 @@ function parseTravelCommands(content) {
 
   if (mapMatch) {
     console.log('🗺️ Encontrado bloque TRAVEL_MAP');
+    debugTravelLog('H1', 'js/viajes.js:parseTravelCommands:map-block', 'Bloque TRAVEL_MAP detectado', {
+      contentLength: content?.length || 0,
+      blocksFound: mapMatch.length
+    });
     result.hasTravel = true;
     result.showMap = true;
 
@@ -569,6 +590,10 @@ function parseTravelCommands(content) {
     });
 
     console.log('🗺️ Lugares parseados:', result.places.length);
+    debugTravelLog('H1', 'js/viajes.js:parseTravelCommands:places-result', 'Resultado parseo TRAVEL_MAP', {
+      placesCount: result.places.length,
+      firstPlace: result.places[0]?.name || null
+    });
 
     // Cuando hay TRAVEL_MAP, NO mostrar ningún texto - solo el mapa
     // IMPORTANTE: Limpiar TODO el contenido, incluyendo texto antes y después del bloque TRAVEL_MAP
@@ -628,6 +653,12 @@ function parseTravelCommands(content) {
 
 function renderTravelComponents(messageContainer, travelData) {
   console.log('🗺️ renderTravelComponents llamado con', travelData?.places?.length, 'lugares');
+  debugTravelLog('H2', 'js/viajes.js:renderTravelComponents:entry', 'Entrada a renderTravelComponents', {
+    hasTravel: !!travelData?.hasTravel,
+    placesCount: travelData?.places?.length || 0,
+    showMap: !!travelData?.showMap,
+    messageContainerClass: messageContainer?.className || null
+  });
 
   if (!travelData.hasTravel || !travelData.places || travelData.places.length === 0) {
     console.log('🗺️ No hay datos de viaje para renderizar');
@@ -659,6 +690,10 @@ function renderTravelComponents(messageContainer, travelData) {
     setTimeout(() => {
       const container = document.getElementById(mapId);
       console.log('🗺️ Buscando container:', mapId, '- Encontrado:', !!container);
+      debugTravelLog('H2', 'js/viajes.js:renderTravelComponents:map-container', 'Validacion de contenedor previo a createInlineChatMap', {
+        mapId,
+        foundContainer: !!container
+      });
       if (container) {
         createInlineChatMap(mapId, travelData.places);
 
